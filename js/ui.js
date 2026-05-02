@@ -618,9 +618,12 @@ function renderLearnTab() {
   const actEl = document.getElementById('learn-actions');
   actEl.innerHTML = acts.map(a => buildActionHTML(a)).join('');
   wireActions(actEl, acts, () => { updateAllUI(); renderLearnTab(); });
+  // Clear any previously appended classmate/teacher sections
+  document.querySelectorAll('.cm-section, .tch-section').forEach(el => el.remove());
 
   if (age >= 5 && age <= 18 && edu.classmates.length) {
     const cmSection = document.createElement('div');
+    cmSection.className = 'cm-section';
     cmSection.style.cssText = 'display:flex;flex-direction:column;gap:8px';
     cmSection.innerHTML = `
       <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
@@ -651,6 +654,7 @@ function renderLearnTab() {
 
     if (edu.teachers && edu.teachers.length) {
       const tchSection = document.createElement('div');
+      tchSection.className = 'tch-section';
       tchSection.style.cssText = 'display:flex;flex-direction:column;gap:8px';
       tchSection.innerHTML = `
         <div class="section-title">Teachers</div>
