@@ -1220,6 +1220,9 @@
 
       /* ── LIFE TAB LAYOUT ────────────────────────────────────── */
       #tab-life {
+        display: flex;
+        flex-direction: column;
+        height: calc(100dvh - 60px);
         overflow: hidden;
         padding: 60px 0 0;
       }
@@ -1230,11 +1233,11 @@
       #life-log-wrap {
         flex: 1;
         overflow-y: auto;
+        min-height: 0;
+        padding: 0 20px 12px;
         display: flex;
         flex-direction: column;
         gap: 8px;
-        padding: 0 20px 12px;
-        min-height: 0;
       }
       .life-log-title {
         font-size: 9px;
@@ -1259,7 +1262,7 @@
       }
       .life-log-divider::before,
       .life-log-divider::after {
-        content: '';
+        content: "";
         flex: 1;
         height: 1px;
         background: var(--border-light);
@@ -1287,7 +1290,10 @@
         font-size: 15px;
         flex-shrink: 0;
       }
-      .life-log-body { flex: 1; min-width: 0; }
+      .life-log-body {
+        flex: 1;
+        min-width: 0;
+      }
       .life-log-text {
         font-size: 13px;
         font-weight: 600;
@@ -1302,7 +1308,7 @@
       }
       #life-bottom {
         flex-shrink: 0;
-        padding: 12px 20px 90px;
+        padding: 12px 20px 100px;
         display: flex;
         flex-direction: column;
         gap: 10px;
@@ -1340,22 +1346,52 @@
       }
 
       /* ── STAT COLOURS ────────────────────────────────────────── */
-      .stat-card-fill[data-stat="health"] { background: #ef4444; }
-      .stat-card-fill[data-stat="happy"]  { background: #eab308; }
-      .stat-card-fill[data-stat="smarts"] { background: #3b82f6; }
-      .stat-card-fill[data-stat="looks"]  { background: #ec4899; }
-      .stat-card-fill[data-stat="rep"]    { background: #8b5cf6; }
+      .stat-card-fill[data-stat="health"] {
+        background: #ef4444;
+      }
+      .stat-card-fill[data-stat="happy"] {
+        background: #eab308;
+      }
+      .stat-card-fill[data-stat="smarts"] {
+        background: #3b82f6;
+      }
+      .stat-card-fill[data-stat="looks"] {
+        background: #ec4899;
+      }
+      .stat-card-fill[data-stat="rep"] {
+        background: #8b5cf6;
+      }
     </style>
   </head>
   <body>
     <!-- BIRTH SCREEN -->
     <div id="screen-birth" class="screen active">
       <div class="birth-scroll">
-        <div id="continue-banner" style="display:none;background:var(--surface);border:1px solid var(--border-light);border-radius:16px;padding:16px;margin-bottom:4px">
-          <div style="font-size:13px;font-weight:700;margin-bottom:10px">Continue your last life?</div>
-          <div style="display:flex;gap:8px">
-            <button class="birth-btn" style="flex:1" onclick="continueGame()">Continue →</button>
-            <button class="birth-btn secondary" style="flex:1" onclick="newGame()">New Life</button>
+        <div
+          id="continue-banner"
+          style="
+            display: none;
+            background: var(--surface);
+            border: 1px solid var(--border-light);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 4px;
+          "
+        >
+          <div style="font-size: 13px; font-weight: 700; margin-bottom: 10px">
+            Continue your last life?
+          </div>
+          <div style="display: flex; gap: 8px">
+            <button class="birth-btn" style="flex: 1" onclick="continueGame()">
+              Continue →
+            </button>
+            <button
+              class="birth-btn secondary"
+              style="flex: 1"
+              onclick="newGame()"
+            >
+              New Life
+            </button>
           </div>
         </div>
         <div class="birth-step active" id="step-deal">
@@ -1428,7 +1464,9 @@
     <!-- GAME SCREEN -->
     <div id="screen-game" class="screen">
       <header class="topbar">
-        <button class="topbar-btn" onclick="showToast('Settings coming soon!')"><span class="icon">settings</span></button>
+        <button class="topbar-btn" onclick="showToast('Settings coming soon!')">
+          <span class="icon">settings</span>
+        </button>
         <span class="topbar-title" id="game-topbar-title">Life Cards</span>
         <button class="topbar-nw" onclick="openFinanceSheet()">
           <span class="topbar-nw-label">Net Worth</span>
@@ -1436,7 +1474,7 @@
         </button>
       </header>
 
-      <div id="tab-life" class="scroll">
+      <div id="tab-life">
         <section id="profile">
           <div class="avatar-wrap">
             <svg viewBox="0 0 70 70">
@@ -1469,11 +1507,15 @@
         <div id="life-log-wrap">
           <div class="life-log-title">Life Log</div>
           <div id="activity-list">
-            <div class="activity-empty">Nothing yet. Your life is just beginning.</div>
+            <div class="activity-empty">
+              Nothing yet. Your life is just beginning.
+            </div>
           </div>
         </div>
         <div id="life-bottom">
-          <button id="age-up-btn">Age Up <span class="age-arrow">→</span></button>
+          <button id="age-up-btn">
+            Age Up <span class="age-arrow">→</span>
+          </button>
           <div class="stat-grid" id="stat-grid"></div>
         </div>
       </div>
@@ -1637,7 +1679,6 @@
     <script src="js/engine.js"></script>
     <script src="js/events.js"></script>
     <script src="js/actions.js"></script>
-
 
     <script src="js/ui.js"></script>
   </body>
