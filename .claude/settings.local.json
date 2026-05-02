@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(head -n 1522 \"/Users/isabellealff/Downloads/lifesim 2/index.html\")",
+      "Bash(printf '\\\\n    <script src=\"js/ui.js\"></script>\\\\n  </body>\\\\n</html>\\\\n')",
+      "Bash(mv /tmp/lifesim_tail.html \"/Users/isabellealff/Downloads/lifesim 2/index.html\")",
+      "Bash(node --input-type=module)",
+      "Bash(node -e \"try { require\\('/Users/isabellealff/Downloads/lifesim 2/js/events.js'\\) } catch\\(e\\) { console.log\\(e.message\\) }\")",
+      "Bash(node -e \"try { const f = require\\('fs'\\).readFileSync\\('/Users/isabellealff/Downloads/lifesim 2/js/events.js','utf8'\\); eval\\(f\\); console.log\\('EVENTS loaded OK, count:', EVENTS.length\\); } catch\\(e\\) { console.log\\('ERROR:', e.message\\); }\")",
+      "Bash(node -e ' *)"
+    ]
+  }
+}
