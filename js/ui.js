@@ -378,7 +378,7 @@ function buildPersonCard(person, role, rel, traitPool) {
   }).join('');
 
   const avatarContent = person.appearance
-    ? `<img src="${getAvatarUrl(person.appearance)}" width="52" height="52" style="width:52px;height:52px;object-fit:cover;display:block"/>`
+    ? `<img src="${getCharacterHTML(person.appearance, STATE.age, size)}" width="52" height="52" style="width:52px;height:52px;object-fit:cover;display:block"/>`
     : `<span style="font-size:26px">${person.emoji || '👤'}</span>`;
 
   const INTERACT_ACTIONS = [
