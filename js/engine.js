@@ -341,9 +341,10 @@ function buildRosterSnapshot() {
 
 function generateTeachers() {
   const subjects = ['English','Maths','Science','History','PE','Art','Music','Geography'];
-  return sampleN(subjects,3).map(sub => ({
+  const titles = ['Mr','Mrs','Miss'];
+  return sampleN(subjects,2).map(sub => ({
     id:         uid(),
-    firstName:  pickRandom([...NAMES_UK.male,...NAMES_UK.female]),
+    title:      pickRandom(titles),
     surname:    pickRandom(NAMES_UK.surnames),
     subject:    sub,
     emoji:      pickRandom(APPEARANCE_EMOJIS),

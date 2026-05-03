@@ -167,11 +167,13 @@ function switchTab(tab, el) {
   });
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   if (el) el.classList.add('active');
-  const titles = {
+  
+  const titleMap = {
     life:'Life Cards', family:'Relationships',
-    learn: STATE && STATE.age >= 18 ? 'Work' : 'Learn', activities:'Activities',
+    learn: STATE && STATE.age >= 18 ? 'Work' : 'Learn', activities:'Play',
   };
-  document.getElementById('game-topbar-title').textContent = titles[tab] || tab;
+  document.getElementById('game-topbar-title').textContent = titleMap[tab] || tab;
+  
   if (tab === 'family') renderFamilyTab();
   if (tab === 'learn')  renderLearnTab();
 }
@@ -568,115 +570,177 @@ function interactClassmate(cmId, action) {
   }
 }
 
-// ── LEARN / WORK TAB ──────────────────────────────────────
 function renderLearnTab() {
   const age = STATE.age, edu = STATE.school, isWork = age >= 18 && edu.level !== 'uni';
   const levelLabels = {
     pre:'Pre-School', primary:'Primary School', secondary:'Secondary School',
     college:'Sixth Form / College', uni:'University', finished_school:'School Complete',
   };
-  document.getElementById('learn-hero-label').textContent = isWork ? 'Career' : 'Education';
-  document.getElementById('learn-hero-val').textContent   = isWork ? STATE.career.job : (levelLabels[edu.level] || '—');
-  document.getElementById('learn-hero-sub').textContent   = isWork ? `${fmtMoney(STATE.finances.income)} / year` : (edu.current || '');
-  document.getElementById('learn-hero-val').style.cursor  = 'pointer';
-  document.getElementById('learn-hero-val').onclick       = isWork ? null : openSchoolSheet;
+  
 
-  const gradeWrap = document.getElementById('grade-block-wrap');
-  if (age >= 5 && age <= 18) {
-    const grade = gradeFromScore(edu.gradeScore);
-    gradeWrap.innerHTML = `
-      <div class="grade-block">
-        <div class="card-title" style="margin-bottom:8px">Current Grade</div>
-        <div class="grade-value" style="color:${gradeColor(grade)}">${grade}</div>
-        <div class="grade-bar-bg"><div class="grade-bar-fill" style="width:${edu.gradeScore}%;background:${gradeColor(grade)}"></div></div>
-        <div style="font-size:11px;color:var(--text-faint);margin-top:6px;font-family:var(--mono)">${edu.gradeScore}/100</div>
+  // Rebuild hero card entirely
+  const grade = (age >= 5 && age <= 18) ? gradeFromScore(edu.gradeScore) : null;
+  const hero = document.querySelector('#tab-learn .hub-hero');
+  const avgScore = edu.classmates.length
+    ? Math.round(edu.classmates.reduce((s, c) => s + c.gradeScore, 0) / edu.classmates.length)
+    : edu.gradeScore;
+  const avgGrade = gradeFromScore(avgScore);
+  const gradeAboveAvg = grade && edu.gradeScore >= avgScore;
+  const gradeBubbleColor = gradeAboveAvg ? '#16a34a' : '#dc2626';
+
+  if (!isWork && grade) {
+    const qualityMap = { lower:2, working:2, middle:3, upper_middle:4, elite:5 };
+    const quality = qualityMap[STATE.socialClass] || 2;
+    const isTarget = quality >= 4;
+    const qualityLabel = quality >= 4 ? 'High' : quality === 3 ? 'Average' : 'Low';
+    const stageLabels = {
+      pre:'Pre-School', primary:'Primary School', secondary:'Secondary School',
+      college:'Sixth Form / College', uni:'University',
+    };
+    const stageLabel = stageLabels[edu.level] || 'School';
+
+    // Colours per stage — only primary designed for now
+    const heroBg    = '#fef9c3'; // butter yellow
+    const heroIcon  = '#ca8a04'; // darker yellow
+    const heroText  = '#1a1814';
+    const heroBorder = '#fde047';
+
+    const gradeBubbleBg = gradeAboveAvg ? '#16a34a' : '#dc2626';
+
+    hero.style.background = heroBg;
+    hero.style.border = `1px solid ${heroBorder}`;
+    hero.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;gap:8px;flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:22px;color:${heroIcon}">🎒</span>
+            <span style="display:inline-block;background:rgba(0,0,0,0.08);border-radius:99px;padding:3px 10px;font-size:11px;font-weight:700;color:${heroText};opacity:.7">${stageLabel}</span>
+          </div>
+          <div style="font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1.2;color:${heroText}">${edu.current || '—'}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;margin-left:12px">
+          <div style="width:52px;height:52px;border-radius:50%;background:${gradeBubbleBg};display:flex;align-items:center;justify-content:center">
+            <span style="font-family:var(--mono);font-size:22px;font-weight:800;color:#fff">${grade}</span>
+          </div>
+          <span style="font-size:10px;font-weight:600;color:${heroText};opacity:.5">Your grade</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:0;margin-top:14px;padding-top:12px;border-top:1px solid rgba(0,0,0,0.08)">
+        <div style="flex:1;text-align:center">
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:${heroText};opacity:.45">Target School</div>
+          <div style="font-size:14px;font-weight:700;color:${heroText};margin-top:3px">${isTarget ? '✅ Yes' : '❌ No'}</div>
+        </div>
+        <div style="width:1px;background:rgba(0,0,0,0.08)"></div>
+        <div style="flex:1;text-align:center">
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:${heroText};opacity:.45">Teacher Quality</div>
+          <div style="font-size:14px;font-weight:700;color:${heroText};margin-top:3px">${qualityLabel}</div>
+        </div>
+        <div style="width:1px;background:rgba(0,0,0,0.08)"></div>
+        <div style="flex:1;text-align:center">
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:${heroText};opacity:.45">Class Average</div>
+          <div style="font-size:14px;font-weight:700;color:${heroText};margin-top:3px">${avgGrade}</div>
+        </div>
       </div>`;
   } else {
-    gradeWrap.innerHTML = '';
+    hero.style.background = '';
+    hero.style.border = '';
+    hero.innerHTML = `
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;opacity:.45;color:#fff">${isWork ? 'Career' : 'Education'}</div>
+      <div style="font-family:var(--mono);font-size:44px;font-weight:500;letter-spacing:-.03em;line-height:1;color:#fff">${isWork ? STATE.career.job : (levelLabels[edu.level] || '—')}</div>
+      <div style="font-size:12px;opacity:.45;color:#fff;margin-top:2px">${isWork ? fmtMoney(STATE.finances.income) + ' / year' : (edu.current || '')}</div>`;
   }
 
+  // Hide old grade block
+  document.getElementById('grade-block-wrap').innerHTML = '';
+
+  // Roster toggle
   const rosterWrap = document.getElementById('roster-toggle-wrap');
-  if (age >= 5 && age <= 18 && edu.classmates.length) {
-    rosterWrap.style.display = 'block';
-    renderRoster();
-  } else {
-    rosterWrap.style.display = 'none';
-  }
+  rosterWrap.style.display = (age >= 5 && age <= 18 && edu.classmates.length) ? 'block' : 'none';
 
-  if (edu.scholarshipOffered && !edu._scholarshipHandled) {
-    const banner = document.createElement('div');
-    banner.style.cssText = 'background:#fefce8;border:1px solid #fde047;border-radius:12px;padding:14px 16px;font-size:13px;font-weight:600;color:#854d0e;cursor:pointer';
-    banner.textContent = edu.scholarshipType === 'full'
-      ? '🏆 You\'ve been offered a scholarship to a top school! Tap to accept.'
-      : '⭐ A good school has offered you a place. Tap to find out more.';
-    banner.onclick = () => handleScholarshipOffer();
-    document.getElementById('learn-hero-sub').after(banner);
-  }
+  // Clear previous dynamic sections
+  document.querySelectorAll('.cm-section,.tch-section,.actions-section').forEach(el => el.remove());
 
-  document.getElementById('learn-section-title').textContent = isWork ? 'Career Options' : 'Education Options';
-  const acts  = isWork ? CAREER_ACTIONS : EDUCATION_ACTIONS;
-  const actEl = document.getElementById('learn-actions');
-  actEl.innerHTML = acts.map(a => buildActionHTML(a)).join('');
-  wireActions(actEl, acts, () => { updateAllUI(); renderLearnTab(); });
-  // Clear any previously appended classmate/teacher sections
-  document.querySelectorAll('.cm-section, .tch-section').forEach(el => el.remove());
+  document.getElementById('learn-section-title').style.display = 'none';
+  document.getElementById('learn-actions').innerHTML = '';
 
+  const container = document.getElementById('learn-actions').parentElement;
+
+  // ── ACTIONS BUTTON ────────────────────────────────────────
+  const acts = isWork ? CAREER_ACTIONS : EDUCATION_ACTIONS;
+  const actionsSection = document.createElement('div');
+  actionsSection.className = 'actions-section';
+  actionsSection.innerHTML = `
+    <button onclick="toggleLearnSection('actions-inner')"
+      style="width:100%;padding:13px 16px;background:var(--surface);border:1px solid var(--border-light);border-radius:14px;font-size:13px;font-weight:700;color:var(--text);display:flex;justify-content:space-between;align-items:center"
+      id="actions-toggle">
+      <span>⚡ Actions</span><span id="actions-arrow">›</span>
+    </button>
+    <div id="actions-inner" style="display:none;margin-top:8px">
+      <div class="action-list" id="learn-actions-inner">${acts.map(a => buildActionHTML(a)).join('')}</div>
+    </div>`;
+  container.appendChild(actionsSection);
+  wireActions(actionsSection.querySelector('#learn-actions-inner'), acts, () => { updateAllUI(); renderLearnTab(); });
+
+  // ── CLASSMATES BUTTON ─────────────────────────────────────
   if (age >= 5 && age <= 18 && edu.classmates.length) {
     const cmSection = document.createElement('div');
     cmSection.className = 'cm-section';
-    cmSection.style.cssText = 'display:flex;flex-direction:column;gap:8px';
     cmSection.innerHTML = `
-      <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
-        <span>Classmates</span>
-        <span style="font-family:var(--mono);font-size:11px;color:var(--text-faint)">${edu.classmates.length} students</span>
-      </div>
-      ${edu.classmates.map(c => `
-        <div style="background:var(--surface);border:1px solid var(--border-light);border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px">
-          <div style="font-size:24px;width:44px;height:44px;border-radius:12px;background:var(--surface-mid);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0">${c.emoji||'🧑'}</div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:14px;font-weight:700">${c.firstName} ${c.surname}</div>
-            <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
-              <span style="font-size:11px;color:var(--text-muted)">Grade</span>
-              <span style="font-size:12px;font-weight:800;color:${gradeColor(c.grade)}">${c.grade}</span>
-              <span style="font-size:11px;color:var(--text-faint)">·</span>
-              <span style="font-size:11px;color:var(--text-muted)">${c.status==='friend'?'🤝 Friend':'Classmate'}</span>
-            </div>
-            ${(c.traits||[]).slice(0,2).map(tid => {
-              const t = CLASSMATE_TRAITS_POOL.find(x => x.id === tid);
-              if (!t) return '';
-              const cls = t.positive===false?'negative':t.positive===true?'positive':'';
-              return `<span class="trait-pill ${cls}" style="margin-top:6px;display:inline-block">${t.label}</span>`;
-            }).join('')}
-          </div>
-          <button onclick="showToast('Interact — coming soon!')" style="width:32px;height:32px;border-radius:99px;background:var(--surface-mid);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--text-muted);cursor:pointer;flex-shrink:0">›</button>
-        </div>`).join('')}`;
-    actEl.after(cmSection);
-
-    if (edu.teachers && edu.teachers.length) {
-      const tchSection = document.createElement('div');
-      tchSection.className = 'tch-section';
-      tchSection.style.cssText = 'display:flex;flex-direction:column;gap:8px';
-      tchSection.innerHTML = `
-        <div class="section-title">Teachers</div>
-        ${edu.teachers.map(t => `
-          <div style="background:var(--surface);border:1px solid var(--border-light);border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px">
-            <div style="font-size:24px;width:44px;height:44px;border-radius:12px;background:var(--surface-mid);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0">${t.emoji||'👨‍🏫'}</div>
-            <div style="flex:1;min-width:0">
-              <div style="font-size:14px;font-weight:700">${t.firstName} ${t.surname}</div>
-              <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${t.subject}</div>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
-                <span style="font-size:11px;color:var(--text-faint)">Strictness</span>
-                <div style="flex:1;height:3px;background:var(--surface-mid);border-radius:99px;overflow:hidden;max-width:80px">
-                  <div style="width:${t.strictness}%;height:100%;background:var(--text);border-radius:99px"></div>
-                </div>
-                <span style="font-size:11px;font-family:var(--mono);color:var(--text-faint)">${t.strictness}%</span>
+      <button onclick="toggleLearnSection('cm-inner')"
+        style="width:100%;padding:13px 16px;background:var(--surface);border:1px solid var(--border-light);border-radius:14px;font-size:13px;font-weight:700;color:var(--text);display:flex;justify-content:space-between;align-items:center">
+        <span>👥 Classmates (${edu.classmates.length})</span><span id="cm-arrow">›</span>
+      </button>
+      <div id="cm-inner" style="display:none;margin-top:8px;display:flex;flex-direction:column;gap:8px">
+        ${edu.classmates.map(c => {
+          const traits = (c.traits||[]).slice(0,2).map(tid => {
+            const t = CLASSMATE_TRAITS_POOL.find(x => x.id === tid);
+            if (!t) return '';
+            const cls = t.positive===false?'negative':t.positive===true?'positive':'';
+            return `<span class="trait-pill ${cls}" style="font-size:10px;padding:3px 8px">${t.label}</span>`;
+          }).join('');
+          return `
+            <div style="background:var(--surface);border:1px solid var(--border-light);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px">
+              <div style="font-size:22px;width:40px;height:40px;border-radius:10px;background:var(--surface-mid);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0">${c.emoji||'🧑'}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:14px;font-weight:700">${c.firstName} ${c.surname}</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:1px">${c.status==='friend'?'🤝 Friend':'Classmate'}</div>
+                ${traits ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${traits}</div>` : ''}
               </div>
-            </div>
-            <button onclick="showToast('Talk to teacher — coming soon!')" style="width:32px;height:32px;border-radius:99px;background:var(--surface-mid);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--text-muted);cursor:pointer;flex-shrink:0">›</button>
-          </div>`).join('')}`;
-      cmSection.after(tchSection);
-    }
+            </div>`;
+        }).join('')}
+      </div>`;
+    cmSection.querySelector('#cm-inner').style.display = 'none';
+    container.appendChild(cmSection);
   }
+
+  // ── TEACHERS BUTTON ───────────────────────────────────────
+  if (edu.teachers && edu.teachers.length) {
+    const tchSection = document.createElement('div');
+    tchSection.className = 'tch-section';
+    tchSection.innerHTML = `
+      <button onclick="toggleLearnSection('tch-inner')"
+        style="width:100%;padding:13px 16px;background:var(--surface);border:1px solid var(--border-light);border-radius:14px;font-size:13px;font-weight:700;color:var(--text);display:flex;justify-content:space-between;align-items:center">
+        <span>👩‍🏫 Teachers</span><span id="tch-arrow">›</span>
+      </button>
+      <div id="tch-inner" style="display:none;margin-top:8px;flex-direction:column;gap:8px">
+        ${edu.teachers.map(t => `
+          <div style="background:var(--surface);border:1px solid var(--border-light);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px">
+            <div style="font-size:22px;width:40px;height:40px;border-radius:10px;background:var(--surface-mid);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0">${t.emoji||'👨‍🏫'}</div>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:700">${t.title} ${t.surname}</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${t.subject}</div>
+            </div>
+          </div>`).join('')}
+      </div>`;
+    tchSection.querySelector('#tch-inner').style.display = 'none';
+    container.appendChild(tchSection);
+  }
+}
+
+function toggleLearnSection(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'flex' : 'none';
 }
 
 let _rosterOpen = false;
@@ -718,7 +782,7 @@ function openSchoolSheet() {
   const teachers = (edu.teachers||[]).map(t => `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-light)">
       <div>
-        <div style="font-size:13px;font-weight:700">${t.firstName} ${t.surname}</div>
+       <div style="font-size:13px;font-weight:700">${t.title} ${t.surname}</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${t.subject}</div>
       </div>
       <div style="font-size:11px;font-family:var(--mono);color:var(--text-faint)">Strictness ${t.strictness}%</div>
