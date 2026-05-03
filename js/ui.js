@@ -194,7 +194,7 @@ function updateNavLearnLabel() {
 
 function updateLifeTab() {
   const stage = getStage(STATE.age);
-  document.getElementById('profile-avatar').innerHTML   = getAvatarImg(STATE.appearance, 56);
+  document.getElementById('profile-avatar').innerHTML = getCharacterHTML(STATE.appearance, STATE.age, 56);
   document.getElementById('profile-name').textContent   = STATE.fullName;
   document.getElementById('badge-age').textContent      = `Age ${STATE.age}`;
   document.getElementById('badge-stage').textContent    = stage.label;
