@@ -49,6 +49,21 @@ const SITUATION_TEXT = {
 };
 
 function initBirth() {
+  _birthData = null;
+  document.getElementById('deal-name').textContent = '—';
+  document.getElementById('deal-location').textContent = '—';
+  document.getElementById('deal-trait-1').innerHTML = '<div class="birth-card-kicker">Trait</div><div class="birth-card-value">???</div>';
+  document.getElementById('deal-trait-2').innerHTML = '<div class="birth-card-kicker">Trait</div><div class="birth-card-value">???</div>';
+  document.getElementById('deal-trait-3').innerHTML = '<div class="birth-card-kicker">Trait</div><div class="birth-card-value">???</div>';
+  document.getElementById('birth-start-actions').style.display = 'none';
+  document.getElementById('roll-life-btn').style.display = 'block';
+  document.getElementById('birth-deal-stack').classList.remove('has-life', 'is-rolling');
+
+  const banner = document.getElementById('continue-banner');
+  if (banner) banner.style.display = hasSavedGame() ? 'block' : 'none';
+}
+
+function createBirthData() {
   const gender     = Math.random() > 0.5 ? 'male' : 'female';
   const firstName  = pickRandom(NAMES_UK[gender]);
   const surname    = pickRandom(NAMES_UK.surnames);
@@ -60,6 +75,8 @@ function initBirth() {
   const sign       = getStarSign(day, month);
   const mumName    = pickRandom(NAMES_UK.female);
   const dadName    = pickRandom(NAMES_UK.male);
+  const mumJob     = pickRandom(PARENT_JOBS[scClass]);
+  const dadJob     = pickRandom(PARENT_JOBS[scClass]);
 
   const SITUATIONS = [
     { id:'happily_married',    weight:35 },
@@ -76,35 +93,62 @@ function initBirth() {
   ]).v;
   const siblings = Array.from({ length: numSiblings }, () => {
     const sg = Math.random() > 0.5 ? 'male' : 'female';
-    return { name: pickRandom(NAMES_UK[sg]), gender: sg };
+    const age = Math.floor(Math.random()*10) - 3;
+    let siblingType = 'full';
+    let familyStatus = null;
+    if (age < 0 && ['single_mum','single_dad','never_knew'].includes(situation)) {
+      siblingType = 'half';
+    }
+    if (age < 0 && situation === 'recently_divorced') {
+      siblingType = Math.random() < 0.5 ? 'full' : 'half';
+      if (siblingType === 'full') familyStatus = "It's complicated";
+    }
+    return { name: pickRandom(NAMES_UK[sg]), gender: sg, age, siblingType, familyStatus };
   });
 
   const hasPet    = Math.random() < 0.4;
   const petHint   = hasPet ? pickRandom([{ name:'a dog' }, { name:'a cat' }]) : null;
 
-  _birthData = { gender, firstName, surname, city, socialClass:scClass, traits,
-    birthday:{ day, month }, sign, mumName, dadName, situation, siblings, petHint };
+  return { gender, firstName, surname, city, socialClass:scClass, traits,
+    birthday:{ day, month }, sign, mumName, dadName, mumJob, dadJob, situation, siblings, petHint };
+}
 
-  const stage = LIFE_STAGES[0];
-  document.getElementById('deal-emoji').textContent    = stage.emoji;
-  document.getElementById('deal-name').textContent     = `${firstName} ${surname}`;
-  document.getElementById('deal-location').textContent = `${city.name}, ${city.region}`;
+function renderBirthDeal() {
+  const d = _birthData;
+  document.getElementById('deal-name').textContent     = `${d.firstName} ${d.surname}`;
+  document.getElementById('deal-location').textContent = d.city.region;
 
-  const sc = SOCIAL_CLASSES.find(c => c.id === scClass);
-  document.getElementById('deal-badges').innerHTML = `
-    <span class="badge badge-class">${sc.label}</span>
-    <span class="badge badge-sign">${sign.symbol} ${sign.sign}</span>
-    <span class="badge badge-age">${MONTHS[month-1].slice(0,3)} ${ordinal(day)}</span>`;
-
-  traits.forEach((tid, i) => {
-    const t = PLAYER_TRAITS_POOL.find(x => x.id === tid);
-    document.getElementById(`deal-trait-${i+1}`).innerHTML = `
-      <div class="trait-reveal-emoji">${t.emoji}</div>
-      <div><div class="trait-reveal-label">${t.label}</div><div class="trait-reveal-desc">${t.weights ? traitDesc(t) : ''}</div></div>`;
+  const revealedTrait = PLAYER_TRAITS_POOL.find(x => x.id === d.traits[0]);
+  document.getElementById('deal-trait-1').innerHTML = `
+    <div class="birth-card-kicker">Trait revealed</div>
+    <div class="birth-card-value">${revealedTrait.label}</div>`;
+  [2, 3].forEach(i => {
+    document.getElementById(`deal-trait-${i}`).innerHTML = `
+      <div class="birth-card-kicker">Trait locked</div>
+      <div class="birth-card-value">???</div>`;
   });
+  document.getElementById('birth-deal-stack').classList.add('has-life');
+  document.getElementById('birth-start-actions').style.display = 'grid';
+  document.getElementById('roll-life-btn').style.display = 'none';
+}
 
-  const banner = document.getElementById('continue-banner');
-  if (banner) banner.style.display = hasSavedGame() ? 'block' : 'none';
+function rollLife() {
+  const stack = document.getElementById('birth-deal-stack');
+  const btn = document.getElementById('roll-life-btn');
+  btn.disabled = true;
+  stack.classList.remove('has-life');
+  stack.classList.add('is-rolling');
+  document.getElementById('birth-start-actions').style.display = 'none';
+  setTimeout(() => {
+    _birthData = createBirthData();
+    renderBirthDeal();
+    stack.classList.remove('is-rolling');
+    btn.disabled = false;
+  }, 650);
+}
+
+function reshuffleLife() {
+  rollLife();
 }
 
 function traitDesc(t) {
@@ -115,43 +159,39 @@ function traitDesc(t) {
   ).join(' · ');
 }
 
-function goBirthStep(step) {
-  document.querySelectorAll('.birth-step').forEach(s => s.classList.remove('active'));
-  if (step === 'backstory') {
-    populateBackstory();
-    document.getElementById('step-backstory').classList.add('active');
+function buildBirthNarrative(d) {
+  const currentSiblings = d.siblings.filter(s => s.age >= 0);
+  const siblingText = currentSiblings.length === 0
+    ? 'You have no siblings'
+    : currentSiblings.length === 1
+      ? `You have one sibling, ${currentSiblings[0].name}`
+      : `You have ${currentSiblings.length} siblings: ${currentSiblings.map(s => s.name).join(', ')}`;
+  const petText = d.petHint ? `Your family has ${d.petHint.name}.` : 'Your family does not have a pet.';
+  let parentText = `Your mother is ${d.mumName}, a ${d.mumJob}, and your father is ${d.dadName}, a ${d.dadJob}.`;
+  if (d.situation === 'single_mum' || d.situation === 'never_knew') {
+    parentText = `Your mother is ${d.mumName}, a ${d.mumJob}.`;
+  } else if (d.situation === 'single_dad') {
+    parentText = `Your father is ${d.dadName}, a ${d.dadJob}.`;
   }
-}
-
-function populateBackstory() {
-  const d  = _birthData;
-  const sc = SOCIAL_CLASSES.find(c => c.id === d.socialClass);
-  const numWords = ['zero','one','two','three','four'];
-  const sibText = d.siblings.length === 0
-    ? `You have no siblings.`
-    : `You have ${numWords[d.siblings.length] ?? d.siblings.length} ${d.siblings.length === 1 ? 'sibling' : 'siblings'}.`;
-  const petText   = d.petHint ? ` Your family has ${d.petHint.name}.` : '';
-  const backstory = `You were born on the ${ordinal(d.birthday.day)} of ${MONTHS[d.birthday.month-1]} in ${d.city.name}, ${d.city.vibe}. ${SITUATION_TEXT[d.situation]()} ${sibText}${petText}`;
-  document.getElementById('bs-name').textContent = `${d.firstName} ${d.surname}`;
-  document.getElementById('bs-meta').innerHTML   = `
-    <span class="badge badge-class">${sc.label}</span>
-    <span class="badge badge-sign">${d.sign.symbol} ${d.sign.sign}</span>
-    <span class="badge badge-age">${d.city.name}</span>`;
-  document.getElementById('bs-text').textContent = backstory;
+  return `You were born on the ${ordinal(d.birthday.day)} of ${MONTHS[d.birthday.month-1]} in ${d.city.name}, ${d.city.region}. ${SITUATION_TEXT[d.situation]()} ${parentText} ${siblingText}. ${petText}`;
 }
 
 function startGame() {
+  if (!_birthData) {
+    rollLife();
+    return;
+  }
+  window._familySubTab = 'family';
+
   const d = _birthData;
   createNewLife({
     gender:d.gender, firstName:d.firstName, surname:d.surname,
     birthday:d.birthday, city:d.city, socialClass:d.socialClass,
     traits:d.traits, situation:d.situation,
-    mumName:d.mumName, dadName:d.dadName, siblings:d.siblings,
+    mumName:d.mumName, dadName:d.dadName, mumJob:d.mumJob, dadJob:d.dadJob, siblings:d.siblings,
   });
   STATE.starSign = d.sign;
-  const gText = d.gender === 'male' ? 'baby boy' : 'baby girl';
-  logActivity(`You were born in ${d.city.name}, ${d.city.region}. You are a ${gText}.`, null);
-  logActivity(`${d.situation === 'single_dad' ? 'Your father' : 'Your mother'} took you home from the hospital.`, null);
+  logActivity(buildBirthNarrative(d), null);
   document.getElementById('screen-birth').classList.remove('active');
   document.getElementById('screen-game').classList.add('active');
   updateAllUI();
@@ -159,6 +199,8 @@ function startGame() {
 
 // ── TAB SWITCHING ─────────────────────────────────────────
 let _currentTab = 'life';
+let _lastRenderedAvatarAge = null;
+let _lastRenderedAvatarStage = null;
 
 function switchTab(tab, el) {
   _currentTab = tab;
@@ -194,7 +236,14 @@ function updateNavLearnLabel() {
 
 function updateLifeTab() {
   const stage = getStage(STATE.age);
-  document.getElementById('profile-avatar').innerHTML = getCharacterHTML(STATE.appearance, STATE.age, 56);
+  const avatarEl = document.getElementById('profile-avatar');
+  const avatarStage = getStageKey(STATE.age, STATE.gender);
+  const spriteChanged = _lastRenderedAvatarStage !== null && _lastRenderedAvatarStage !== avatarStage;
+  if (spriteChanged) avatarEl.classList.add('is-aging');
+  avatarEl.innerHTML = getCharacterHTML(STATE.appearance, STATE.age, 56);
+  _lastRenderedAvatarAge = STATE.age;
+  _lastRenderedAvatarStage = avatarStage;
+  if (spriteChanged) setTimeout(() => avatarEl.classList.remove('is-aging'), 520);
   document.getElementById('profile-name').textContent   = STATE.fullName;
   document.getElementById('badge-age').textContent      = `Age ${STATE.age}`;
   document.getElementById('badge-stage').textContent    = stage.label;
@@ -208,23 +257,65 @@ function updateLifeTab() {
     C - Math.min((STATE.age - lo) / (hi - lo), 1) * C;
   renderStatGrid();
   renderActivityLog();
+  renderReputationPanel();
 }
 
 function renderStatGrid() {
   const grid = document.getElementById('stat-grid'), age = STATE.age, s = STATE.stats;
   const stats = [];
-  if (age >= 0) stats.push({ id:'health', emoji:'❤️', label:'Health',     val:s.health, hub:'health' });
-  if (age >= 0) stats.push({ id:'happy',  emoji:'😊', label:'Happiness',  val:s.happy,  hub:'happy'  });
-  if (age >= 0) stats.push({ id:'smarts', emoji:'🧠', label:'Smarts',     val:s.smarts, hub:'smarts' });
-  if (age >= 0) stats.push({ id:'looks',  emoji:'✨', label:'Looks',      val:s.looks,  hub:'looks'  });
-  if (age >= 13) stats.push({ id:'rep',   emoji:'⭐', label:'Reputation', val:s.rep,    hub:'rep'    });
-  grid.innerHTML = stats.map(st => `
-    <div class="stat-card" onclick="openStatSheet('${st.hub}')">
-      <div class="stat-card-top"><span class="stat-card-emoji">${st.emoji}</span><span class="stat-card-arrow">›</span></div>
-      <div class="stat-card-val">${st.val}</div>
-      <div class="stat-card-label">${st.label}</div>
-      <div class="stat-card-bar"><div class="stat-card-fill" data-stat="${st.id}" style="width:${clamp(st.val)}%"></div></div>
-    </div>`).join('');
+  if (age >= 0) stats.push({ id:'health', label:'Health',    val:s.health, hub:'health' });
+  if (age >= 0) stats.push({ id:'happy',  label:'Happiness', val:s.happy,  hub:'happy'  });
+  if (age >= 0) stats.push({ id:'smarts', label:'Smarts',    val:s.smarts, hub:'smarts' });
+  if (age >= 0) stats.push({ id:'looks',  label:'Looks',     val:s.looks,  hub:'looks'  });
+
+  const iconMap = {
+    health: { icon:'solar:heart-pulse-bold-duotone', bg:'#fee2e2', color:'#ef4444' },
+    happy: { icon:null, bg:'#fef9c3', color:'#eab308' },
+    smarts: { icon:null, bg:'#dbeafe', color:'#3b82f6' },
+    looks:  { icon:'solar:magic-stick-3-bold-duotone', bg:'#fce7f3', color:'#ec4899' },
+  };
+
+  grid.innerHTML = stats.map(st => {
+    const ic = iconMap[st.id];
+    return `
+      <div class="stat-card" onclick="openStatSheet('${st.hub}')">
+        <div class="stat-card-top">
+          <div style="width:36px;height:36px;border-radius:99px;background:${ic.bg};display:flex;align-items:center;justify-content:center">
+            ${ic.icon
+              ? `<iconify-icon icon="${ic.icon}" style="font-size:20px;color:${ic.color}"></iconify-icon>`
+              : st.id === 'smarts' ? '<span class="brain-icon"></span>'
+              : '<span class="happiness-icon"></span>'
+            }
+          </div>
+          <span class="stat-card-arrow">›</span>
+        </div>
+        <div class="stat-card-val">${st.val}</div>
+        <div class="stat-card-label">${st.label}</div>
+        <div class="stat-card-bar"><div class="stat-card-fill" data-stat="${st.id}" style="width:${clamp(st.val)}%"></div></div>
+      </div>`;
+  }).join('');
+}
+
+function repLabel(value) {
+  if (value <= -60) return 'Notorious';
+  if (value < -15) return 'Dubious';
+  if (value <= 15) return 'Neutral';
+  if (value < 60) return 'Respected';
+  return 'Honourable';
+}
+
+function renderReputationPanel() {
+  const panel = document.getElementById('reputation-panel');
+  if (!panel) return;
+  const rep = clamp(STATE.stats.rep || 0, -100, 100);
+  const markerBottom = ((rep + 100) / 200) * 100;
+  panel.innerHTML = `
+    <div class="honour-title">Reputation</div>
+    <div class="honour-track">
+      <div class="honour-marker" style="bottom:${markerBottom}%"></div>
+    </div>
+    <div class="honour-value">${rep > 0 ? '+' : ''}${rep}</div>
+    <div class="honour-label">${repLabel(rep)}</div>`;
 }
 
 function getActivityIcon(text) {
@@ -378,7 +469,7 @@ function buildPersonCard(person, role, rel, traitPool) {
   }).join('');
 
   const avatarContent = person.appearance
-    ? `<img src="${getCharacterHTML(person.appearance, STATE.age, size)}" width="52" height="52" style="width:52px;height:52px;object-fit:cover;display:block"/>`
+    ? getCharacterHTML(person.appearance, person.age || STATE.age, 52, { showBg:false })
     : `<span style="font-size:26px">${person.emoji || '👤'}</span>`;
 
   const INTERACT_ACTIONS = [
@@ -446,6 +537,22 @@ function buildEmptyState(emoji, title, subtitle) {
   </div>`;
 }
 
+function educationLevelForAge(age) {
+  if (age < 5) return 'Pre-school';
+  if (age < 12) return 'Primary school';
+  if (age < 17) return 'Secondary school';
+  if (age < 19) return 'Sixth form / college';
+  if (age < 22) return 'University age';
+  return 'Finished education';
+}
+
+function compatibilityFor(person) {
+  if (person.compatibility !== undefined) return person.compatibility;
+  const seed = `${person.firstName || ''}${person.surname || ''}${person.age || 0}`.split('')
+    .reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+  return 35 + (seed % 55);
+}
+
 function openPersonSheet(personId, role) {
   let person = null;
   if (personId === STATE.family.mum.id)
@@ -472,8 +579,27 @@ function openPersonSheet(personId, role) {
   }).join('');
 
   const avatarHTML = person.appearance
-    ? `<img src="${getAvatarUrl(person.appearance)}" width="70" height="70" style="border-radius:50%;display:block"/>`
+    ? getCharacterHTML(person.appearance, person.age || STATE.age, 70, { showBg:false })
     : `<span style="font-size:44px">${person.emoji || '👤'}</span>`;
+
+  const detailRows = [];
+  if (person.age !== undefined) detailRows.push(['Age', person.age]);
+  if (role === 'Mother' || role === 'Father') {
+    detailRows.push(['Job', person.job || 'None']);
+    detailRows.push(['Marital status', STATE.family.maritalStatus || maritalStatusForSituation(STATE.family.situation)]);
+  }
+  if (role === 'Brother' || role === 'Sister') {
+    detailRows.push(['Education', educationLevelForAge(person.age)]);
+    detailRows.push(['Sibling type', person.siblingType === 'half' ? 'Half sibling' : 'Full sibling']);
+    if (person.familyStatus) detailRows.push(['Family status', person.familyStatus]);
+  }
+  if (!person.isPet) detailRows.push(['Compatibility', `${compatibilityFor(person)}%`]);
+  const detailsHTML = detailRows.length ? `
+    <div class="detail-card">
+      ${detailRows.map(([label, value]) => `
+        <div class="detail-row"><span class="detail-label">${label}</span><span class="detail-val">${value}</span></div>
+      `).join('')}
+    </div>` : '';
 
   let actionsHTML = '';
   if (role === 'Mother' || role === 'Father') {
@@ -514,6 +640,7 @@ function openPersonSheet(personId, role) {
       </div>
     </div>
     ${person.gradeScore !== undefined ? `<div style="font-size:12px;color:var(--text-muted)">Grade: <strong style="color:${gradeColor(person.grade)}">${person.grade}</strong> · Compatibility: ${person.compatibility}%</div>` : ''}
+    ${detailsHTML}
     ${traitsHTML ? `<div class="trait-pills">${traitsHTML}</div>` : ''}
     ${actionsHTML}`;
 
@@ -614,7 +741,7 @@ function renderLearnTab() {
         <div style="display:flex;flex-direction:column;gap:8px;flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:8px">
             <span style="font-size:22px;color:${heroIcon}">🎒</span>
-            <span style="display:inline-block;background:rgba(0,0,0,0.08);border-radius:99px;padding:3px 10px;font-size:11px;font-weight:700;color:${heroText};opacity:.7">${stageLabel}</span>
+            <span style="display:inline-block;background:rgba(0,0,0,0.08);border-radius:99px;padding:3px 10px;font-size:11px;font-weight:700;color:${heroText};opacity:.7">${edu.current || stageLabel}</span>
           </div>
           <div style="font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1.2;color:${heroText}">${edu.current || '—'}</div>
         </div>
@@ -700,11 +827,17 @@ function renderLearnTab() {
           }).join('');
           return `
             <div style="background:var(--surface);border:1px solid var(--border-light);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px">
-              <div style="font-size:22px;width:40px;height:40px;border-radius:10px;background:var(--surface-mid);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0">${c.emoji||'🧑'}</div>
+              <div style="width:40px;height:40px;border-radius:50%;background:transparent;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden">${getCharacterHTML(c.appearance, STATE.age, 40, { showBg:false })}</div>
               <div style="flex:1;min-width:0">
                 <div style="font-size:14px;font-weight:700">${c.firstName} ${c.surname}</div>
                 <div style="font-size:11px;color:var(--text-muted);margin-top:1px">${c.status==='friend'?'🤝 Friend':'Classmate'}</div>
                 ${traits ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${traits}</div>` : ''}
+                <div style="display:flex;align-items:center;gap:8px;margin-top:7px">
+                  <div style="flex:1;height:4px;background:var(--surface-mid);border-radius:99px;overflow:hidden">
+                    <div style="width:${clamp(c.relationship)}%;height:100%;background:#22c55e;border-radius:99px"></div>
+                  </div>
+                  <span style="font-family:var(--mono);font-size:10px;color:var(--text-faint)">${c.relationship}%</span>
+                </div>
               </div>
             </div>`;
         }).join('')}
@@ -725,7 +858,7 @@ function renderLearnTab() {
       <div id="tch-inner" style="display:none;margin-top:8px;flex-direction:column;gap:8px">
         ${edu.teachers.map(t => `
           <div style="background:var(--surface);border:1px solid var(--border-light);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px">
-            <div style="font-size:22px;width:40px;height:40px;border-radius:10px;background:var(--surface-mid);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0">${t.emoji||'👨‍🏫'}</div>
+            <div style="width:40px;height:40px;border-radius:50%;background:transparent;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden">${getCharacterHTML(t.appearance, 35, 40, { showBg:false })}</div>
             <div style="flex:1">
               <div style="font-size:14px;font-weight:700">${t.title} ${t.surname}</div>
               <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${t.subject}</div>
@@ -757,7 +890,7 @@ function renderRoster() {
   document.getElementById('roster-list').innerHTML = snapshot.map((p, i) => `
     <div class="roster-row ${p.isPlayer ? 'is-player' : ''}">
       <div class="roster-rank">${i+1}</div>
-      <div class="roster-emoji">${p.emoji||'🧑'}</div>
+      <div class="roster-emoji" style="overflow:hidden;border-radius:50%;background:${p.isPlayer?'var(--surface-mid)':'transparent'}">${getCharacterHTML(p.appearance, STATE.age, 28, { showBg:!!p.isPlayer })}</div>
       <div class="roster-name">${p.firstName} ${p.surname}${p.isPlayer?' (you)':''}</div>
       <div class="roster-grade-bar"><div class="roster-grade-fill" style="width:${p.gradeScore}%;background:${gradeColor(p.grade)}"></div></div>
       <div class="roster-grade" style="color:${gradeColor(p.grade)}">${p.grade}</div>
@@ -777,7 +910,10 @@ function openSchoolSheet() {
   const quality  = qualityMap[STATE.socialClass] || 2;
   const stars    = '★'.repeat(quality) + '☆'.repeat(5-quality);
   const isTarget = quality >= 4;
-  const avgGrade = gradeFromScore(Math.max(20, edu.gradeScore - 10 + Math.floor(Math.random()*20)));
+  const avgScore = edu.classmates.length
+    ? Math.round(edu.classmates.reduce((s, c) => s + c.gradeScore, 0) / edu.classmates.length)
+    : edu.gradeScore;
+  const avgGrade = gradeFromScore(avgScore);
 
   const teachers = (edu.teachers||[]).map(t => `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-light)">
@@ -806,7 +942,7 @@ function openSchoolSheet() {
     <div style="display:flex;flex-direction:column;gap:8px">
       ${(edu.classmates||[]).slice(0,5).map(c => `
         <div style="background:var(--surface);border:1px solid var(--border-light);border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px">
-          <div style="font-size:22px">${c.emoji||'🧑'}</div>
+          <div style="width:34px;height:34px;border-radius:50%;overflow:hidden;background:transparent;border:1px solid var(--border);flex-shrink:0">${getCharacterHTML(c.appearance, STATE.age, 34, { showBg:false })}</div>
           <div style="flex:1">
             <div style="font-size:13px;font-weight:700">${c.firstName} ${c.surname}</div>
             <div style="font-size:11px;color:var(--text-muted);margin-top:1px">Grade: <strong style="color:${gradeColor(c.grade)}">${c.grade}</strong></div>
@@ -820,9 +956,13 @@ function openSchoolSheet() {
 // ── IDENTITY SHEET ────────────────────────────────────────
 function openIdentitySheet() {
   const s = STATE;
-  const traits = s.traits.map(tid => {
+  const revealedCount = Math.max(1, Math.min(3, s.revealedTraitCount || 1));
+  const traits = s.traits.map((tid, i) => {
     const t = PLAYER_TRAITS_POOL.find(x => x.id === tid);
-    return t ? `<span class="trait-pill player">${t.emoji} ${t.label}</span>` : '';
+    if (!t) return '';
+    return i < revealedCount
+      ? `<span class="trait-pill player">${t.emoji} ${t.label}</span>`
+      : `<span class="trait-pill">???</span>`;
   }).join('');
   document.getElementById('identity-inner').innerHTML = `
     <div class="identity-section">
@@ -1035,8 +1175,9 @@ function showOutcome(choice, totalDelta) {
     rel_family:'Family', rel_friends:'Friends', gradeScore:'Grades',
   };
   const effects = choice.effects || {};
+  const outcomeText = choice.getOutcome ? choice.getOutcome() : (choice.outcome || choice.log);
   document.getElementById('event-inner').innerHTML = `
-    <div class="outcome-text">${choice.outcome || choice.log}</div>
+    <div class="outcome-text">${outcomeText}</div>
     <div class="effects-row">${Object.entries(effects)
       .filter(([k]) => !['income','expenses'].includes(k))
       .map(([k,v]) => `<span class="effect-chip ${v>=0?'pos':'neg'}">${labels[k]||k} ${v>0?'+':''}${v}</span>`)

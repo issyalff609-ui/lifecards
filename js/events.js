@@ -122,9 +122,20 @@ const EVENTS = [
   text:'The envelope has been sitting on the kitchen table all morning. Your parents are watching.',
   choices:[
     { text:'Open it',
-      effects:{ smarts:+5, happy:+8, rep:+5 },
-      outcome:'You got in. A new chapter begins.',
-      log:'Got accepted to a private school' },
+      effects:{},
+      outcome:'You open the letter.',
+      log:'Heard back from the private school application',
+      onChoose: () => {
+        if (STATE.school._privateAccepted) {
+          applyEffects({ smarts:+5, happy:+8, rep:+5 });
+          STATE.school.current = pickRandom(SCHOOL_NAMES.private);
+        } else {
+          applyEffects({ happy:-4, smarts:+2 });
+        }
+      },
+      getOutcome: () => STATE.school._privateAccepted
+        ? 'You got in. A new chapter begins.'
+        : 'You did not get a place this time. It stings, but nothing stops here.' },
   ]},
 
 { id:'scholarship_result', category:'🏫 School', minAge:12, maxAge:12, type:'story',
@@ -134,9 +145,20 @@ const EVENTS = [
   text:'You applied for a scholarship last year. Today you find out if it worked.',
   choices:[
     { text:'Open the letter',
-      effects:{ smarts:+8, happy:+10, rep:+8, balance:+500 },
-      outcome:'You\'ve been awarded a full scholarship. Your family is overjoyed.',
-      log:'Won a scholarship to a private school' },
+      effects:{},
+      outcome:'You open the letter.',
+      log:'Heard back from the scholarship application',
+      onChoose: () => {
+        if (STATE.school._scholarshipWon) {
+          applyEffects({ smarts:+8, happy:+10, rep:+8, balance:+500 });
+          STATE.school.current = pickRandom(SCHOOL_NAMES.private);
+        } else {
+          applyEffects({ happy:-5, smarts:+2 });
+        }
+      },
+      getOutcome: () => STATE.school._scholarshipWon
+        ? 'You\'ve been awarded a full scholarship. Your family is overjoyed.'
+        : 'You did not win the scholarship. Your family is disappointed, but proud you tried.' },
   ]},
 
   

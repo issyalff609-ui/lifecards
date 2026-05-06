@@ -161,25 +161,30 @@ function createNewLife(opts) {
   const starSign   = getStarSign(birthday.day, birthday.month);
   const schoolType = SCHOOL_TYPES[socialClass] || SCHOOL_TYPES['working'];
 
-  const mumJob    = pickRandom(PARENT_JOBS[socialClass]);
-  const dadJob    = pickRandom(PARENT_JOBS[socialClass]);
+  const mumJob    = opts.mumJob || pickRandom(PARENT_JOBS[socialClass]);
+  const dadJob    = opts.dadJob || pickRandom(PARENT_JOBS[socialClass]);
   const mumTraits = sampleN(PARENT_TRAITS_POOL, 2).map(t => t.id);
   const dadTraits = sampleN(PARENT_TRAITS_POOL, 2).map(t => t.id);
+  const mumAppearance = generateAppearance('female');
+  const dadAppearance = generateAppearance('male');
+  const playerApp     = generateFamilyAppearance(gender, [mumAppearance, dadAppearance]);
 
-  const siblingObjects = (siblings||[]).map(s => ({
-    id:           uid(),
-    firstName:    s.name,
-    surname,
-    gender:       s.gender,
-    age:          Math.floor(Math.random()*10) - 3,
-    emoji:        pickRandom(APPEARANCE_EMOJIS),
-    relationship: Math.floor(Math.random()*30)+50,
-  }));
+
+  const siblingObjects = [];
+  const pendingSiblings = [];
+  (siblings||[]).forEach(s => {
+    const age = s.age !== undefined ? s.age : Math.floor(Math.random()*10) - 3;
+    if (age < 0) {
+      pendingSiblings.push({ ...s, dueAge: Math.abs(age), siblingType: s.siblingType || 'full', familyStatus: s.familyStatus || null });
+    } else {
+      siblingObjects.push(buildSiblingObject(s, surname, mumAppearance, dadAppearance, age));
+    }
+  });
 
   STATE = {
     gender, firstName, surname, fullName:`${firstName} ${surname}`,
     birthday, starSign, city, socialClass, socialClassLabel: sc.label,
-    traits, appearance: generateAppearance(gender),
+    traits, appearance: playerApp,
 
     age:      0,
     deathAge: Math.floor(Math.random()*20)+72,
@@ -187,9 +192,9 @@ function createNewLife(opts) {
     stats: {
       happy:  Math.floor(Math.random()*20)+55,
       health: Math.floor(Math.random()*20)+60,
-      smarts: traits.includes('intelligent') ? Math.floor(Math.random()*30)+70 : Math.floor(Math.random()*20)+40,
-      looks:  Math.floor(Math.random()*20)+40,
-      rep:    Math.floor(Math.random()*10)+45,
+      smarts: Math.floor(Math.random()*101),
+      looks:  Math.floor(Math.random()*101),
+      rep:    0,
     },
 
     finances: {
@@ -208,9 +213,11 @@ function createNewLife(opts) {
 
     family: {
       situation,
-      mum: { id:uid(), firstName:mumName, surname, gender:'female', age:Math.floor(Math.random()*10)+28, emoji:pickRandom(APPEARANCE_EMOJIS), job:mumJob, traits:mumTraits, relationship:70, alive:true },
-      dad: { id:uid(), firstName:dadName, surname, gender:'male',   age:Math.floor(Math.random()*10)+28, emoji:pickRandom(APPEARANCE_EMOJIS), job:dadJob, traits:dadTraits, relationship:65, alive:true },
+      maritalStatus: maritalStatusForSituation(situation),
+      mum: { id:uid(), firstName:mumName, surname, gender:'female', age:Math.floor(Math.random()*10)+28, emoji:pickRandom(APPEARANCE_EMOJIS), job:mumJob, traits:mumTraits, compatibility:Math.floor(Math.random()*35)+50, relationship:70, alive:true, appearance:mumAppearance },
+      dad: { id:uid(), firstName:dadName, surname, gender:'male',   age:Math.floor(Math.random()*10)+28, emoji:pickRandom(APPEARANCE_EMOJIS), job:dadJob, traits:dadTraits, compatibility:Math.floor(Math.random()*35)+45, relationship:65, alive:true, appearance:dadAppearance },
       siblings: siblingObjects,
+      pendingSiblings,
       pets: [],
     },
 
@@ -236,6 +243,7 @@ function createNewLife(opts) {
     pendingMilestone: null,
     annualGradeGain:  0,
     annualStudyCount: 0,
+    revealedTraitCount: 1,
   };
 
   return STATE;
@@ -252,6 +260,7 @@ function weightedRandom(items) {
   return items[items.length-1];
 }
 function clamp(v,lo=0,hi=100) { return Math.max(lo,Math.min(hi,v)); }
+function clampRep(v) { return Math.max(-100, Math.min(100, v)); }
 function fmtMoney(v) {
   if (v>=1000000) return `£${(v/1000000).toFixed(1)}m`;
   if (v>=1000)    return `£${(v/1000).toFixed(0)}k`;
@@ -261,13 +270,42 @@ function fmtMoney(v) {
 function getStage(age) { return LIFE_STAGES.find(s=>age<=s.maxAge); }
 function uid() { return Math.random().toString(36).slice(2,8); }
 
+function maritalStatusForSituation(situation) {
+  const map = {
+    happily_married: 'Married',
+    married_struggling: 'Married, struggling',
+    recently_divorced: 'Divorced / separated',
+    single_mum: 'Single parent',
+    single_dad: 'Single parent',
+    never_knew: 'Father unknown',
+  };
+  return map[situation] || 'Unknown';
+}
+
+function buildSiblingObject(s, surname, mumAppearance, dadAppearance, age) {
+  return {
+    id:           uid(),
+    firstName:    s.name,
+    surname,
+    gender:       s.gender,
+    age,
+    emoji:        pickRandom(APPEARANCE_EMOJIS),
+    appearance:   generateFamilyAppearance(s.gender, [mumAppearance, dadAppearance]),
+    traits:       sampleN(CLASSMATE_TRAITS_POOL, 2).map(t => t.id),
+    compatibility:Math.floor(Math.random()*45)+35,
+    siblingType:  s.siblingType || 'full',
+    familyStatus: s.familyStatus || null,
+    relationship: Math.floor(Math.random()*30)+50,
+  };
+}
+
 function applyEffects(effects) {
   if (!effects) return;
   Object.entries(effects).forEach(([k,v]) => {
     if      (k==='balance')     STATE.finances.balance     += v;
     else if (k==='income')      STATE.finances.income      += v;
     else if (k==='expenses')    STATE.finances.expenses    += v;
-    else if (k==='rep')         STATE.stats.rep             = clamp(STATE.stats.rep+v);
+    else if (k==='rep')         STATE.stats.rep             = clampRep((STATE.stats.rep||0)+v);
     else if (k==='gradeScore')  STATE.school.gradeScore     = clamp(STATE.school.gradeScore+v,0,100);
     else if (k==='rel_family')  STATE.relationships.family  = clamp(STATE.relationships.family+v);
     else if (k==='rel_friends') STATE.relationships.friends = clamp(STATE.relationships.friends+v);
@@ -283,9 +321,10 @@ function logActivity(text, delta) {
 
 // ── CLASSMATE GENERATION ──────────────────────────────────
 function generateClassmates(count=9) {
+  const avgTarget = schoolAverageTarget();
   return Array.from({length:count}, () => {
     const g          = Math.random()>0.5?'male':'female';
-    const gradeScore = Math.floor(Math.random()*70)+15;
+    const gradeScore = clamp(Math.round(avgTarget + Math.floor(Math.random()*31) - 15), 10, 98);
     const traits     = sampleN(CLASSMATE_TRAITS_POOL, 2).map(t=>t.id);
     return {
       id:            uid(),
@@ -293,6 +332,7 @@ function generateClassmates(count=9) {
       surname:       pickRandom(NAMES_UK.surnames),
       gender:        g,
       emoji:         pickRandom(APPEARANCE_EMOJIS),
+      appearance:    generateAppearance(g),
       gradeScore,
       grade:         gradeFromScore(gradeScore),
       smarts:        Math.floor(Math.random()*50)+30,
@@ -312,16 +352,24 @@ function transitionSchool(newLevel) {
   const newCount  = 9 - kept.length;
   STATE.school.classmates     = [...kept, ...generateClassmates(newCount)];
   STATE.school.level          = newLevel;
+  STATE.school.current        = pickSchoolName(STATE.socialClass, newLevel === 'college' ? 'college' : 'secondary');
   STATE.school.rosterSnapshot = buildRosterSnapshot();
   STATE.school.teachers       = generateTeachers();
 }
 
 function startPrimarySchool() {
   STATE.school.level          = 'primary';
-  STATE.school.current        = STATE.school.type.primary;
+  STATE.school.current        = pickSchoolName(STATE.socialClass, 'primary');
   STATE.school.classmates     = generateClassmates(9);
   STATE.school.rosterSnapshot = buildRosterSnapshot();
   STATE.school.teachers       = generateTeachers();
+}
+
+function schoolAverageTarget() {
+  const qualityMap = { lower:42, working:48, middle:58, upper_middle:70, elite:78 };
+  const base = qualityMap[STATE.socialClass] || 50;
+  const levelBoost = STATE.school.level === 'secondary' ? 3 : STATE.school.level === 'college' ? 6 : 0;
+  return clamp(base + levelBoost, 25, 90);
 }
 
 function buildRosterSnapshot() {
@@ -331,6 +379,7 @@ function buildRosterSnapshot() {
       id:         '__player__',
       firstName:  STATE.firstName,
       surname:    STATE.surname,
+      appearance:  STATE.appearance,
       gradeScore: STATE.school.gradeScore,
       grade:      gradeFromScore(STATE.school.gradeScore),
       isPlayer:   true,
@@ -342,14 +391,20 @@ function buildRosterSnapshot() {
 function generateTeachers() {
   const subjects = ['English','Maths','Science','History','PE','Art','Music','Geography'];
   const titles = ['Mr','Mrs','Miss'];
-  return sampleN(subjects,2).map(sub => ({
-    id:         uid(),
-    title:      pickRandom(titles),
-    surname:    pickRandom(NAMES_UK.surnames),
-    subject:    sub,
-    emoji:      pickRandom(APPEARANCE_EMOJIS),
-    strictness: Math.floor(Math.random()*80)+10,
-  }));
+  return sampleN(subjects,2).map(sub => {
+    const title = pickRandom(titles);
+    const gender = title === 'Mr' ? 'male' : 'female';
+    return {
+      id:         uid(),
+      title,
+      gender,
+      surname:    pickRandom(NAMES_UK.surnames),
+      subject:    sub,
+      emoji:      pickRandom(APPEARANCE_EMOJIS),
+      strictness: Math.floor(Math.random()*80)+10,
+      appearance: generateAppearance(gender),
+    };
+  });
 }
 
 // ── FRIENDSHIP SYSTEM ─────────────────────────────────────
@@ -421,6 +476,35 @@ function annualTick() {
   STATE.family.mum.age++;
   STATE.family.dad.age++;
 
+  const bornNow = [];
+  STATE.family.pendingSiblings = (STATE.family.pendingSiblings || []).filter(s => {
+    if (s.dueAge !== STATE.age) return true;
+    const sibling = buildSiblingObject(
+      s,
+      STATE.surname,
+      STATE.family.mum.appearance,
+      STATE.family.dad.appearance,
+      0
+    );
+    STATE.family.siblings.push(sibling);
+    if (s.familyStatus) STATE.family.maritalStatus = s.familyStatus;
+    bornNow.push(sibling);
+    return false;
+  });
+  bornNow.forEach(s => {
+    const type = s.siblingType === 'half' ? 'half-sibling' : 'sibling';
+    logActivity(`${s.firstName} was born. You have a new ${type}.`, null);
+  });
+
+  if (STATE.age === 8 && (STATE.revealedTraitCount || 1) < 2) {
+    STATE.revealedTraitCount = 2;
+    logActivity('You understood another part of yourself.', null);
+  }
+  if (STATE.age === 16 && (STATE.revealedTraitCount || 1) < 3) {
+    STATE.revealedTraitCount = 3;
+    logActivity('Your final hidden trait became clear.', null);
+  }
+
   checkScholarship();
 
   if (STATE.school.classmates.length) {
@@ -448,6 +532,7 @@ function checkScholarship() {
       STATE.school._scholarshipWon = Math.random() < 0.3;
     } else {
       STATE.school._privateAccepted = Math.random() < 0.6;
+      STATE.school._privateRejected = !STATE.school._privateAccepted;
     }
   }
 }
@@ -475,8 +560,8 @@ function pickEvent() {
     if (STATE.age < e.minAge || STATE.age > e.maxAge) return false;
     if (STATE.usedEvents.includes(e.id)) return false;
     if (e.id === 'private_school_offer' && !STATE.school._privateSchoolEligible) return false;
-    if (e.id === 'private_school_result' && (!STATE.school._privateAccepted || STATE.school._appliedScholarship)) return false;
-    if (e.id === 'scholarship_result' && !STATE.school._scholarshipWon) return false;
+    if (e.id === 'private_school_result' && (!STATE.school._appliedPrivate || STATE.school._appliedScholarship || !STATE.school._privateResolved)) return false;
+    if (e.id === 'scholarship_result' && (!STATE.school._appliedScholarship || !STATE.school._privateResolved)) return false;
     return true;
   });
 

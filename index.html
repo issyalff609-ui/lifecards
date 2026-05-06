@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <script src="https://code.iconify.design/iconify-icon/3.0.0/iconify-icon.min.js"></script>
     <meta charset="UTF-8" />
     <meta
       name="viewport"
@@ -237,6 +238,24 @@
       }
       .avatar-inner:hover {
         background: var(--surface-mid);
+      }
+      .character-avatar {
+        transition:
+          opacity 0.28s ease,
+          transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      .avatar-inner.is-aging .character-avatar {
+        animation: avatarAgeIn 0.48s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+      }
+      @keyframes avatarAgeIn {
+        from {
+          opacity: 0;
+          transform: scale(0.88) rotate(-3deg);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1) rotate(0);
+        }
       }
       .profile-info {
         flex: 1;
@@ -810,10 +829,10 @@
 
       .birth-scroll {
         flex: 1;
-        padding: 48px 24px 60px;
+        padding: 42px 24px 60px;
         display: flex;
         flex-direction: column;
-        gap: 24px;
+        gap: 22px;
         overflow-y: auto;
       }
       .birth-step {
@@ -826,7 +845,7 @@
         display: flex;
       }
       .birth-title {
-        font-size: 28px;
+        font-size: 30px;
         font-weight: 800;
         letter-spacing: -0.03em;
         line-height: 1.1;
@@ -857,6 +876,95 @@
         background: var(--surface);
         color: var(--text);
         border: 1.5px solid var(--border);
+      }
+      .birth-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .birth-roll-panel {
+        background: var(--surface);
+        border: 1px solid var(--border-light);
+        border-radius: 16px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .birth-deal-stack {
+        display: grid;
+        gap: 10px;
+      }
+      .birth-card {
+        background: var(--surface);
+        border: 1px solid var(--border-light);
+        border-radius: 16px;
+        padding: 18px;
+        box-shadow: 0 12px 30px rgba(26, 24, 20, 0.05);
+        transform-origin: center;
+      }
+      .birth-card.primary {
+        padding: 24px 20px;
+      }
+      .birth-card-kicker {
+        font-size: 9px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-faint);
+        margin-bottom: 8px;
+      }
+      .birth-card-value {
+        font-size: 24px;
+        font-weight: 900;
+        letter-spacing: -0.03em;
+        line-height: 1.1;
+      }
+      .birth-card-sub {
+        color: var(--text-muted);
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.4;
+        margin-top: 6px;
+      }
+      .birth-deal-stack.is-rolling .birth-card {
+        animation: shuffleCard 0.22s ease-in-out infinite alternate;
+      }
+      .birth-deal-stack.is-rolling .birth-card:nth-child(2) {
+        animation-delay: 0.05s;
+      }
+      .birth-deal-stack.is-rolling .birth-card:nth-child(3) {
+        animation-delay: 0.1s;
+      }
+      .birth-deal-stack.has-life .birth-card {
+        animation: dealIn 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+      }
+      .birth-deal-stack.has-life .birth-card:nth-child(2) {
+        animation-delay: 0.06s;
+      }
+      .birth-deal-stack.has-life .birth-card:nth-child(3) {
+        animation-delay: 0.12s;
+      }
+      .birth-deal-stack.has-life .birth-card:nth-child(4) {
+        animation-delay: 0.18s;
+      }
+      @keyframes shuffleCard {
+        from {
+          transform: translateX(-9px) rotate(-1.6deg);
+        }
+        to {
+          transform: translateX(9px) rotate(1.6deg);
+        }
+      }
+      @keyframes dealIn {
+        from {
+          opacity: 0;
+          transform: translateY(18px) scale(0.97);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
       }
       .trait-reveal-card {
         background: var(--surface);
@@ -1119,7 +1227,7 @@
         width: 70px;
         height: 70px;
         border-radius: 50%;
-        background: var(--surface-mid);
+        background: transparent;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1198,8 +1306,8 @@
       .person-avatar-sq {
         width: 56px;
         height: 56px;
-        border-radius: 14px;
-        background: var(--surface-mid);
+        border-radius: 50%;
+        background: transparent;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1235,10 +1343,85 @@
         flex: 1;
         overflow-y: auto;
         min-height: 0;
-        padding: 0 20px 12px;
+        padding: 0;
         display: flex;
         flex-direction: column;
         gap: 8px;
+      }
+      .life-main {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 82px;
+        gap: 10px;
+        padding: 0 20px 12px;
+      }
+      .honour-panel {
+        background: var(--surface);
+        border: 1px solid var(--border-light);
+        border-radius: 14px;
+        padding: 10px 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        min-height: 0;
+      }
+      .honour-title {
+        font-size: 8px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        color: var(--text-faint);
+      }
+      .honour-track {
+        position: relative;
+        flex: 1;
+        width: 12px;
+        min-height: 140px;
+        border-radius: 99px;
+        background: linear-gradient(to top, #7f1d1d 0%, #e5e7eb 50%, #14532d 100%);
+        border: 1px solid var(--border);
+      }
+      .honour-track::after {
+        content: "";
+        position: absolute;
+        left: -8px;
+        right: -8px;
+        top: 50%;
+        height: 1px;
+        background: rgba(26,24,20,.24);
+      }
+      .honour-marker {
+        position: absolute;
+        left: 50%;
+        width: 28px;
+        height: 8px;
+        border-radius: 99px;
+        background: var(--text);
+        border: 1px solid #fff;
+        transform: translate(-50%, 50%);
+        box-shadow: 0 2px 8px rgba(0,0,0,.18);
+      }
+      .honour-value {
+        font-family: var(--mono);
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .honour-label {
+        font-size: 9px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        color: var(--text-muted);
+      }
+      @media (max-width: 360px) {
+        .life-main {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .honour-panel {
+          display: none;
+        }
       }
       .life-log-title {
         font-size: 9px;
@@ -1363,6 +1546,23 @@
       .stat-card-fill[data-stat="rep"] {
         background: #8b5cf6;
       }
+          .brain-icon {
+  display:inline-block;
+  width:20px;
+  height:20px;
+  background-repeat:no-repeat;
+  background-size:100% 100%;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cg fill='none' fill-rule='evenodd' clip-rule='evenodd'%3E%3Cpath fill='%238fbffa' d='M6.375 1.744a2.618 2.618 0 0 0-4.596 1.982C.73 4.296 0 5.744 0 7.234c0 1.093.393 2.404 1.017 3.074a2.997 2.997 0 0 0 5.358 2.084zm1.25 10.648a2.997 2.997 0 0 0 5.358-2.084C13.606 9.638 14 8.328 14 7.234c0-1.49-.73-2.939-1.779-3.508a2.618 2.618 0 0 0-4.596-1.982z' stroke-width='0.5' stroke='%238fbffa'/%3E%3Cpath fill='%23446fcf' d='M7.625 6.548c.256.186.528.338.792.45a.625.625 0 1 0 .486-1.153c-.553-.233-1.062-.685-1.24-1.1l-.038-.074zm4.189-1.856c.18-.177.346-.555.41-.965c.393.215.742.553 1.024.972a2.55 2.55 0 0 1-.557.883a.625.625 0 1 1-.877-.89m1.153 5.607l.023.001l-.007.008a3 3 0 0 1-.154 1.234a3 3 0 0 1-.778-.183c-.595-.224-1.242-.665-1.773-1.436a.625.625 0 0 1 1.03-.709c.382.555.82.839 1.183.975c.184.07.348.1.476.11M6.375 6.307c-.017.205-.133.633-.4 1.023c-.265.385-.635.678-1.144.734a.625.625 0 0 0 .139 1.243a2.7 2.7 0 0 0 1.405-.585zM1.779 3.726c-.363.197-.688.5-.957.872c.11.213.242.4.384.562c.369.42.83.692 1.188.774a.625.625 0 0 0 .278-1.219c-.057-.013-.298-.119-.527-.38a1.56 1.56 0 0 1-.382-.89q0 .142.016.28Zm-.772 6.834q0 .225.032.443c.114-.35.3-.654.478-.794a.625.625 0 1 0-.775-.982a2 2 0 0 0-.259.245c.15.328.33.616.534.836q-.01.124-.01.252' stroke-width='0.5' stroke='%23446fcf'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+.happiness-icon {
+  display:inline-block;
+  width:20px;
+  height:20px;
+  background-repeat:no-repeat;
+  background-size:100% 100%;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fbde4b' d='M12 7.5c-2.21 0-4 1.79-4 4s1.79 4 4 4s4-1.79 4-4s-1.79-4-4-4' opacity='0.3' stroke-width='0.5' stroke='%23fbde4b'/%3E%3Cpath fill='%23fbde4b' d='m5.34 6.25l1.42-1.41l-1.8-1.79l-1.41 1.41zM1 10.5h3v2H1zM11 .55h2V3.5h-2zm7.66 5.705l-1.41-1.407l1.79-1.79l1.406 1.41zM17.24 18.16l1.79 1.8l1.41-1.41l-1.8-1.79zM20 10.5h3v2h-3zm-8-5c-3.31 0-6 2.69-6 6s2.69 6 6 6s6-2.69 6-6s-2.69-6-6-6m0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4s4 1.79 4 4s-1.79 4-4 4m-1 4h2v2.95h-2zm-7.45-.96l1.41 1.41l1.79-1.8l-1.41-1.41z' stroke-width='0.5' stroke='%23fbde4b'/%3E%3C/svg%3E");
+}
     </style>
   </head>
   <body>
@@ -1399,66 +1599,35 @@
         <div class="birth-step active" id="step-deal">
           <div>
             <div class="birth-title">
-              These are the cards you've been dealt.
+              Roll the dice. Randomise a life.
             </div>
             <div class="birth-sub" style="margin-top: 8px">
-              You didn't choose any of this. But it's yours.
+              See the first cards, then decide whether to begin or reshuffle.
             </div>
           </div>
-          <div
-            id="deal-card"
-            class="backstory-box"
-            style="text-align: center; padding: 32px 20px"
-          >
-            <div style="font-size: 48px" id="deal-emoji">👶</div>
-            <div
-              style="
-                font-size: 28px;
-                font-weight: 900;
-                letter-spacing: -0.02em;
-                margin-top: 12px;
-              "
-              id="deal-name"
-            >
-              —
+          <div class="birth-roll-panel">
+            <button class="birth-btn" id="roll-life-btn" onclick="rollLife()">
+              Roll Life
+            </button>
+            <div class="birth-deal-stack" id="birth-deal-stack">
+              <div id="deal-card" class="birth-card primary">
+                <div class="birth-card-kicker">Name</div>
+                <div class="birth-card-value" id="deal-name">—</div>
+                <div class="birth-card-sub">
+                  Country: <span id="deal-location">—</span>
+                </div>
+              </div>
+              <div class="birth-card" id="deal-trait-1"></div>
+              <div class="birth-card" id="deal-trait-2"></div>
+              <div class="birth-card" id="deal-trait-3"></div>
             </div>
-            <div
-              style="font-size: 13px; color: var(--text-muted); margin-top: 6px"
-              id="deal-location"
-            >
-              —
-            </div>
-            <div
-              style="
-                display: flex;
-                flex-wrap: wrap;
-                gap: 6px;
-                justify-content: center;
-                margin-top: 12px;
-              "
-              id="deal-badges"
-            ></div>
-          </div>
-          <div class="trait-reveal-card" id="deal-trait-1"></div>
-          <div class="trait-reveal-card" id="deal-trait-2"></div>
-          <div class="trait-reveal-card" id="deal-trait-3"></div>
-          <button class="birth-btn" onclick="goBirthStep('backstory')">
-            This is who I am →
-          </button>
-        </div>
-        <div class="birth-step" id="step-backstory">
-          <div>
-            <div class="birth-title">Your story so far.</div>
-            <div class="birth-sub" style="margin-top: 8px">
-              Before you could decide anything, life already started.
+            <div class="birth-actions" id="birth-start-actions" style="display:none">
+              <button class="birth-btn" onclick="startGame()">Begin</button>
+              <button class="birth-btn secondary" onclick="reshuffleLife()">
+                Reshuffle
+              </button>
             </div>
           </div>
-          <div class="backstory-box" id="backstory-card">
-            <div class="backstory-name" id="bs-name">—</div>
-            <div class="backstory-meta" id="bs-meta"></div>
-            <div class="backstory-text" id="bs-text">—</div>
-          </div>
-          <button class="birth-btn" onclick="startGame()">Begin →</button>
         </div>
       </div>
     </div>
@@ -1506,13 +1675,16 @@
             </div>
           </div>
         </section>
-        <div id="life-log-wrap">
-          <div class="life-log-title">Life Log</div>
-          <div id="activity-list">
-            <div class="activity-empty">
-              Nothing yet. Your life is just beginning.
+        <div class="life-main">
+          <div id="life-log-wrap">
+            <div class="life-log-title">Life Log</div>
+            <div id="activity-list">
+              <div class="activity-empty">
+                Nothing yet. Your life is just beginning.
+              </div>
             </div>
           </div>
+          <div class="honour-panel" id="reputation-panel"></div>
         </div>
         <div id="life-bottom">
           <button id="age-up-btn">
@@ -1660,7 +1832,6 @@
     </div>
     <div id="toast"></div>
 
-    <script src="data/appearance/avataaars.js"></script>
     <script src="data/names/uk.js"></script>
     <script src="data/places/uk.js"></script>
     <script src="data/starsigns.js"></script>

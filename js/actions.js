@@ -197,7 +197,7 @@ function buildActionHTML(action, extraClass='') {
     </div>`;
 }
 
-function wireActions(containerEl, actionList, onDone) {
+function wireActions(containerEl, actionList, onDone, petId) {
   containerEl.querySelectorAll('.action-card:not(.locked)').forEach(el => {
     const id = el.dataset.id;
     const action = actionList.find(a=>a.id===id);
@@ -205,7 +205,7 @@ function wireActions(containerEl, actionList, onDone) {
     el.onclick = () => {
       const check = isActionAvailable(action);
       if (!check.ok) { showToast(check.reason); return; }
-      doAction(action);
+      doAction(action, petId);
       showToast(`${action.name} ✓`);
       if (onDone) onDone();
     };
