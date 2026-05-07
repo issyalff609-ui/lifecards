@@ -181,6 +181,11 @@ function createNewLife(opts) {
     }
   });
 
+  const mum = { id:uid(), firstName:mumName, surname, gender:'female', age:Math.floor(Math.random()*10)+28, emoji:pickRandom(APPEARANCE_EMOJIS), job:mumJob, traits:mumTraits, compatibility:Math.floor(Math.random()*35)+50, relationship:70, alive:true, appearance:mumAppearance };
+  mum.npcStats = buildParentNpcStats(mum);
+  const dad = { id:uid(), firstName:dadName, surname, gender:'male',   age:Math.floor(Math.random()*10)+28, emoji:pickRandom(APPEARANCE_EMOJIS), job:dadJob, traits:dadTraits, compatibility:Math.floor(Math.random()*35)+45, relationship:65, alive:true, appearance:dadAppearance };
+  dad.npcStats = buildParentNpcStats(dad);
+
   STATE = {
     gender, firstName, surname, fullName:`${firstName} ${surname}`,
     birthday, starSign, city, socialClass, socialClassLabel: sc.label,
@@ -194,6 +199,7 @@ function createNewLife(opts) {
       health: Math.floor(Math.random()*20)+60,
       smarts: Math.floor(Math.random()*101),
       looks:  Math.floor(Math.random()*101),
+      popularity: Math.floor(Math.random()*45)+25,
       rep:    0,
     },
 
@@ -214,8 +220,9 @@ function createNewLife(opts) {
     family: {
       situation,
       maritalStatus: maritalStatusForSituation(situation),
-      mum: { id:uid(), firstName:mumName, surname, gender:'female', age:Math.floor(Math.random()*10)+28, emoji:pickRandom(APPEARANCE_EMOJIS), job:mumJob, traits:mumTraits, compatibility:Math.floor(Math.random()*35)+50, relationship:70, alive:true, appearance:mumAppearance },
-      dad: { id:uid(), firstName:dadName, surname, gender:'male',   age:Math.floor(Math.random()*10)+28, emoji:pickRandom(APPEARANCE_EMOJIS), job:dadJob, traits:dadTraits, compatibility:Math.floor(Math.random()*35)+45, relationship:65, alive:true, appearance:dadAppearance },
+      mum,
+      dad,
+      moneyRequests: { total:0, byParent:{} },
       siblings: siblingObjects,
       pendingSiblings,
       pets: [],
@@ -234,6 +241,9 @@ function createNewLife(opts) {
     },
 
     career: { job:'None', salary:0, level:0 },
+    sexuality: opts.sexuality || 'heterosexual',
+    sexualityConfirmed: false,
+    social: { bullyCount:0, isBully:false },
 
     usedEvents:       [],
     shownMilestones:  [],
@@ -246,6 +256,7 @@ function createNewLife(opts) {
     revealedTraitCount: 1,
   };
 
+  STATE.relationships.family = Math.round((STATE.family.mum.relationship + STATE.family.dad.relationship) / 2);
   return STATE;
 }
 
@@ -282,8 +293,141 @@ function maritalStatusForSituation(situation) {
   return map[situation] || 'Unknown';
 }
 
-function buildSiblingObject(s, surname, mumAppearance, dadAppearance, age) {
+function traitIsPositive(traitId, pool) {
+  const trait = pool.find(t => t.id === traitId);
+  return trait?.positive === true;
+}
+
+function traitIsNegative(traitId, pool) {
+  const trait = pool.find(t => t.id === traitId);
+  return trait?.positive === false;
+}
+
+function randomStat(min = 20, max = 85) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function buildParentNpcStats(parent) {
+  const traits = parent.traits || [];
+  let looks = randomStat(30, 80);
+  let smarts = randomStat(35, 80);
+  let warmth = randomStat(25, 80);
+  let generosity = randomStat(20, 75);
+
+  if (isHighPayingParentJob(parent.job)) generosity += 10;
+  if (['Teacher','University Lecturer','Doctor','Engineer','Architect','Accountant','Financial Advisor'].includes(parent.job)) smarts += 12;
+  if (traits.includes('supportive')) { warmth += 18; generosity += 12; }
+  if (traits.includes('kind')) { warmth += 16; generosity += 10; }
+  if (traits.includes('hardworking')) smarts += 8;
+  if (traits.includes('ambitious')) smarts += 10;
+  if (traits.includes('funny')) warmth += 8;
+  if (traits.includes('distant')) warmth -= 16;
+  if (traits.includes('absent')) warmth -= 24;
+  if (traits.includes('overbearing')) warmth -= 10;
+  if (traits.includes('strict')) warmth -= 8;
+
   return {
+    looks: clamp(looks),
+    smarts: clamp(smarts),
+    warmth: clamp(warmth),
+    generosity: clamp(generosity),
+  };
+}
+
+function buildSiblingNpcStats(sibling) {
+  const traits = sibling.traits || [];
+  let looks = randomStat(25, 80);
+  let smarts = randomStat(25, 80);
+  let warmth = randomStat(20, 80);
+  let trouble = randomStat(10, 70);
+
+  if (traits.includes('creative')) looks += 6;
+  if (traits.includes('ambitious')) smarts += 8;
+  if (traits.includes('supportive')) warmth += 14;
+  if (traits.includes('loyal')) warmth += 12;
+  if (traits.includes('funny')) warmth += 6;
+  if (traits.includes('dramatic')) trouble += 14;
+  if (traits.includes('manipulative')) trouble += 18;
+  if (traits.includes('jealous')) trouble += 12;
+  if (traits.includes('toxic')) trouble += 20;
+  if (traits.includes('flaky')) trouble += 8;
+  if (traits.includes('two_faced')) trouble += 16;
+
+  return {
+    looks: clamp(looks),
+    smarts: clamp(smarts),
+    warmth: clamp(warmth),
+    trouble: clamp(trouble),
+  };
+}
+
+function buildClassmateNpcStats(classmate) {
+  const traits = classmate.traits || [];
+  let popularity = clamp((classmate.socialStanding ?? randomStat(20, 80)) + Math.floor(Math.random() * 11) - 5);
+  let looks = randomStat(25, 85);
+  let smarts = clamp((classmate.gradeScore ?? 50) + Math.floor(Math.random() * 25) - 12);
+  let reputation = randomStat(20, 75);
+
+  if (traits.includes('charismatic')) popularity += 0;
+  if (traits.includes('creative')) looks += 6;
+  if (traits.includes('ambitious')) smarts += 8;
+  if (traits.includes('supportive')) reputation += 10;
+  if (traits.includes('loyal')) reputation += 10;
+  if (traits.includes('funny')) popularity += 8;
+  if (traits.includes('jealous')) reputation -= 10;
+  if (traits.includes('manipulative')) reputation -= 14;
+  if (traits.includes('dramatic')) reputation -= 8;
+  if (traits.includes('two_faced')) reputation -= 16;
+  if (traits.includes('toxic')) reputation -= 18;
+  if (traits.includes('flaky')) popularity -= 8;
+
+  return {
+    popularity: clamp(popularity),
+    looks: clamp(looks),
+    smarts: clamp(smarts),
+    reputation: clamp(reputation),
+  };
+}
+
+function buildTeacherNpcStats(teacher) {
+  let looks = randomStat(25, 75);
+  let smarts = randomStat(65, 95);
+  let warmth = randomStat(25, 80);
+  let strictness = clamp(teacher.strictness ?? randomStat(20, 85));
+
+  if (teacher.subject === 'Art' || teacher.subject === 'Music') warmth += 4;
+  if (teacher.subject === 'Maths' || teacher.subject === 'Science') smarts += 4;
+  if (strictness >= 70) warmth -= 10;
+
+  return {
+    looks: clamp(looks),
+    smarts: clamp(smarts),
+    warmth: clamp(warmth),
+    strictness: clamp(strictness),
+  };
+}
+
+function playerLikesGender(gender) {
+  if (STATE.sexuality === 'bisexual') return true;
+  if (STATE.sexuality === 'heterosexual') return STATE.gender !== gender;
+  if (STATE.sexuality === 'homosexual') return STATE.gender === gender;
+  return true;
+}
+
+function isClassmateCrush(classmate) {
+  if (!classmate?.npcStats) return false;
+  return playerLikesGender(classmate.gender)
+    && classmate.npcStats.looks >= 70
+    && classmate.compatibility >= 70;
+}
+
+function classmateDisplayName(classmate) {
+  const fullName = `${classmate.firstName} ${classmate.surname}`;
+  return isClassmateCrush(classmate) ? `💗 ${fullName} (crush) 💗` : fullName;
+}
+
+function buildSiblingObject(s, surname, mumAppearance, dadAppearance, age) {
+  const sibling = {
     id:           uid(),
     firstName:    s.name,
     surname,
@@ -295,8 +439,11 @@ function buildSiblingObject(s, surname, mumAppearance, dadAppearance, age) {
     compatibility:Math.floor(Math.random()*45)+35,
     siblingType:  s.siblingType || 'full',
     familyStatus: s.familyStatus || null,
+    hasKids:      s.hasKids ?? (age >= 22 ? Math.random() < 0.35 : false),
     relationship: Math.floor(Math.random()*30)+50,
   };
+  sibling.npcStats = buildSiblingNpcStats(sibling);
+  return sibling;
 }
 
 function applyEffects(effects) {
@@ -307,7 +454,11 @@ function applyEffects(effects) {
     else if (k==='expenses')    STATE.finances.expenses    += v;
     else if (k==='rep')         STATE.stats.rep             = clampRep((STATE.stats.rep||0)+v);
     else if (k==='gradeScore')  STATE.school.gradeScore     = clamp(STATE.school.gradeScore+v,0,100);
-    else if (k==='rel_family')  STATE.relationships.family  = clamp(STATE.relationships.family+v);
+    else if (k==='rel_family') {
+      if (STATE.family?.mum?.alive) STATE.family.mum.relationship = clamp((STATE.family.mum.relationship ?? 60) + v);
+      if (STATE.family?.dad?.alive) STATE.family.dad.relationship = clamp((STATE.family.dad.relationship ?? 60) + v);
+      syncSharedFamilyRelationshipFromParents();
+    }
     else if (k==='rel_friends') STATE.relationships.friends = clamp(STATE.relationships.friends+v);
     else if (k==='rel_partner') STATE.relationships.partner = clamp(STATE.relationships.partner+v);
     else if (STATE.stats[k]!==undefined) STATE.stats[k]    = clamp(STATE.stats[k]+v);
@@ -319,6 +470,404 @@ function logActivity(text, delta) {
   if (STATE.activity.length > 50) STATE.activity.pop();
 }
 
+// ── FAMILY ACTIONS ──────────────────────────────────
+
+function getParentById(personId) {
+  if (personId === STATE.family.mum?.id) return STATE.family.mum;
+  if (personId === STATE.family.dad?.id) return STATE.family.dad;
+  return null;
+}
+
+function getSiblingById(personId) {
+  return STATE.family.siblings.find(s => s.id === personId) || null;
+}
+
+function syncSharedFamilyRelationshipFromParents() {
+  const parents = [STATE.family?.mum, STATE.family?.dad].filter(Boolean).filter(p => p.alive !== false);
+  if (!parents.length) return;
+  STATE.relationships.family = clamp(Math.round(
+    parents.reduce((sum, p) => sum + (p.relationship ?? 60), 0) / parents.length
+  ));
+}
+
+function applyTargetedParentEffects(effects, person) {
+  if (!effects) return 0;
+  const passthrough = {};
+  let delta = 0;
+  Object.entries(effects).forEach(([k, v]) => {
+    if (k === 'rel_family') {
+      person.relationship = clamp((person.relationship ?? 60) + v);
+      delta += v;
+    } else {
+      passthrough[k] = v;
+      delta += v;
+    }
+  });
+  applyEffects(passthrough);
+  syncSharedFamilyRelationshipFromParents();
+  return delta;
+}
+
+function applyTargetedSiblingEffects(effects, person) {
+  if (!effects) return 0;
+  const passthrough = {};
+  let delta = 0;
+  Object.entries(effects).forEach(([k, v]) => {
+    if (k === 'rel_sibling') {
+      person.relationship = clamp((person.relationship ?? 60) + v);
+      delta += v;
+    } else {
+      passthrough[k] = v;
+      delta += v;
+    }
+  });
+  applyEffects(passthrough);
+  return delta;
+}
+
+function parentNoun(role) {
+  return role === 'Mother' ? 'mother' : 'father';
+}
+
+function isHighPayingParentJob(job) {
+  return PARENT_JOBS.upper_middle.includes(job) || PARENT_JOBS.elite.includes(job);
+}
+
+function diaryPlaceholderFor(actionId, role, variant='success') {
+  const parent = parentNoun(role);
+  const placeholders = {
+    cuddle: {
+      success: [
+        `PLACEHOLDER: I cuddled with my ${parent} for x minutes.`,
+        `PLACEHOLDER: My ${parent} would not let go of me.`,
+        `PLACEHOLDER: I snuggled with my ${parent}.`,
+      ],
+    },
+    play_together: {
+      success: [
+        `PLACEHOLDER: I played with my ${parent} today.`,
+        `PLACEHOLDER: My ${parent} made time to play with me.`,
+        `PLACEHOLDER: I laughed and played with my ${parent}.`,
+      ],
+    },
+    throw_tantrum: {
+      success: [
+        `PLACEHOLDER: I threw a tantrum at my ${parent}.`,
+        `PLACEHOLDER: My ${parent} had to deal with one of my meltdowns.`,
+        `PLACEHOLDER: I made life hard for my ${parent} today.`,
+      ],
+    },
+    learn_from_parent: {
+      success: [
+        `PLACEHOLDER: My ${parent} taught me something new today.`,
+        `PLACEHOLDER: I learned something from my ${parent}.`,
+        `PLACEHOLDER: My ${parent} showed me how something worked.`,
+      ],
+      busy: [
+        `PLACEHOLDER: My ${parent} was too busy to teach me anything today.`,
+      ],
+      distant: [
+        `PLACEHOLDER: My ${parent} felt too distant to teach me anything today.`,
+      ],
+      absent: [
+        `PLACEHOLDER: My ${parent} was not around to teach me anything today.`,
+      ],
+    },
+    ask_for_money_young_adult: {
+      success_easy: [
+        `My ${parent} did not ask any questions and gave me the money.`,
+      ],
+      success: [
+        `My ${parent} gave me the money after I asked.`,
+      ],
+      deny_too_much: [
+        `My ${parent} said that was way too much money and called me irresponsible.`,
+      ],
+      deny_repeat: [
+        `My ${parent} said no and demanded to know what I wanted the money for.`,
+      ],
+      deny_generic: [
+        `My ${parent} said no when I asked for money.`,
+      ],
+    },
+  };
+  const pool = placeholders[actionId]?.[variant] || [`PLACEHOLDER: Something happened with my ${parent}.`];
+  return pickRandom(pool);
+}
+
+function runParentRelationshipAction(action, person, role) {
+  if (!person) return { ok:false };
+
+  if (action.id === 'ask_for_money_young_adult') {
+    openMoneyRequestOverlay(person.id, role);
+    return { ok:true, skipRefresh:true, skipToast:true };
+  }
+
+  if (action.customType === 'coming_soon_parent_action') {
+    return { ok:true, toast:'COMING SOON' };
+  }
+
+  if (action.customType === 'parent_learn') {
+    const traits = person.traits || [];
+    if (traits.includes('absent') && Math.random() < 0.85) {
+      logActivity(diaryPlaceholderFor(action.id, role, 'absent'), 0);
+      return { ok:true, toast:`${person.firstName} was not around.` };
+    }
+    if (traits.includes('distant') && Math.random() < 0.65) {
+      logActivity(diaryPlaceholderFor(action.id, role, 'distant'), 0);
+      return { ok:true, toast:`${person.firstName} kept their distance.` };
+    }
+
+    let busyChance = isHighPayingParentJob(person.job) ? 0.45 : 0.1;
+    if (traits.includes('hardworking')) busyChance += 0.15;
+    if (traits.includes('supportive'))  busyChance -= 0.1;
+    if (traits.includes('kind'))        busyChance -= 0.05;
+    busyChance = Math.max(0, Math.min(0.9, busyChance));
+
+    if (Math.random() < busyChance) {
+      logActivity(diaryPlaceholderFor(action.id, role, 'busy'), 0);
+      return { ok:true, toast:`${person.firstName} was too busy.` };
+    }
+
+    let smartsGain = 1 + Math.floor(Math.random() * 3);
+    if (traits.includes('supportive'))  smartsGain += 1;
+    if (traits.includes('kind'))        smartsGain += 1;
+    if (traits.includes('ambitious'))   smartsGain += 1;
+    if (traits.includes('strict'))      smartsGain += 1;
+    if (traits.includes('hardworking')) smartsGain += 1;
+
+    const teachingJobs = new Set([
+      'Teacher',
+      'University Lecturer',
+      'Doctor',
+      'Nurse',
+      'Engineer',
+      'Architect',
+      'Accountant',
+      'Financial Advisor',
+      'Social Worker',
+      'Police Officer',
+    ]);
+    if (teachingJobs.has(person.job)) smartsGain += 1;
+
+    smartsGain = clamp(smartsGain, 1, 5);
+    const effects = { smarts: smartsGain };
+    applyEffects(effects);
+    logActivity(diaryPlaceholderFor(action.id, role, 'success'), smartsGain);
+    return { ok:true, toast:`Learned something with ${person.firstName} ✓` };
+  }
+
+  const delta = applyTargetedParentEffects(action.effects || {}, person);
+  logActivity(diaryPlaceholderFor(action.id, role, 'success'), delta);
+  return { ok:true, toast:`${action.name} with ${person.firstName} ✓` };
+}
+
+function runSiblingRelationshipAction(action, person, role) {
+  if (!person) return { ok:false };
+  if (action.customType === 'sibling_help_kids' && !person.hasKids) {
+    return { ok:false };
+  }
+  const delta = applyTargetedSiblingEffects(action.effects || {}, person);
+  logActivity(`${action.name} with ${person.firstName}`, delta);
+  return { ok:true, toast:`${action.name} with ${person.firstName} ✓` };
+}
+
+function applyTargetedClassmateEffects(effects, person) {
+  if (!effects) return 0;
+  const passthrough = {};
+  let delta = 0;
+  Object.entries(effects).forEach(([k, v]) => {
+    if (k === 'rel_classmate') {
+      person.relationship = clamp((person.relationship ?? 0) + v);
+      delta += v;
+    } else {
+      passthrough[k] = v;
+      delta += v;
+    }
+  });
+  applyEffects(passthrough);
+  return delta;
+}
+
+function markPlayerAsBully(reason, person) {
+  STATE.social.bullyCount = (STATE.social.bullyCount || 0) + 1;
+  if (!STATE.social.isBully && STATE.social.bullyCount >= 2) {
+    STATE.social.isBully = true;
+    applyEffects({ rep:-10 });
+    logActivity(`You became known as a bully after ${reason} ${person.firstName}.`, -10);
+  }
+}
+
+function runClassmateConversation(person) {
+  const goodChance = 0.45 + (person.compatibility / 200) + ((STATE.stats.popularity || 0) / 300);
+  if (Math.random() < goodChance) {
+    const delta = applyTargetedClassmateEffects({ happy:+2, rel_classmate:+4, popularity:+1 }, person);
+    logActivity(`Had a good conversation with ${person.firstName}.`, delta);
+    return { ok:true, toast:`Good conversation with ${person.firstName} ✓` };
+  }
+  const delta = applyTargetedClassmateEffects({ happy:-1, rel_classmate:-2 }, person);
+  logActivity(`A conversation with ${person.firstName} went badly.`, delta);
+  return { ok:true, toast:`That went badly with ${person.firstName}.` };
+}
+
+function runClassmateFlirt(person) {
+  const crushBonus = isClassmateCrush(person) ? 15 : 0;
+  const chance = clamp(35 + Math.floor(person.compatibility / 3) + Math.floor((STATE.stats.looks || 0) / 6) + crushBonus, 5, 95);
+  if (Math.random() * 100 < chance) {
+    const delta = applyTargetedClassmateEffects({ happy:+5, rel_classmate:+5, popularity:+1 }, person);
+    logActivity(`Flirted with ${person.firstName} and it landed well.`, delta);
+    return { ok:true, toast:`Flirted with ${person.firstName} ✓` };
+  }
+  const delta = applyTargetedClassmateEffects({ happy:-2, rel_classmate:-3, rep:-1 }, person);
+  logActivity(`Flirted with ${person.firstName} and it got awkward.`, delta);
+  return { ok:true, toast:`That got awkward with ${person.firstName}.` };
+}
+
+function runClassmateRelationshipAction(action, person, role) {
+  if (!person) return { ok:false };
+  if (action.customType === 'classmate_friend_request') {
+    return tryMakeFriend(person);
+  }
+  if (action.customType === 'classmate_conversation') {
+    return runClassmateConversation(person);
+  }
+  if (action.customType === 'classmate_flirt') {
+    return runClassmateFlirt(person);
+  }
+  const delta = applyTargetedClassmateEffects(action.effects || {}, person);
+  if (action.customType === 'classmate_insult') {
+    markPlayerAsBully('insulting', person);
+  }
+  if (action.customType === 'classmate_rumour') {
+    markPlayerAsBully('spreading rumours about', person);
+  }
+  logActivity(`${action.name} with ${person.firstName}`, delta);
+  return { ok:true, toast:`${action.name} with ${person.firstName} ✓` };
+}
+
+function getAvailableActions(role, age = STATE.age, person = null) {
+  const actionList = (role === 'Mother' || role === 'Father')
+    ? PARENT_RELATIONSHIP_ACTIONS
+    : (role === 'Brother' || role === 'Sister')
+      ? SIBLING_RELATIONSHIP_ACTIONS
+      : (role === 'Friend' || role === 'classmate')
+        ? CLASSMATE_RELATIONSHIP_ACTIONS
+        : [];
+  return actionList.filter(a => {
+    const minAge = a.minAge ?? 0;
+    const maxAge = a.maxAge ?? Infinity;
+    if (!(minAge <= age && age <= maxAge)) return false;
+    if (a.customType === 'sibling_help_kids' && !(person?.hasKids)) return false;
+    if (a.customType === 'classmate_friend_request' && person?.status === 'friend') return false;
+    return true;
+  });
+}
+
+function triggerAction(actionId, personId, role) {
+  const person = (role === 'Mother' || role === 'Father')
+    ? getParentById(personId)
+    : (role === 'Brother' || role === 'Sister')
+      ? getSiblingById(personId)
+      : (role === 'Friend' || role === 'classmate')
+        ? STATE.school.classmates.find(c => c.id === personId) || null
+        : null;
+  const action = getAvailableActions(role, STATE.age, person).find(a => a.id === actionId);
+  if (!action) return;
+
+  const minAge = action.minAge ?? 0;
+  const maxAge = action.maxAge ?? Infinity;
+  if (STATE.age < minAge || STATE.age > maxAge) {
+    console.warn(`Action ${actionId} not available at age ${STATE.age}`);
+    return;
+  }
+
+  const result = (role === 'Mother' || role === 'Father')
+    ? runParentRelationshipAction(action, person, role)
+    : (role === 'Brother' || role === 'Sister')
+      ? runSiblingRelationshipAction(action, person, role)
+      : runClassmateRelationshipAction(action, person, role);
+  if (!result.ok) return;
+  if (!result.skipRefresh) {
+    updateAllUI();
+    renderFamilyTab();
+  }
+  if (!result.skipToast) {
+    showToast(result.toast || `${action.name} ✓`);
+  }
+}
+
+function requestMoneyFromParent(personId, role, amount) {
+  const person = getParentById(personId);
+  if (!person) return { ok:false, message:'Parent not found.' };
+
+  const roundedAmount = Math.max(0, Math.min(10000, Math.round(Number(amount) || 0)));
+  const moneyRequests = STATE.family.moneyRequests || (STATE.family.moneyRequests = { total:0, byParent:{} });
+  moneyRequests.total += 1;
+  moneyRequests.byParent[person.id] = (moneyRequests.byParent[person.id] || 0) + 1;
+
+  if (moneyRequests.total > 3) {
+    person.relationship = clamp((person.relationship ?? 60) - 15);
+    syncSharedFamilyRelationshipFromParents();
+    logActivity(diaryPlaceholderFor('ask_for_money_young_adult', role, 'deny_repeat'), -15);
+    return { ok:true, approved:false, message:`${person.firstName} said no.` };
+  }
+
+  const traits = person.traits || [];
+  const positiveTraitCount = traits.filter(tid => {
+    const trait = PARENT_TRAITS_POOL.find(t => t.id === tid);
+    return trait?.positive === true;
+  }).length;
+
+  let chance = roundedAmount <= 100 ? 0.9
+    : roundedAmount <= 500 ? 0.72
+    : roundedAmount <= 1000 ? 0.58
+    : roundedAmount <= 3000 ? 0.4
+    : roundedAmount <= 5000 ? 0.24
+    : 0.1;
+
+  const wealthBonus = {
+    lower: -0.12,
+    working: -0.08,
+    middle: 0.02,
+    upper_middle: 0.15,
+    elite: 0.25,
+  }[STATE.socialClass] || 0;
+  chance += wealthBonus;
+  if (isHighPayingParentJob(person.job)) chance += 0.12;
+  if (traits.includes('supportive')) chance += 0.16;
+  if (traits.includes('kind')) chance += 0.1;
+  if (traits.includes('funny')) chance += 0.04;
+  if (positiveTraitCount >= 2) chance += 0.08;
+  if (traits.includes('distant')) chance -= 0.12;
+  if (traits.includes('absent')) chance -= 0.2;
+  if (traits.includes('strict')) chance -= 0.08;
+  if (traits.includes('overbearing')) chance -= 0.08;
+  if (roundedAmount > 5000) chance -= 0.15;
+  chance = Math.max(0.02, Math.min(0.98, chance));
+
+  if (roundedAmount > 3000 && Math.random() > chance) {
+    person.relationship = clamp((person.relationship ?? 60) - 15);
+    syncSharedFamilyRelationshipFromParents();
+    logActivity(diaryPlaceholderFor('ask_for_money_young_adult', role, 'deny_too_much'), -15);
+    return { ok:true, approved:false, message:`${person.firstName} said it was too much.` };
+  }
+
+  if (Math.random() <= chance) {
+    applyEffects({ balance: roundedAmount });
+    const successVariant = (roundedAmount <= 100 || traits.includes('supportive') || positiveTraitCount >= 2)
+      ? 'success_easy'
+      : 'success';
+    logActivity(`${diaryPlaceholderFor('ask_for_money_young_adult', role, successVariant)} (£${roundedAmount})`, roundedAmount);
+    return { ok:true, approved:true, message:`${person.firstName} gave you £${roundedAmount}.` };
+  }
+
+  person.relationship = clamp((person.relationship ?? 60) - 6);
+  syncSharedFamilyRelationshipFromParents();
+  logActivity(diaryPlaceholderFor('ask_for_money_young_adult', role, 'deny_generic'), -6);
+  return { ok:true, approved:false, message:`${person.firstName} said no.` };
+}
+
+
 // ── CLASSMATE GENERATION ──────────────────────────────────
 function generateClassmates(count=9) {
   const avgTarget = schoolAverageTarget();
@@ -326,7 +875,7 @@ function generateClassmates(count=9) {
     const g          = Math.random()>0.5?'male':'female';
     const gradeScore = clamp(Math.round(avgTarget + Math.floor(Math.random()*31) - 15), 10, 98);
     const traits     = sampleN(CLASSMATE_TRAITS_POOL, 2).map(t=>t.id);
-    return {
+    const classmate = {
       id:            uid(),
       firstName:     pickRandom(NAMES_UK[g]),
       surname:       pickRandom(NAMES_UK.surnames),
@@ -342,14 +891,20 @@ function generateClassmates(count=9) {
       relationship:  0,
       status:        'classmate',
     };
+    classmate.npcStats = buildClassmateNpcStats(classmate);
+    return classmate;
   });
 }
 
 function transitionSchool(newLevel) {
-  const prev      = STATE.school.classmates;
+  const prev = STATE.school.classmates;
+  const friends = prev.filter(c => c.status === 'friend');
+  const others = prev.filter(c => c.status !== 'friend');
   const keepCount = Math.floor(prev.length * 0.7);
-  const kept      = [...prev].sort(()=>Math.random()-0.5).slice(0, keepCount);
-  const newCount  = 9 - kept.length;
+  const remainingSlots = Math.max(0, keepCount - friends.length);
+  const keptOthers = [...others].sort(()=>Math.random()-0.5).slice(0, remainingSlots);
+  const kept = [...friends, ...keptOthers];
+  const newCount = Math.max(0, 9 - kept.length);
   STATE.school.classmates     = [...kept, ...generateClassmates(newCount)];
   STATE.school.level          = newLevel;
   STATE.school.current        = pickSchoolName(STATE.socialClass, newLevel === 'college' ? 'college' : 'secondary');
@@ -394,16 +949,19 @@ function generateTeachers() {
   return sampleN(subjects,2).map(sub => {
     const title = pickRandom(titles);
     const gender = title === 'Mr' ? 'male' : 'female';
-    return {
+    const teacher = {
       id:         uid(),
       title,
       gender,
+      firstName:  pickRandom(NAMES_UK[gender]),
       surname:    pickRandom(NAMES_UK.surnames),
       subject:    sub,
       emoji:      pickRandom(APPEARANCE_EMOJIS),
       strictness: Math.floor(Math.random()*80)+10,
       appearance: generateAppearance(gender),
     };
+    teacher.npcStats = buildTeacherNpcStats(teacher);
+    return teacher;
   });
 }
 
@@ -414,6 +972,7 @@ function friendshipThreshold(classmate) {
   if (playerTraits.includes('charismatic')) base -= 10;
   if (playerTraits.includes('anxious'))     base += 15;
   if (playerTraits.includes('empathetic'))  base -= 5;
+  if (STATE.age < 11) base -= 8;
   const negTraits = classmate.traits.filter(t => {
     const tr = CLASSMATE_TRAITS_POOL.find(x=>x.id===t);
     return tr && !tr.positive;
@@ -424,16 +983,32 @@ function friendshipThreshold(classmate) {
 
 function tryMakeFriend(classmate) {
   const threshold = friendshipThreshold(classmate);
-  if (classmate.relationship < threshold) return { success:false, reason:`You're not close enough yet. (${classmate.relationship}/${threshold} needed)` };
+  if (classmate.relationship < threshold) {
+    applyEffects({ rep:-1 });
+    logActivity(`Tried to befriend ${classmate.firstName}, but it was too soon.`, -1);
+    return { ok:true, success:false, toast:`Not close enough yet. (${classmate.relationship}/${threshold})` };
+  }
 
-  const base        = 60;
+  let base          = 50;
   const relBonus    = Math.floor((classmate.relationship - threshold) / 2);
   const compatBonus = Math.floor(classmate.compatibility / 5);
-  let chance        = base + relBonus + compatBonus;
+  const repBonus    = Math.floor((STATE.stats.rep || 0) / 8);
+  let chance        = base + relBonus + compatBonus + repBonus;
+
+  if (STATE.age < 11) chance += 12;
+  if (STATE.age > 13) {
+    const popularityDiff = (STATE.stats.popularity || 0) - (classmate.npcStats?.popularity || 50);
+    chance += Math.floor(popularityDiff / 6);
+  }
+  if (STATE.social?.isBully) chance -= 18;
+  if (STATE.traits.includes('charismatic')) chance += 8;
+  if (STATE.traits.includes('empathetic')) chance += 5;
+  if (STATE.traits.includes('anxious')) chance -= 8;
 
   classmate.traits.forEach(t => {
     const tr = CLASSMATE_TRAITS_POOL.find(x=>x.id===t);
-    if (tr && !tr.positive) chance -= 15;
+    if (tr && !tr.positive) chance -= 10;
+    if (tr && tr.positive) chance += 5;
   });
   chance = clamp(chance, 10, 95);
 
@@ -441,10 +1016,22 @@ function tryMakeFriend(classmate) {
     classmate.status = 'friend';
     STATE.relationships.friends = clamp(STATE.relationships.friends + 10);
     logActivity(`Became friends with ${classmate.firstName}`, 10);
-    return { success:true };
+    return { ok:true, success:true, toast:`${classmate.firstName} said yes ✓` };
   }
   classmate.relationship = Math.max(0, classmate.relationship - 8);
-  return { success:false, reason:`${classmate.firstName} wasn't ready for that.` };
+  applyEffects({ rep:-2 });
+  logActivity(`${classmate.firstName} turned down your friendship.`, -2);
+  return { ok:true, success:false, toast:`${classmate.firstName} said no.` };
+}
+
+function maybeReceiveClassmateFriendRequest() {
+  const candidates = STATE.school.classmates.filter(c => c.status === 'classmate' && c.relationship >= 70);
+  if (!candidates.length) return;
+  if (Math.random() > 0.25) return;
+  const classmate = pickRandom(candidates);
+  classmate.status = 'friend';
+  STATE.relationships.friends = clamp(STATE.relationships.friends + 10);
+  logActivity(`${classmate.firstName} asked to be your friend. You said yes.`, 10);
 }
 
 // ── ANNUAL TICK ───────────────────────────────────────────
@@ -506,6 +1093,7 @@ function annualTick() {
   }
 
   checkScholarship();
+  maybeReceiveClassmateFriendRequest();
 
   if (STATE.school.classmates.length) {
     STATE.school.rosterSnapshot = buildRosterSnapshot();

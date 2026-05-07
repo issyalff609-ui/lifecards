@@ -8,10 +8,7 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <title>LifeSim</title>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=DM+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Nunito:wght@700&display=swap" rel="stylesheet" />
     <link
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
       rel="stylesheet"
@@ -27,8 +24,8 @@
         --text: #1a1814;
         --text-muted: #6b6560;
         --text-faint: #a39d96;
-        --font: "Be Vietnam Pro", sans-serif;
-        --mono: "DM Mono", monospace;
+        --font: "Montserrat", sans-serif;
+        --mono: "Nunito", sans-serif; 
       }
       *,
       *::before,
@@ -77,6 +74,24 @@
           "opsz" 24;
       }
 
+.looks-icon {
+  display:inline-block;
+  width:20px;
+  height:20px;
+  background-repeat:no-repeat;
+  background-size:100% 100%;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fe0ec0' d='m21.838 11.126l-.229 2.436c-.378 4.012-.567 6.019-1.75 7.228C18.678 22 16.906 22 13.36 22h-2.72c-3.545 0-5.317 0-6.5-1.21s-1.371-3.216-1.749-7.228l-.23-2.436c-.18-1.912-.27-2.869.058-3.264a1 1 0 0 1 .675-.367c.476-.042 1.073.638 2.268 1.998c.618.704.927 1.055 1.271 1.11a.92.92 0 0 0 .562-.09c.319-.16.53-.595.955-1.464l2.237-4.584C10.989 2.822 11.39 2 12 2s1.011.822 1.813 2.465l2.237 4.584c.424.87.636 1.304.955 1.464c.176.089.37.12.562.09c.344-.055.653-.406 1.271-1.11c1.195-1.36 1.792-2.04 2.268-1.998a1 1 0 0 1 .675.367c.327.395.237 1.352.057 3.264' opacity='0.5'/%3E%3Cpath fill='%23fe0ec0' d='m12.952 12.699l-.098-.176c-.38-.682-.57-1.023-.854-1.023s-.474.34-.854 1.023l-.098.176c-.108.194-.162.29-.246.354c-.085.064-.19.088-.4.135l-.19.044c-.738.167-1.107.25-1.195.532s.164.577.667 1.165l.13.152c.143.167.215.25.247.354s.021.215 0 .438l-.02.203c-.076.785-.114 1.178.115 1.352c.23.174.576.015 1.267-.303l.178-.082c.197-.09.295-.136.399-.136s.202.046.399.136l.178.082c.691.319 1.037.477 1.267.303s.191-.567.115-1.352l-.02-.203c-.021-.223-.032-.334 0-.438s.104-.187.247-.354l.13-.152c.503-.588.755-.882.667-1.165c-.088-.282-.457-.365-1.195-.532l-.19-.044c-.21-.047-.315-.07-.4-.135c-.084-.064-.138-.16-.246-.354'/%3E%3C/svg%3E");
+}
+
+.sunny-icon {
+  display:inline-block;
+  width:24px;
+  height:24px;
+  background-repeat:no-repeat;
+  background-size:100% 100%;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23ffd529' d='M12 7.5c-2.21 0-4 1.79-4 4s1.79 4 4 4s4-1.79 4-4s-1.79-4-4-4' opacity='0.3' stroke-width='0.5' stroke='%23ffd529'/%3E%3Cpath fill='%23ffd529' d='m5.34 6.25l1.42-1.41l-1.8-1.79l-1.41 1.41zM1 10.5h3v2H1zM11 .55h2V3.5h-2zm7.66 5.705l-1.41-1.407l1.79-1.79l1.406 1.41zM17.24 18.16l1.79 1.8l1.41-1.41l-1.8-1.79zM20 10.5h3v2h-3zm-8-5c-3.31 0-6 2.69-6 6s2.69 6 6 6s6-2.69 6-6s-2.69-6-6-6m0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4s4 1.79 4 4s-1.79 4-4 4m-1 4h2v2.95h-2zm-7.45-.96l1.41 1.41l1.79-1.8l-1.41-1.41z' stroke-width='0.5' stroke='%23ffd529'/%3E%3C/svg%3E");
+}
+
       .screen {
         display: none;
         width: 100%;
@@ -103,7 +118,7 @@
         padding: 13px 20px;
       }
       .topbar-title {
-        font-size: 13px;
+        font-size: 17px;
         font-weight: 800;
         letter-spacing: 0.06em;
         text-transform: uppercase;
@@ -262,7 +277,7 @@
         min-width: 0;
       }
       .profile-name {
-        font-size: 24px;
+        font-size: 22px;
         font-weight: 800;
         letter-spacing: -0.03em;
         line-height: 1;
@@ -271,7 +286,7 @@
         display: flex;
         align-items: center;
         gap: 6px;
-        margin-top: 5px;
+        margin-top: 4px;
         flex-wrap: wrap;
       }
       .badge {
@@ -283,17 +298,21 @@
         letter-spacing: 0.06em;
       }
       .badge-age {
-        background: var(--surface-high);
-        color: var(--text-muted);
+      background: #e5e4e0;
+      color: #64758b;
+      padding: 5.5px 8.5px;
+
       }
       .badge-stage {
-        background: var(--text);
-        color: #fff;
+      background: #1e293b;
+      color: #e5e4e0; 
+        padding: 5.5px 8.5px;
       }
       .badge-sign {
-        background: var(--surface-mid);
-        color: var(--text-muted);
+        background: #e5e4e0;
+color: #64758b;
         border: 1px solid var(--border);
+        padding: 3px 8.5px;
       }
       .badge-class {
         background: #fef3c7;
@@ -375,24 +394,24 @@
 
       #age-up-btn {
         width: 100%;
-        padding: 15px 20px;
-        background: var(--surface);
-        color: var(--text);
-        font-size: 15px;
-        font-weight: 700;
-        border-radius: 14px;
-        border: 1.5px solid var(--border);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        padding: 14px 18px;
+        margin: 2px 0;
+        background: #1e293b;
+        color: #fff;
+        font-size: 16px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        border-radius: 999px;
+        border: 1.5px solid #1e293b;
+        box-shadow: 0 12px 24px rgba(15, 23, 42, 0.16);
         transition: all 0.15s;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 8px;
+        gap: 10px;
       }
       #age-up-btn:hover {
-        background: var(--text);
-        color: #fff;
-        border-color: var(--text);
+        opacity: 0.85;
       }
       #age-up-btn:active {
         transform: scale(0.98);
@@ -412,16 +431,17 @@
       .stat-card {
         background: var(--surface);
         border: 1px solid var(--border-light);
-        border-radius: 14px;
-        padding: 10px 12px;
+        border-radius: 22px;
+        padding: 13px 13px 11px;
         display: flex;
         flex-direction: column;
-        gap: 4px;
-
+        gap: 5px;
         cursor: pointer;
         transition:
           background 0.12s,
           transform 0.1s;
+        min-height: 112px;
+        box-shadow: 0 5px 10px rgba(26, 24, 20, 0.2);
       }
       .stat-card:active {
         transform: scale(0.97);
@@ -441,7 +461,7 @@
       }
       .stat-card-val {
         font-family: var(--mono);
-        font-size: 20px;
+        font-size: 22px;
         font-weight: 500;
         letter-spacing: -0.02em;
         line-height: 1;
@@ -450,21 +470,23 @@
         font-size: 10px;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.07em;
+        letter-spacing: 0.12em;
         color: var(--text-faint);
+        margin-top: -1px;
+        line-height: 1.05;
       }
       .stat-card-bar {
         width: 100%;
-        height: 3px;
-        background: var(--surface-mid);
+        height: 8px;
+        background: #e7e2da;
         border-radius: 99px;
         overflow: hidden;
+        margin-top: 1px;
       }
       .stat-card-fill {
         height: 100%;
         background: var(--text);
         border-radius: 99px;
-        transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
       }
 
       .activity-empty {
@@ -666,6 +688,7 @@
         gap: 14px;
         cursor: pointer;
         transition: background 0.13s;
+        box-shadow: 0 5px 12px rgba(26, 24, 20, 0.2);
       }
       .person-card:hover {
         background: var(--surface-mid);
@@ -723,27 +746,25 @@
         gap: 6px;
       }
       .trait-pill {
-        font-size: 12px;
+        font-size: 10px;
         font-weight: 700;
-        padding: 5px 12px;
+        padding: 3px 9px;
         border-radius: 99px;
         background: var(--surface-mid);
-        border: 1.5px solid var(--border);
         color: var(--text-muted);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
       }
       .trait-pill.positive {
         background: #dcfce7;
-        border-color: #86efac;
         color: #15803d;
       }
       .trait-pill.negative {
         background: #fee2e2;
-        border-color: #fca5a5;
         color: #b91c1c;
       }
       .trait-pill.player {
         background: #ede9fe;
-        border-color: #ddd6fe;
         color: #6d28d9;
       }
 
@@ -1331,77 +1352,112 @@
       #tab-life {
         display: flex;
         flex-direction: column;
-        height: calc(100dvh - 60px);
+        height: 100dvh;
         overflow: hidden;
-        padding: 60px 0 0;
+        padding: 60px 0 94px;
+        box-sizing: border-box;
       }
       #profile {
-        padding: 12px 20px 8px;
+        padding: 8px 16px 4px;
         flex-shrink: 0;
       }
+      .life-left {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .life-section-head {
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #6f7b86;
+        padding: 0 2px;
+      }
       #life-log-wrap {
-        flex: 1;
+        flex: 0 0 190px;
         overflow-y: auto;
-        min-height: 0;
-        padding: 0;
+        min-height: 190px;
+        max-height: 190px;
+        padding: 13px 15px;
         display: flex;
         flex-direction: column;
         gap: 8px;
+        background: var(--surface);
+        border: 1px solid var(--border-light);
+        border-radius: 28px;
+        box-shadow: 0 5px 12px rgba(26, 24, 20, 0.2);
       }
       .life-main {
         flex: 1;
         min-height: 0;
         display: grid;
-        grid-template-columns: minmax(0, 1fr) 82px;
-        gap: 10px;
-        padding: 0 20px 12px;
+        grid-template-columns: minmax(0, 1fr) 68px;
+        gap: 8px;
+        padding: 0 14px 6px;
+      }
+      .honour-wrap {
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
       }
       .honour-panel {
+        flex: 1;
         background: var(--surface);
         border: 1px solid var(--border-light);
-        border-radius: 14px;
-        padding: 10px 8px;
+        border-radius: 28px;
+        padding: 8px 6px 10px;
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: 8px;
         min-height: 0;
+        height: calc(100% - 28px);
+        box-shadow: 0 5px 12px rgba(26, 24, 20, 0.2);
       }
       .honour-title {
-        font-size: 8px;
+        font-size: 10px;
         font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: 0.09em;
-        color: var(--text-faint);
+        letter-spacing: 0.06em;
+        color: #6f7b86;
+        text-align: center;
+        margin: 0 0 6px;
       }
       .honour-track {
         position: relative;
         flex: 1;
         width: 12px;
-        min-height: 140px;
+        min-height: 0;
         border-radius: 99px;
-        background: linear-gradient(to top, #7f1d1d 0%, #e5e7eb 50%, #14532d 100%);
-        border: 1px solid var(--border);
+        background: #f1efeb;
+        border: 1px solid #ebe5dd;
+        overflow: hidden;
       }
       .honour-track::after {
         content: "";
         position: absolute;
-        left: -8px;
-        right: -8px;
+        left: -6px;
+        right: -6px;
         top: 50%;
-        height: 1px;
-        background: rgba(26,24,20,.24);
+        height: 6px;
+        border-radius: 99px;
+        background: #111827;
+        transform: translateY(-50%);
+        z-index: 2;
       }
       .honour-marker {
         position: absolute;
         left: 50%;
-        width: 28px;
+        width: 30px;
         height: 8px;
         border-radius: 99px;
         background: var(--text);
         border: 1px solid #fff;
         transform: translate(-50%, 50%);
         box-shadow: 0 2px 8px rgba(0,0,0,.18);
+        display: none;
       }
       .honour-value {
         font-family: var(--mono);
@@ -1423,85 +1479,50 @@
           display: none;
         }
       }
-      .life-log-title {
-        font-size: 9px;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
-        color: var(--text-faint);
-        padding: 8px 0 4px;
-        flex-shrink: 0;
+      @media (max-width: 430px) {
+        #profile {
+          padding: 8px 16px 6px;
+        }
+        .profile-name {
+          font-size: 20px;
+        }
+        #tab-life {
+          padding-bottom: 92px;
+        }
       }
       .life-log-divider {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 10px;
-        font-weight: 700;
+        display: block;
+        font-size: 12px;
+        font-weight: 800;
         text-transform: uppercase;
         letter-spacing: 0.08em;
-        color: var(--text-faint);
+        color: #667684;
         flex-shrink: 0;
-        margin: 2px 0;
-      }
-      .life-log-divider::before,
-      .life-log-divider::after {
-        content: "";
-        flex: 1;
-        height: 1px;
-        background: var(--border-light);
+        margin: 2px 0 1px;
       }
       .life-log-item {
-        background: var(--surface);
-        border: 1px solid var(--border-light);
-        border-radius: 14px;
-        padding: 12px 14px;
-        display: flex;
-        align-items: flex-start;
-        gap: 12px;
+        padding: 0 0 0 0;
+        display: block;
         flex-shrink: 0;
-        animation: fadeIn 0.3s ease both;
+        background: transparent;
+        border: none;
       }
       .life-log-icon {
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        background: var(--surface-mid);
-        border: 1px solid var(--border-light);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 15px;
-        flex-shrink: 0;
+        display: none;
       }
       .life-log-body {
-        flex: 1;
         min-width: 0;
       }
       .life-log-text {
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 600;
-        color: var(--text);
-        line-height: 1.4;
+        color: #6f7b86;
+        line-height: 1.35;
       }
       .life-log-time {
-        font-size: 11px;
-        color: var(--text-faint);
-        margin-top: 3px;
-        font-family: var(--mono);
+        display: none;
       }
-      #life-bottom {
-        flex-shrink: 0;
-        padding: 12px 20px 100px;
-        max-height: 320px;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        border-top: 1px solid var(--border-light);
-        background: var(--bg);
-      }
-
-      /* ── TOPBAR NET WORTH ───────────────────────────────────── */
+      /* ── TOPBAR BANK ───────────────────────────────────── */
       .topbar-nw {
         display: flex;
         flex-direction: column;
@@ -1518,14 +1539,15 @@
         font-weight: 800;
         text-transform: uppercase;
         letter-spacing: 0.08em;
-        color: var(--text-faint);
+        color: #64758b;
         line-height: 1;
       }
       .topbar-nw-val {
         font-family: var(--mono);
         font-size: 16px;
         font-weight: 600;
-        color: var(--text);
+        color: #1e293b;
+
         letter-spacing: -0.02em;
         line-height: 1;
       }
@@ -1636,11 +1658,14 @@
     <div id="screen-game" class="screen">
       <header class="topbar">
         <button class="topbar-btn" onclick="showToast('Settings coming soon!')">
-          <span class="icon">settings</span>
-        </button>
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+    <path fill="#808080" fill-rule="evenodd" d="M14.279 2.152C13.909 2 13.439 2 12.5 2s-1.408 0-1.779.152a2 2 0 0 0-1.09 1.083c-.094.223-.13.484-.145.863a1.62 1.62 0 0 1-.796 1.353a1.64 1.64 0 0 1-1.579.008c-.338-.178-.583-.276-.825-.308a2.03 2.03 0 0 0-1.49.396c-.318.242-.553.646-1.022 1.453c-.47.807-.704 1.21-.757 1.605c-.07.526.074 1.058.4 1.479c.148.192.357.353.68.555c.477.297.783.803.783 1.361s-.306 1.064-.782 1.36c-.324.203-.533.364-.682.556a2 2 0 0 0-.399 1.479c.053.394.287.798.757 1.605s.704 1.21 1.022 1.453c.424.323.96.465 1.49.396c.242-.032.487-.13.825-.308a1.64 1.64 0 0 1 1.58.008c.486.28.774.795.795 1.353c.015.38.051.64.145.863c.204.49.596.88 1.09 1.083c.37.152.84.152 1.779.152s1.409 0 1.779-.152a2 2 0 0 0 1.09-1.083c.094-.223.13-.483.145-.863c.02-.558.309-1.074.796-1.353a1.64 1.64 0 0 1 1.579-.008c.338.178.583.276.825.308c.53.07 1.066-.073 1.49-.396c.318-.242.553-.646 1.022-1.453c.47-.807.704-1.21.757-1.605a2 2 0 0 0-.4-1.479c-.148-.192-.357-.353-.68-.555c-.477-.297-.783-.803-.783-1.361s.306-1.064.782-1.36c.324-.203.533-.364.682-.556a2 2 0 0 0 .399-1.479c-.053-.394-.287-.798-.757-1.605s-.704-1.21-1.022-1.453a2.03 2.03 0 0 0-1.49-.396c-.242.032-.487.13-.825.308a1.64 1.64 0 0 1-1.58-.008a1.62 1.62 0 0 1-.795-1.353c-.015-.38-.051-.64-.145-.863a2 2 0 0 0-1.09-1.083" clip-rule="evenodd" opacity="0.5"/>
+    <path fill="#808080" d="M15.523 12c0 1.657-1.354 3-3.023 3s-3.023-1.343-3.023-3S10.83 9 12.5 9s3.023 1.343 3.023 3"/>
+  </svg>
+</button>
         <span class="topbar-title" id="game-topbar-title">Life Cards</span>
         <button class="topbar-nw" onclick="openFinanceSheet()">
-          <span class="topbar-nw-label">Net Worth</span>
+          <span class="topbar-nw-label">Bank Balance</span>
           <span class="topbar-nw-val" id="topbar-nw-val">£0</span>
         </button>
       </header>
@@ -1676,21 +1701,30 @@
           </div>
         </section>
         <div class="life-main">
-          <div id="life-log-wrap">
-            <div class="life-log-title">Life Log</div>
-            <div id="activity-list">
-              <div class="activity-empty">
-                Nothing yet. Your life is just beginning.
+          <div class="life-left">
+            <div class="life-section-head">Diary</div>
+            <div id="life-log-wrap">
+              <div id="activity-list">
+                <div class="activity-empty">
+                  Nothing yet. Your life is just beginning.
+                </div>
               </div>
             </div>
+            <button id="age-up-btn">
+  Age Up
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 16 16" style="flex-shrink:0">
+    <g fill="#fff">
+      <path d="M7.596 7.304a.802.802 0 0 1 0 1.392l-6.363 3.692C.713 12.69 0 12.345 0 11.692V4.308c0-.653.713-.998 1.233-.696z"/>
+      <path d="M15.596 7.304a.802.802 0 0 1 0 1.392l-6.363 3.692C8.713 12.69 8 12.345 8 11.692V4.308c0-.653.713-.998 1.233-.696z"/>
+    </g>
+  </svg>
+</button>
+            <div class="stat-grid" id="stat-grid"></div>
           </div>
-          <div class="honour-panel" id="reputation-panel"></div>
-        </div>
-        <div id="life-bottom">
-          <button id="age-up-btn">
-            Age Up <span class="age-arrow">→</span>
-          </button>
-          <div class="stat-grid" id="stat-grid"></div>
+          <div class="honour-wrap">
+            <div class="honour-title">Reputation</div>
+            <div class="honour-panel" id="reputation-panel"></div>
+          </div>
         </div>
       </div>
 
@@ -1789,6 +1823,13 @@
       <div class="sheet" id="person-sheet">
         <div class="sheet-handle"></div>
         <div id="person-inner"></div>
+      </div>
+    </div>
+    <div id="money-request-overlay" class="overlay">
+      <div class="overlay-backdrop" onclick="closeMoneyRequestOverlay()"></div>
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div id="money-request-inner"></div>
       </div>
     </div>
     <div id="identity-overlay" class="overlay">

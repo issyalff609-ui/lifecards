@@ -4,14 +4,14 @@ const NAMES_UK = {
     'Dylan','Edward','Elliot','Ethan','Felix','Finn','Freddie','George','Harry','Henry',
     'Isaac','Jack','Jacob','James','Joseph','Joshua','Jude','Kit','Leo','Liam',
     'Logan','Louie','Lucas','Luke','Mason','Max','Monty','Nathan','Noah','Oliver',
-    'Oscar','Reuben','Rory','Ryan','Samuel','Sebastian','Theo','Thomas','Toby','William'
+    'Oscar','Reuben','Rory','Ryan','Samuel','Sebastian', 'Theodore','Tom','Toby','William',
   ],
   female: [
-    'Alice','Amelia','Amber','Arabella','Ava','Beatrice','Charlotte','Chloe','Clara','Daisy',
+    'Alex','Alice','Amelia','Amber','Anna','Ava','Beatrice','Charlotte','Chloe','Clara','Daisy',
     'Ella','Ellie','Eliza','Emma','Esme','Eva','Evie','Florence','Freya','Georgia',
     'Grace','Hannah','Harriet','Imogen','Iris','Isabella','Isla','Ivy','Lexi','Lily',
-    'Lottie','Lydia','Matilda','Maya','Millie','Molly','Naomi','Nora','Olivia','Penelope',
-    'Phoebe','Poppy','Rosie','Ruby','Sadie','Scarlett','Sophie','Violet','Zoe'
+    'Lottie','Lydia','Logan','Matilda','Maya','Millie','Molly','Naomi','Nora','Olivia','Olive','Penelope',
+    'Phoebe','Poppy','Rosie','Ruby','Sadie','Scarlett','Sophie','Violet','Viola','Zoe'
   ],
   surnames: [
     'Adams','Bailey','Baker','Barnes','Bennett','Brown','Burns','Butler','Campbell','Carter',
@@ -24,7 +24,7 @@ const NAMES_UK = {
   ],
   petNames: [
     'Biscuit','Milo','Bella','Buddy','Charlie','Daisy','Poppy','Max','Rosie','Teddy',
-    'Luna','Coco','Alfie','Molly','Oscar','Ruby','Leo','Lola','Archie','Honey',
+    'Luna','Coco','Alfie','Molly','Oscar','Ruby','Leo','Lola','Archie','Honey', 'Tiny',
     'Pip','Toby','Willow','Baxter','Nala','Bruno','Elsie','Patch','Sable','Chester'
   ]
 };
