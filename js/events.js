@@ -100,6 +100,11 @@ const EVENTS = [
   text:'Your grades have caught the attention of some of the best schools in the area. You have options.',
   choices:[
   { text:'Apply to a private school',
+    beforeChoose: () => {
+      if (!shouldWarnPrivateAffordability()) return true;
+      const confirmed = window.confirm('It is unlikely that your parents will be able to afford this. Do you still want to apply?');
+      return confirmed;
+    },
     effects:{ smarts:+3 },
     outcome:'Your application is in. Now you wait.',
     log:'Applied to a private school',
@@ -128,7 +133,7 @@ const EVENTS = [
       onChoose: () => {
         if (STATE.school._privateAccepted) {
           applyEffects({ smarts:+5, happy:+8, rep:+5 });
-          STATE.school.current = pickRandom(SCHOOL_NAMES.private);
+          STATE.school.current = pickRandom(SCHOOL_NAMES_UK.private);
         } else {
           applyEffects({ happy:-4, smarts:+2 });
         }
@@ -151,7 +156,7 @@ const EVENTS = [
       onChoose: () => {
         if (STATE.school._scholarshipWon) {
           applyEffects({ smarts:+8, happy:+10, rep:+8, balance:+500 });
-          STATE.school.current = pickRandom(SCHOOL_NAMES.private);
+          STATE.school.current = pickRandom(SCHOOL_NAMES_UK.private);
         } else {
           applyEffects({ happy:-5, smarts:+2 });
         }

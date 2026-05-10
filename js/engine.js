@@ -118,6 +118,87 @@ function gradeColor(g) {
   return map[g] || '#6b7280';
 }
 
+function getSchoolTypeLabels() {
+  const type = STATE?.school?.type || {};
+  return [type.primary, type.secondary, type.college].filter(Boolean).map(value => String(value).toLowerCase());
+}
+
+function isAlreadyPrivateTrack() {
+  const labels = getSchoolTypeLabels();
+  return labels.some(label =>
+    label.includes('prep school') ||
+    label.includes('private school') ||
+    label.includes('boarding school') ||
+    label.includes('private sixth') ||
+    label.includes('elite sixth')
+  );
+}
+
+function getParentPrivateSupportScore() {
+  const parents = [STATE.family?.mum, STATE.family?.dad].filter(Boolean).filter(parent => parent.alive !== false);
+  let score = 0;
+  parents.forEach(parent => {
+    if (isHighPayingParentJob(parent.job)) score += 12;
+    const traits = parent.traits || [];
+    if (traits.includes('supportive')) score += 10;
+    if (traits.includes('kind')) score += 8;
+    if (traits.includes('ambitious')) score += 6;
+    if (traits.includes('hardworking')) score += 4;
+    if (traits.includes('strict')) score += 3;
+    if (traits.includes('distant')) score -= 6;
+    if (traits.includes('absent')) score -= 10;
+    if (traits.includes('overbearing')) score -= 4;
+  });
+  return score;
+}
+
+function getPrivateSchoolOfferChance() {
+  const grade = gradeFromScore(STATE.school.gradeScore);
+  let chance = grade === 'A+' ? 0.72 : grade === 'A' ? 0.58 : 0;
+  const classModifier = {
+    lower: -0.12,
+    working: -0.08,
+    middle: 0.04,
+    upper_middle: 0.02,
+    elite: 0,
+  }[STATE.socialClass] || 0;
+  chance += classModifier;
+  chance += getParentPrivateSupportScore() / 500;
+  return Math.max(0, Math.min(0.92, chance));
+}
+
+function getPrivateSchoolAcceptanceChance() {
+  let chance = 0.18;
+  chance += {
+    lower: -0.08,
+    working: -0.02,
+    middle: 0.08,
+    upper_middle: 0.28,
+    elite: 0.4,
+  }[STATE.socialClass] || 0;
+  chance += (STATE.school.gradeScore >= 90 ? 0.1 : STATE.school.gradeScore >= 80 ? 0.05 : 0);
+  chance += getParentPrivateSupportScore() / 250;
+  return Math.max(0.03, Math.min(0.96, chance));
+}
+
+function getScholarshipChance() {
+  let chance = 0.16;
+  chance += STATE.school.gradeScore >= 92 ? 0.18 : STATE.school.gradeScore >= 85 ? 0.1 : 0.04;
+  chance += {
+    lower: 0.16,
+    working: 0.12,
+    middle: 0.04,
+    upper_middle: -0.03,
+    elite: -0.08,
+  }[STATE.socialClass] || 0;
+  chance += Math.max(0, -getParentPrivateSupportScore()) / 500;
+  return Math.max(0.05, Math.min(0.7, chance));
+}
+
+function shouldWarnPrivateAffordability() {
+  return ['lower', 'working'].includes(STATE.socialClass);
+}
+
 // ── STATE ─────────────────────────────────────────────────
 let STATE = null;
 
@@ -225,6 +306,8 @@ function createNewLife(opts) {
   };
 
   STATE.relationships.family = Math.round((STATE.family.mum.relationship + STATE.family.dad.relationship) / 2);
+  if (typeof initializeHomeState === 'function') initializeHomeState();
+  ensureNpcSystemState();
   return STATE;
 }
 
@@ -375,6 +458,649 @@ function buildTeacherNpcStats(teacher) {
   };
 }
 
+const NPC_RELATIONSHIP_STATUSES = ['Single', 'Talking to someone', 'In a relationship', 'Complicated', 'Married', 'Separated', 'Widowed'];
+const NPC_HOUSING_STATUSES = ['Living with family', 'Student housing', 'Shared flat', 'Own flat', 'Partner household', 'Moved back home', 'Retired at home'];
+const NPC_EDUCATION_STATUSES = ['In school', 'In college', 'At university', 'Graduated', 'Dropped out', 'No higher education'];
+
+function npcSeed(npc, salt = '') {
+  const raw = `${npc?.id || ''}|${npc?.firstName || ''}|${npc?.surname || ''}|${salt}`;
+  let hash = 0;
+  for (let i = 0; i < raw.length; i += 1) hash = ((hash * 31) + raw.charCodeAt(i)) >>> 0;
+  return hash;
+}
+
+function npcSeedBetween(npc, salt, min, max) {
+  const span = Math.max(1, (max - min) + 1);
+  return min + (npcSeed(npc, salt) % span);
+}
+
+function hasNpcTrait(npc, traitId) {
+  return Array.isArray(npc?.traits) && npc.traits.includes(traitId);
+}
+
+function getNpcDisplayName(npc) {
+  return `${npc?.firstName || 'Someone'}${npc?.surname ? ` ${npc.surname}` : ''}`.trim();
+}
+
+function getNpcSmarts(npc) {
+  return clamp(npc?.npcStats?.smarts ?? npcSeedBetween(npc, 'smarts', 38, 74));
+}
+
+function getNpcWarmth(npc) {
+  return clamp(npc?.npcStats?.warmth ?? npc?.npcStats?.reputation ?? npcSeedBetween(npc, 'warmth', 35, 72));
+}
+
+function getNpcReputationBase(npc) {
+  if (npc?.reputation !== undefined) return clamp(npc.reputation);
+  if (npc?.npcStats?.reputation !== undefined) return clamp(npc.npcStats.reputation);
+  const warmth = npc?.npcStats?.warmth;
+  const generosity = npc?.npcStats?.generosity;
+  if (warmth !== undefined || generosity !== undefined) {
+    return clamp(Math.round(((warmth ?? 50) + (generosity ?? 50)) / 2));
+  }
+  return clamp(npcSeedBetween(npc, 'reputation', 36, 74));
+}
+
+function getPlayerDegreeBias() {
+  if (typeof getDegreeCourse === 'function') return getDegreeCourse();
+  return STATE?.school?.postSchool?.uniApplication?.course || null;
+}
+
+function getNpcCourseCatalog() {
+  if (typeof UNI_COURSES !== 'undefined' && Array.isArray(UNI_COURSES) && UNI_COURSES.length) {
+    return UNI_COURSES.map(course => course.id);
+  }
+  return ['Law', 'Medicine', 'Business', 'Computer Science', 'Art', 'Education', 'Engineering', 'History', 'Music'];
+}
+
+function relatedDegreeCourses(course) {
+  const map = {
+    Law: ['History', 'Business'],
+    Medicine: ['Biology', 'Chemistry', 'Psychology'],
+    Business: ['Economics', 'Law'],
+    'Computer Science': ['Engineering', 'Business'],
+    Education: ['History', 'English'],
+    Engineering: ['Computer Science', 'Mathematics'],
+    Art: ['Music', 'History'],
+    History: ['Law', 'Education'],
+    Music: ['Art'],
+  };
+  return map[course] || [];
+}
+
+function chooseNpcDegreeCourse(npc, context = {}) {
+  const current = npc.degreeCourse;
+  if (current) return current;
+  const playerCourse = getPlayerDegreeBias();
+  const metAtUniversity = context.socialGroup === 'university friend' || context.metAtUniversity;
+  const catalog = getNpcCourseCatalog();
+  if (!catalog.length) return null;
+
+  if (metAtUniversity && playerCourse) {
+    const roll = npcSeedBetween(npc, 'degree-course', 1, 100);
+    if (roll <= 58) return playerCourse;
+    const related = relatedDegreeCourses(playerCourse).filter(course => catalog.includes(course));
+    if (related.length && roll <= 82) return related[npcSeedBetween(npc, 'related-degree', 0, related.length - 1)];
+  }
+  return catalog[npcSeedBetween(npc, 'fallback-degree', 0, catalog.length - 1)];
+}
+
+function inferCareerPathFromJobOrCourse(jobTitle, degreeCourse) {
+  const title = String(jobTitle || '').toLowerCase();
+  if (/doctor|nurse|health|lab|medical/.test(title) || degreeCourse === 'Medicine') return 'Healthcare';
+  if (/legal|law|court|solicitor|barrister|paralegal|judge/.test(title) || degreeCourse === 'Law') return 'Legal';
+  if (/teacher|education|school/.test(title) || degreeCourse === 'Education') return 'Education';
+  if (/engineer|electrical|plumber|operations/.test(title) || degreeCourse === 'Engineering') return 'Engineering';
+  if (/design|music|creator|actor|illustrator|artist/.test(title) || ['Art', 'Music'].includes(degreeCourse)) return 'Creative';
+  if (/finance|business|sales|project|management|recruitment/.test(title) || degreeCourse === 'Business') return 'Business';
+  if (/software|computer|tech/.test(title) || degreeCourse === 'Computer Science') return 'Technology';
+  if (/police|firefighter|civil service/.test(title)) return 'Public Service';
+  return 'General';
+}
+
+function estimateNpcSalary(jobTitle, context = {}, npc = null) {
+  if (!jobTitle || jobTitle === 'None') return 0;
+  const parentIncome = SOCIAL_CLASSES.find(item => item.id === STATE.socialClass)?.parentIncome || 22000;
+  if (context.role === 'parent') {
+    const multiplier = {
+      lower: 0.85,
+      working: 1,
+      middle: 1.15,
+      upper_middle: 1.5,
+      elite: 2.6,
+    }[STATE.socialClass] || 1;
+    const seedBump = npc ? npcSeedBetween(npc, 'parent-salary', -3500, 8500) : 0;
+    return Math.max(12000, Math.round((parentIncome * multiplier) + seedBump));
+  }
+  const title = String(jobTitle).toLowerCase();
+  if (/partner|judge/.test(title)) return npc ? npcSeedBetween(npc, 'salary', 180000, 550000) : 220000;
+  if (/doctor|barrister|senior associate|principal/.test(title)) return npc ? npcSeedBetween(npc, 'salary', 70000, 180000) : 90000;
+  if (/associate|manager|engineer|teacher|police|solicitor|analyst/.test(title)) return npc ? npcSeedBetween(npc, 'salary', 30000, 78000) : 42000;
+  if (/assistant|secretary|retail|care|creator|musician|actor|cashier/.test(title)) return npc ? npcSeedBetween(npc, 'salary', 18000, 32000) : 24000;
+  return npc ? npcSeedBetween(npc, 'salary', 22000, 45000) : 28000;
+}
+
+function inferNpcEducationStatus(npc, context = {}) {
+  if (npc.educationLevel) return npc.educationLevel;
+  const age = npc.age ?? 0;
+  const playerCourse = getPlayerDegreeBias();
+  const smart = getNpcSmarts(npc);
+  const ambitious = clamp(npc.ambition ?? npcSeedBetween(npc, 'ambition', 35, 80));
+  const universityBias = smart + ambitious + (playerCourse && context.socialGroup === 'university friend' ? 12 : 0);
+  if (age < 16) return 'In school';
+  if (age < 18) return universityBias >= 118 ? 'In college' : 'In school';
+  if (age <= 22) {
+    if (universityBias >= 126) return 'At university';
+    if (universityBias >= 102) return 'In college';
+  }
+  if (age >= 22 && universityBias >= 126) return 'Graduated';
+  return 'No higher education';
+}
+
+function inferNpcCurrentEducation(npc) {
+  const level = npc.educationLevel;
+  if (level === 'At university') return npc.degreeCourse || chooseNpcDegreeCourse(npc, { socialGroup: npc.socialGroup });
+  if (level === 'In college') return 'College';
+  if (level === 'In school') return 'School';
+  return null;
+}
+
+function inferNpcHousingStatus(npc, context = {}) {
+  if (npc.housingStatus) return npc.housingStatus;
+  const age = npc.age ?? 0;
+  if (context.role === 'parent') return age >= 65 ? 'Retired at home' : 'Living with family';
+  if (age < 18) return 'Living with family';
+  if (npc.educationLevel === 'At university') return 'Student housing';
+  if ((npc.employmentStatus === 'Employed' || npc.jobTitle) && age >= 22) return 'Shared flat';
+  return 'Living with family';
+}
+
+function inferNpcLivesWith(npc, context = {}) {
+  if (Array.isArray(npc.livesWith) && npc.livesWith.length) return npc.livesWith;
+  if (context.role === 'parent') return ['Family household'];
+  if (npc.housingStatus === 'Student housing') return ['Roommates'];
+  if (npc.housingStatus === 'Partner household') return ['Partner'];
+  if (npc.housingStatus === 'Own flat') return ['Alone'];
+  if (npc.housingStatus === 'Shared flat') return ['Roommates'];
+  return ['Family'];
+}
+
+function inferNpcRelationshipStatus(npc, context = {}) {
+  if (npc.relationshipStatus) return npc.relationshipStatus;
+  if (context.role === 'parent') {
+    const status = STATE.family?.maritalStatus || maritalStatusForSituation(STATE.family?.situation);
+    if (/married/i.test(status)) return 'Married';
+    if (/divorc|separat/i.test(status)) return 'Separated';
+    return 'Single';
+  }
+  if ((npc.age ?? 0) < 16) return 'Single';
+  const roll = npcSeedBetween(npc, 'relationship-status', 1, 100);
+  if ((npc.age ?? 0) >= 28 && roll >= 88) return 'Married';
+  if ((npc.age ?? 0) >= 20 && roll >= 62) return 'In a relationship';
+  if ((npc.age ?? 0) >= 18 && roll >= 45) return 'Talking to someone';
+  return 'Single';
+}
+
+function inferNpcSocialGroup(npc, context = {}) {
+  if (npc.socialGroup) return npc.socialGroup;
+  if (context.role === 'parent') return 'family';
+  if (context.role === 'sibling') return 'family';
+  if (context.role === 'friend') return context.socialGroup || (STATE.school?.level === 'uni' ? 'university friend' : 'school friend');
+  if (context.role === 'classmate') return 'classmate';
+  if (context.role === 'roommate') return 'roommate';
+  return 'recurring';
+}
+
+function inferNpcAge(npc, context = {}) {
+  if (npc?.age !== undefined && npc?.age !== null) return npc.age;
+  if (context.role === 'roommate') return Math.max(18, STATE.age || 18);
+  if (context.role === 'friend' || context.role === 'classmate') return Math.max(0, STATE.age || 0);
+  if (context.role === 'teacher') return 35;
+  return Math.max(0, STATE.age || 0);
+}
+
+function ensureNpcCoreFields(npc, context = {}) {
+  if (!npc) return npc;
+  npc.age = inferNpcAge(npc, context);
+  if (!Array.isArray(npc.lifeUpdates)) npc.lifeUpdates = [];
+  if (!Array.isArray(npc.memoriesWithPlayer)) npc.memoriesWithPlayer = [];
+  npc.socialGroup = inferNpcSocialGroup(npc, context);
+  npc.ambition = clamp(npc.ambition ?? npcSeedBetween(npc, 'ambition', 30, 82) + (hasNpcTrait(npc, 'ambitious') ? 12 : 0) - (hasNpcTrait(npc, 'lazy') ? 14 : 0));
+  npc.happiness = clamp(npc.happiness ?? npcSeedBetween(npc, 'happiness', 44, 72) + (hasNpcTrait(npc, 'funny') ? 5 : 0) + (hasNpcTrait(npc, 'supportive') ? 4 : 0) - (hasNpcTrait(npc, 'toxic') ? 10 : 0));
+  npc.stress = clamp(npc.stress ?? npcSeedBetween(npc, 'stress', 26, 58) + (hasNpcTrait(npc, 'ambitious') ? 7 : 0) + (hasNpcTrait(npc, 'flaky') ? 2 : 0));
+  npc.reputation = clamp(npc.reputation ?? getNpcReputationBase(npc));
+  npc.educationLevel = inferNpcEducationStatus(npc, context);
+  npc.degreeCourse = npc.degreeCourse ?? (npc.educationLevel === 'At university' || npc.educationLevel === 'Graduated' ? chooseNpcDegreeCourse(npc, context) : null);
+  npc.currentEducation = npc.currentEducation ?? inferNpcCurrentEducation(npc);
+  npc.jobTitle = npc.jobTitle ?? npc.job ?? ((npc.age >= 18 && npc.educationLevel !== 'At university' && context.role === 'parent') ? npc.job : 'None');
+  npc.employer = npc.employer ?? (npc.jobTitle && npc.jobTitle !== 'None' ? `${npc.surname || 'Local'} ${inferCareerPathFromJobOrCourse(npc.jobTitle, npc.degreeCourse)}` : null);
+  npc.careerPath = npc.careerPath ?? inferCareerPathFromJobOrCourse(npc.jobTitle, npc.degreeCourse);
+  npc.salary = npc.salary ?? estimateNpcSalary(npc.jobTitle, context, npc);
+  npc.careerStage = npc.careerStage ?? ((npc.jobTitle && npc.jobTitle !== 'None')
+    ? ((npc.age ?? 0) >= 45 ? 'Established' : (npc.age ?? 0) >= 27 ? 'Mid-career' : 'Early career')
+    : ((npc.age ?? 0) >= 65 ? 'Retired' : 'Exploring'));
+  npc.yearsInRole = npc.yearsInRole ?? ((npc.jobTitle && npc.jobTitle !== 'None') ? Math.max(0, Math.min((npc.age ?? 0) - 18, npcSeedBetween(npc, 'years-in-role', 0, 6))) : 0);
+  npc.employmentStatus = npc.employmentStatus ?? (
+    (npc.age ?? 0) >= 65 ? 'Retired'
+      : npc.educationLevel === 'At university' ? 'Student'
+      : npc.jobTitle && npc.jobTitle !== 'None' ? 'Employed'
+      : (npc.age ?? 0) >= 18 ? 'Unemployed' : 'Student'
+  );
+  npc.relationshipStatus = inferNpcRelationshipStatus(npc, context);
+  npc.housingStatus = inferNpcHousingStatus(npc, context);
+  npc.livesWith = inferNpcLivesWith(npc, context);
+  npc.friendshipCloseness = clamp(npc.friendshipCloseness ?? npc.relationship ?? 60);
+  npc.lastInteractionAge = npc.lastInteractionAge ?? STATE.age;
+  npc.attractionToPlayer = clamp(npc.attractionToPlayer ?? npcSeedBetween(npc, 'attraction', 20, 78));
+  npc.romanticCompatibility = clamp(npc.romanticCompatibility ?? npc.compatibility ?? npcSeedBetween(npc, 'romantic-compat', 35, 82));
+  npc.canBecomePartner = npc.canBecomePartner ?? (context.role !== 'parent' && context.role !== 'sibling' && !npc.isPet);
+  npc.livesWithPlayer = npc.livesWithPlayer ?? false;
+  npc.sharedHouseholdId = npc.sharedHouseholdId ?? null;
+  if (context.role === 'parent') npc.job = npc.jobTitle;
+  if (context.role === 'friend' || npc.status === 'friend') normalizeFriendRelationshipState(npc);
+  return npc;
+}
+
+function sanitizeParentNpcState(parent) {
+  if (!parent) return;
+  ensureNpcCoreFields(parent, { role: 'parent' });
+  parent.housingStatus = (parent.age ?? 0) >= 65 && parent.employmentStatus === 'Retired'
+    ? 'Retired at home'
+    : 'Living with family';
+  parent.livesWith = ['Family household'];
+  if (Array.isArray(parent.lifeUpdates) && parent.lifeUpdates.length) {
+    parent.lifeUpdates = parent.lifeUpdates.filter(update => {
+      const text = String(update?.text || '').toLowerCase();
+      return !(
+        text.includes('shared flat') ||
+        text.includes('own place') ||
+        text.includes('student housing') ||
+        text.includes('moved back home')
+      );
+    });
+  }
+}
+
+function buildNpcMemory(npc, text) {
+  if (!text) return;
+  if (!Array.isArray(npc.memoriesWithPlayer)) npc.memoriesWithPlayer = [];
+  npc.memoriesWithPlayer.unshift({ text, age: STATE.age });
+  if (npc.memoriesWithPlayer.length > 6) npc.memoriesWithPlayer.length = 6;
+}
+
+function markNpcInteraction(npc, memoryText = null) {
+  if (!npc) return;
+  ensureNpcCoreFields(npc);
+  npc.lastInteractionAge = STATE.age;
+  if (memoryText) buildNpcMemory(npc, memoryText);
+}
+
+function recordNpcLifeUpdate(npc, text, bucket, priority = 1) {
+  ensureNpcCoreFields(npc);
+  const entry = { text, age: STATE.age, priority };
+  npc.lifeUpdates.unshift(entry);
+  bucket.push({ npcId: npc.id, text, priority });
+}
+
+function ensureNpcSystemState() {
+  if (!STATE) return;
+  if (!STATE.npc) STATE.npc = { annualUpdates: [], archive: [] };
+  if (!Array.isArray(STATE.npc.annualUpdates)) STATE.npc.annualUpdates = [];
+  if (!Array.isArray(STATE.npc.archive)) STATE.npc.archive = [];
+  ensurePersistentFriendState();
+  ensureNpcCoreFields(STATE.family?.mum, { role: 'parent' });
+  ensureNpcCoreFields(STATE.family?.dad, { role: 'parent' });
+  sanitizeParentNpcState(STATE.family?.mum);
+  sanitizeParentNpcState(STATE.family?.dad);
+  (STATE.family?.siblings || []).forEach(sibling => ensureNpcCoreFields(sibling, { role: 'sibling' }));
+  (STATE.school?.classmates || []).forEach(classmate => ensureNpcCoreFields(classmate, {
+    role: classmate.status === 'friend' ? 'friend' : 'classmate',
+    socialGroup: classmate.status === 'friend'
+      ? (STATE.school?.level === 'uni' ? 'university friend' : 'school friend')
+      : 'classmate',
+  }));
+  (STATE.social?.friends || []).forEach(friend => ensureNpcCoreFields(friend, { role: 'friend', socialGroup: friend.socialGroup || 'school friend' }));
+  return STATE.npc;
+}
+
+function getImportantNpcEntries() {
+  ensureNpcSystemState();
+  const entries = [];
+  if (STATE.family?.mum?.alive !== false && !['single_dad'].includes(STATE.family?.situation)) entries.push({ npc: STATE.family.mum, role: 'parent', label: 'mother' });
+  if (STATE.family?.dad?.alive !== false && !['single_mum', 'never_knew'].includes(STATE.family?.situation)) entries.push({ npc: STATE.family.dad, role: 'parent', label: 'father' });
+  (STATE.family?.siblings || []).forEach(sibling => entries.push({ npc: sibling, role: 'sibling', label: sibling.gender === 'male' ? 'brother' : 'sister' }));
+
+  const friendMap = new Map();
+  (STATE.school?.classmates || []).filter(classmate => classmate.status === 'friend').forEach(friend => friendMap.set(friend.id, friend));
+  (STATE.social?.friends || []).forEach(friend => {
+    if (!friendMap.has(friend.id)) friendMap.set(friend.id, friend);
+  });
+  friendMap.forEach(friend => {
+    ensureNpcCoreFields(friend, { role: 'friend', socialGroup: friend.socialGroup || 'school friend' });
+    entries.push({ npc: friend, role: 'friend', label: 'friend' });
+  });
+  return entries;
+}
+
+function getNpcPromotionTitle(npc) {
+  const path = npc.careerPath || inferCareerPathFromJobOrCourse(npc.jobTitle, npc.degreeCourse);
+  const stages = {
+    Healthcare: ['Healthcare Assistant', 'Staff Nurse', 'Senior Clinician', 'Department Lead'],
+    Legal: ['Legal Assistant', 'Paralegal', 'Senior Paralegal', 'Lead Paralegal'],
+    Education: ['Teaching Assistant', 'Teacher', 'Head of Department', 'Senior Leader'],
+    Engineering: ['Junior Engineer', 'Engineer', 'Senior Engineer', 'Lead Engineer'],
+    Technology: ['Support Analyst', 'Developer', 'Senior Developer', 'Tech Lead'],
+    Business: ['Coordinator', 'Executive', 'Manager', 'Senior Manager'],
+    Creative: ['Creative Assistant', 'Designer', 'Senior Designer', 'Creative Lead'],
+    'Public Service': ['Officer', 'Senior Officer', 'Team Lead', 'Regional Lead'],
+    General: ['Assistant', 'Coordinator', 'Manager', 'Senior Manager'],
+  }[path] || ['Assistant', 'Coordinator', 'Manager', 'Senior Manager'];
+  const currentIndex = Math.max(0, stages.indexOf(npc.jobTitle));
+  return stages[Math.min(stages.length - 1, currentIndex + 1)] || npc.jobTitle;
+}
+
+function getNpcEntryPrefix(entry) {
+  if (entry.role === 'parent') return `Your ${entry.label} ${entry.npc.firstName}`;
+  if (entry.role === 'sibling') return `Your ${entry.label} ${entry.npc.firstName}`;
+  return `Your friend ${entry.npc.firstName}`;
+}
+
+function syncFriendSnapshot(friend) {
+  if (!friend) return;
+  normalizeFriendRelationshipState(friend);
+  const liveFriend = STATE.school?.classmates?.find(classmate => classmate.id === friend.id);
+  if (liveFriend && liveFriend !== friend) Object.assign(liveFriend, friend);
+  upsertPersistentFriend(friend);
+}
+
+function maybeUpdateNpcEducation(entry, updates) {
+  const npc = entry.npc;
+  const prefix = getNpcEntryPrefix(entry);
+  if ((npc.age ?? 0) < 16) {
+    npc.educationLevel = 'In school';
+    npc.currentEducation = 'School';
+    return;
+  }
+  if ((npc.age ?? 0) < 18) {
+    const shouldStayAcademic = getNpcSmarts(npc) + npc.ambition >= 108;
+    npc.educationLevel = shouldStayAcademic ? 'In college' : 'In school';
+    npc.currentEducation = shouldStayAcademic ? 'College' : 'School';
+    if ((npc.age ?? 0) === 16 && shouldStayAcademic) {
+      recordNpcLifeUpdate(npc, `${prefix} started college.`, updates, 2);
+    }
+    return;
+  }
+
+  if (npc.educationLevel === 'In college' && getNpcSmarts(npc) + npc.ambition >= 122) {
+    npc.educationLevel = 'At university';
+    npc.degreeCourse = npc.degreeCourse || chooseNpcDegreeCourse(npc, { socialGroup: npc.socialGroup });
+    npc.currentEducation = npc.degreeCourse;
+    npc.employmentStatus = 'Student';
+    npc.jobTitle = 'None';
+    npc.salary = 0;
+    npc.careerStage = 'Student';
+    if (npc.housingStatus === 'Living with family' || npc.housingStatus === 'Moved back home') {
+      npc.housingStatus = 'Student housing';
+      npc.livesWith = ['Roommates'];
+    }
+    recordNpcLifeUpdate(npc, `${prefix} started university${npc.degreeCourse ? ` to study ${npc.degreeCourse}` : ''}.`, updates, 4);
+    return;
+  }
+
+  if (npc.educationLevel === 'At university') {
+    const universityYears = (npc.universityYears ?? 0) + 1;
+    npc.universityYears = universityYears;
+    const neededYears = npc.degreeCourse === 'Medicine' ? 5 : 3;
+    const dropoutChance = Math.max(0.02, 0.12 - ((getNpcSmarts(npc) - 50) * 0.001) + (npc.stress > 72 ? 0.05 : 0));
+    if (Math.random() < dropoutChance) {
+      npc.educationLevel = 'Dropped out';
+      npc.currentEducation = null;
+      npc.employmentStatus = 'Unemployed';
+      recordNpcLifeUpdate(npc, `${prefix} dropped out of university.`, updates, 4);
+      return;
+    }
+    if (universityYears >= neededYears) {
+      npc.educationLevel = 'Graduated';
+      npc.currentEducation = null;
+      npc.degreeCourse = npc.degreeCourse || chooseNpcDegreeCourse(npc, { socialGroup: npc.socialGroup });
+      recordNpcLifeUpdate(npc, `${prefix} graduated${npc.degreeCourse ? ` in ${npc.degreeCourse}` : ''}.`, updates, 5);
+    }
+    return;
+  }
+
+  if (!['Graduated', 'Dropped out'].includes(npc.educationLevel) && (npc.age ?? 0) >= 22) {
+    npc.educationLevel = 'No higher education';
+    npc.currentEducation = null;
+  }
+}
+
+function maybeUpdateNpcCareer(entry, updates) {
+  const npc = entry.npc;
+  const prefix = getNpcEntryPrefix(entry);
+  const adult = (npc.age ?? 0) >= 18;
+  if (!adult) return;
+  if ((npc.age ?? 0) >= 65 && npc.employmentStatus !== 'Retired' && Math.random() < 0.35) {
+    npc.employmentStatus = 'Retired';
+    npc.jobTitle = 'Retired';
+    npc.job = 'Retired';
+    npc.salary = 0;
+    npc.careerStage = 'Retired';
+    npc.yearsInRole = 0;
+    recordNpcLifeUpdate(npc, `${prefix} retired.`, updates, 5);
+    return;
+  }
+  if (npc.educationLevel === 'At university') return;
+
+  const smart = getNpcSmarts(npc);
+  const rep = npc.reputation ?? getNpcReputationBase(npc);
+  const ambitious = npc.ambition ?? 50;
+  const employed = npc.employmentStatus === 'Employed' && npc.jobTitle && !['None', 'Retired'].includes(npc.jobTitle);
+
+  if (!employed) {
+    const wantsWork = npc.educationLevel !== 'At university' && npc.employmentStatus !== 'Retired';
+    if (!wantsWork) return;
+    const readyChance = 0.42 + ((smart - 50) * 0.003) + ((ambitious - 50) * 0.004) + ((rep - 50) * 0.002);
+    if (Math.random() < readyChance) {
+      const path = npc.careerPath || inferCareerPathFromJobOrCourse(npc.jobTitle, npc.degreeCourse);
+      const catalog = {
+        Legal: ['Legal Assistant', 'Paralegal', 'Court Clerk'],
+        Healthcare: ['Healthcare Assistant', 'Lab Assistant', 'Junior Doctor'],
+        Education: ['Teaching Assistant', 'Classroom Support Officer', 'Teacher Trainee'],
+        Engineering: ['Electrical Trainee', 'Operations Analyst', 'Junior Engineer'],
+        Technology: ['Operations Analyst', 'Project Coordinator', 'Support Analyst'],
+        Business: ['Finance Assistant', 'Sales Executive', 'Project Coordinator'],
+        Creative: ['Content Creator', 'Graphic Designer', 'Illustrator'],
+        'Public Service': ['Police Officer', 'Firefighter', 'Civil Service Officer'],
+        General: ['Receptionist', 'Admin Assistant', 'Customer Service Advisor'],
+      }[path] || ['Receptionist', 'Admin Assistant', 'Sales Executive'];
+      npc.jobTitle = catalog[npcSeedBetween(npc, `new-job-${STATE.age}`, 0, catalog.length - 1)];
+      npc.job = npc.jobTitle;
+      npc.employmentStatus = 'Employed';
+      npc.salary = estimateNpcSalary(npc.jobTitle, { role: entry.role }, npc);
+      npc.careerStage = 'Early career';
+      npc.yearsInRole = 0;
+      npc.employer = `${npc.surname || 'Northbridge'} ${path}`;
+      recordNpcLifeUpdate(npc, `${prefix} started working as ${npc.jobTitle}.`, updates, 4);
+    }
+    return;
+  }
+
+  npc.yearsInRole = (npc.yearsInRole || 0) + 1;
+  npc.salary = Math.max(0, Math.round((npc.salary || estimateNpcSalary(npc.jobTitle, { role: entry.role }, npc)) * (1 + ((Math.random() * 0.08) - 0.01))));
+  const promotionChance = 0.08
+    + Math.max(0, ambitious - 55) * 0.0025
+    + Math.max(0, smart - 55) * 0.0018
+    + Math.max(0, rep - 50) * 0.0016
+    + (hasNpcTrait(npc, 'hardworking') ? 0.04 : 0)
+    - (hasNpcTrait(npc, 'flaky') ? 0.05 : 0)
+    - (hasNpcTrait(npc, 'toxic') ? 0.03 : 0);
+  const jobLossChance = 0.04
+    + (npc.stress > 76 ? 0.05 : 0)
+    + (hasNpcTrait(npc, 'flaky') ? 0.06 : 0)
+    + (hasNpcTrait(npc, 'toxic') ? 0.04 : 0)
+    - Math.max(0, rep - 55) * 0.0013;
+  const careerChangeChance = 0.05 + (ambitious > 72 && npc.yearsInRole >= 3 ? 0.08 : 0) + (npc.happiness < 42 ? 0.04 : 0);
+
+  if (Math.random() < jobLossChance) {
+    npc.employmentStatus = 'Unemployed';
+    npc.jobTitle = 'None';
+    npc.job = 'None';
+    npc.salary = 0;
+    npc.careerStage = 'Between roles';
+    npc.yearsInRole = 0;
+    recordNpcLifeUpdate(npc, `${prefix} lost ${entry.role === 'parent' ? 'their' : 'their'} job.`, updates, 5);
+    return;
+  }
+  if (Math.random() < promotionChance && npc.yearsInRole >= 2) {
+    npc.jobTitle = getNpcPromotionTitle(npc);
+    npc.job = npc.jobTitle;
+    npc.salary = Math.round((npc.salary || estimateNpcSalary(npc.jobTitle, { role: entry.role }, npc)) * 1.12);
+    npc.careerStage = (npc.careerStage === 'Early career') ? 'Mid-career' : 'Established';
+    npc.yearsInRole = 0;
+    npc.reputation = clamp((npc.reputation || rep) + 6);
+    recordNpcLifeUpdate(npc, `${prefix} got promoted to ${npc.jobTitle}.`, updates, 5);
+    return;
+  }
+  if (Math.random() < careerChangeChance && (npc.age ?? 0) <= 58) {
+    const oldPath = npc.careerPath;
+    const possible = ['Business', 'Education', 'Creative', 'Public Service', 'General', 'Technology', 'Engineering']
+      .filter(path => path !== oldPath);
+    npc.careerPath = possible[npcSeedBetween(npc, `career-shift-${STATE.age}`, 0, possible.length - 1)];
+    npc.jobTitle = getNpcPromotionTitle({ ...npc, jobTitle: 'Assistant', careerPath: npc.careerPath });
+    npc.job = npc.jobTitle;
+    npc.salary = estimateNpcSalary(npc.jobTitle, { role: entry.role }, npc);
+    npc.yearsInRole = 0;
+    npc.careerStage = 'Fresh start';
+    recordNpcLifeUpdate(npc, `${prefix} changed careers and became ${npc.jobTitle}.`, updates, 4);
+  }
+}
+
+function maybeUpdateNpcHousing(entry, updates) {
+  const npc = entry.npc;
+  const prefix = getNpcEntryPrefix(entry);
+  if (entry.role === 'parent') {
+    npc.housingStatus = npc.employmentStatus === 'Retired' && (npc.age ?? 0) >= 65
+      ? 'Retired at home'
+      : 'Living with family';
+    npc.livesWith = ['Family household'];
+    return;
+  }
+  if ((npc.age ?? 0) < 18) return;
+  const employed = npc.employmentStatus === 'Employed';
+  if (npc.educationLevel === 'At university' && npc.housingStatus !== 'Student housing') {
+    npc.housingStatus = 'Student housing';
+    npc.livesWith = ['Roommates'];
+    recordNpcLifeUpdate(npc, `${prefix} moved into student housing.`, updates, 3);
+    return;
+  }
+  if (employed && (npc.age ?? 0) >= 22 && ['Living with family', 'Moved back home'].includes(npc.housingStatus) && Math.random() < 0.34) {
+    npc.housingStatus = Math.random() < 0.28 ? 'Own flat' : 'Shared flat';
+    npc.livesWith = npc.housingStatus === 'Own flat' ? ['Alone'] : ['Roommates'];
+    recordNpcLifeUpdate(npc, `${prefix} moved ${npc.housingStatus === 'Own flat' ? 'into their own place' : 'into a shared flat'}.`, updates, 4);
+    return;
+  }
+  if (!employed && ['Shared flat', 'Own flat'].includes(npc.housingStatus) && Math.random() < 0.18) {
+    npc.housingStatus = 'Moved back home';
+    npc.livesWith = ['Family'];
+    recordNpcLifeUpdate(npc, `${prefix} moved back home.`, updates, 4);
+  }
+}
+
+function maybeUpdateNpcRelationships(entry, updates) {
+  const npc = entry.npc;
+  const prefix = getNpcEntryPrefix(entry);
+  if ((npc.age ?? 0) < 18 || entry.role === 'parent') return;
+  const roll = Math.random();
+  if (npc.relationshipStatus === 'Single' && roll < 0.18) {
+    npc.relationshipStatus = 'In a relationship';
+    if (npc.housingStatus === 'Own flat' && Math.random() < 0.22) {
+      npc.housingStatus = 'Partner household';
+      npc.livesWith = ['Partner'];
+    }
+    recordNpcLifeUpdate(npc, `${prefix} started a relationship.`, updates, 3);
+    return;
+  }
+  if (npc.relationshipStatus === 'In a relationship' && (npc.age ?? 0) >= 28 && roll < 0.08) {
+    npc.relationshipStatus = 'Married';
+    npc.housingStatus = 'Partner household';
+    npc.livesWith = ['Partner'];
+    recordNpcLifeUpdate(npc, `${prefix} got married.`, updates, 5);
+    return;
+  }
+  if (['In a relationship', 'Talking to someone'].includes(npc.relationshipStatus) && roll > 0.94) {
+    npc.relationshipStatus = 'Single';
+    recordNpcLifeUpdate(npc, `${prefix} is single again.`, updates, 2);
+  }
+}
+
+function applyNpcRelationshipDrift(entry) {
+  const npc = entry.npc;
+  const traits = npc.traits || [];
+  let drift = entry.role === 'parent' ? 0 : entry.role === 'sibling' ? -1 : -4;
+  if (traits.includes('loyal')) drift += 2;
+  if (traits.includes('supportive')) drift += 1;
+  if (traits.includes('kind')) drift += 1;
+  if (traits.includes('flaky')) drift -= 3;
+  if (traits.includes('toxic')) drift -= 3;
+  if (traits.includes('ambitious') && (npc.age ?? 0) >= 18) drift -= 1;
+  const yearsIgnored = Math.max(0, STATE.age - (npc.lastInteractionAge ?? STATE.age));
+  if (entry.role === 'friend') drift -= Math.min(6, yearsIgnored);
+  if (entry.role === 'sibling') drift -= Math.min(3, Math.max(0, yearsIgnored - 1));
+  npc.relationship = clamp((npc.relationship ?? npc.friendshipCloseness ?? 60) + drift);
+  npc.friendshipCloseness = clamp(npc.relationship ?? npc.friendshipCloseness ?? 60);
+}
+
+function getStableFriendRelationship(friend, fallback = 60) {
+  const values = [
+    friend?.friendshipCloseness,
+    friend?.relationship,
+    fallback,
+  ].filter(value => value !== undefined && value !== null && !Number.isNaN(Number(value)));
+  return clamp(Math.max(...values.map(value => Number(value))));
+}
+
+function normalizeFriendRelationshipState(friend, fallback = null) {
+  if (!friend || friend.status !== 'friend') return friend;
+  const chosenFallback = fallback ?? STATE.relationships?.friends ?? 60;
+  const rawValues = [friend?.friendshipCloseness, friend?.relationship]
+    .filter(value => value !== undefined && value !== null && !Number.isNaN(Number(value)))
+    .map(value => Number(value));
+  const hasOnlyZeroData = rawValues.length > 0 && rawValues.every(value => value === 0);
+  const stable = hasOnlyZeroData
+    ? clamp(Math.max(chosenFallback, 55))
+    : getStableFriendRelationship(friend, chosenFallback);
+  friend.relationship = stable;
+  friend.friendshipCloseness = stable;
+  return friend;
+}
+
+function runAnnualNpcLifeProgression() {
+  const state = ensureNpcSystemState();
+  const updates = [];
+  getImportantNpcEntries().forEach(entry => {
+    const npc = ensureNpcCoreFields(entry.npc, { role: entry.role, socialGroup: entry.npc.socialGroup });
+    maybeUpdateNpcEducation(entry, updates);
+    maybeUpdateNpcCareer(entry, updates);
+    maybeUpdateNpcHousing(entry, updates);
+    maybeUpdateNpcRelationships(entry, updates);
+    npc.happiness = clamp((npc.happiness ?? 50) + Math.floor(Math.random() * 9) - 4 - (npc.stress > 70 ? 2 : 0));
+    npc.stress = clamp((npc.stress ?? 40) + Math.floor(Math.random() * 9) - 4 + (npc.employmentStatus === 'Employed' ? 1 : 0));
+    applyNpcRelationshipDrift(entry);
+    if (entry.role === 'friend') syncFriendSnapshot(npc);
+  });
+  const selected = updates
+    .sort((a, b) => (b.priority - a.priority) || (a.text > b.text ? 1 : -1))
+    .slice(0, 5)
+    .map(item => item.text);
+  state.annualUpdates = selected;
+  if (selected.length) {
+    selected.forEach(logPeopleUpdate);
+    state.archive.unshift({ age: STATE.age, updates: selected });
+    if (state.archive.length > 12) state.archive.length = 12;
+  }
+  return selected;
+}
+
 function ensurePersistentFriendState() {
   if (!STATE.social) STATE.social = { bullyCount:0, isBully:false, friends:[] };
   if (!Array.isArray(STATE.social.friends)) STATE.social.friends = [];
@@ -383,10 +1109,17 @@ function ensurePersistentFriendState() {
 function upsertPersistentFriend(friend) {
   if (!friend) return;
   ensurePersistentFriendState();
+  ensureNpcCoreFields(friend, {
+    role: 'friend',
+    socialGroup: friend.socialGroup || (STATE.school?.level === 'uni' ? 'university friend' : 'school friend'),
+  });
+  const existing = STATE.social.friends.find(current => current.id === friend.id) || null;
+  const stableRelationship = getStableFriendRelationship(friend, getStableFriendRelationship(existing, STATE.relationships?.friends ?? 60));
   const snapshot = {
     ...friend,
     status: 'friend',
-    relationship: friend.relationship ?? 60,
+    relationship: stableRelationship,
+    friendshipCloseness: stableRelationship,
   };
   const index = STATE.social.friends.findIndex(existing => existing.id === snapshot.id);
   if (index >= 0) STATE.social.friends[index] = { ...STATE.social.friends[index], ...snapshot };
@@ -461,6 +1194,14 @@ function logActivity(text, delta) {
   if (STATE.activity.length > 50) STATE.activity.pop();
 }
 
+function logPeopleUpdate(text) {
+  if (!text) return;
+  const alreadyLogged = (STATE.activity || []).some(entry => entry.age === STATE.age && entry.text === text);
+  if (alreadyLogged) return;
+  STATE.activity.unshift({ text, delta: null, age: STATE.age, type: 'people_update' });
+  if (STATE.activity.length > 80) STATE.activity.pop();
+}
+
 // ── FAMILY ACTIONS ──────────────────────────────────
 
 function getParentById(personId) {
@@ -483,6 +1224,7 @@ function syncSharedFamilyRelationshipFromParents() {
 
 function applyTargetedParentEffects(effects, person) {
   if (!effects) return 0;
+  markNpcInteraction(person);
   const passthrough = {};
   let delta = 0;
   Object.entries(effects).forEach(([k, v]) => {
@@ -501,6 +1243,7 @@ function applyTargetedParentEffects(effects, person) {
 
 function applyTargetedSiblingEffects(effects, person) {
   if (!effects) return 0;
+  markNpcInteraction(person);
   const passthrough = {};
   let delta = 0;
   Object.entries(effects).forEach(([k, v]) => {
@@ -589,13 +1332,25 @@ function diaryPlaceholderFor(actionId, role, variant='success') {
 function runParentRelationshipAction(action, person, role) {
   if (!person) return { ok:false };
 
-  if (action.id === 'ask_for_money_young_adult') {
-    openMoneyRequestOverlay(person.id, role);
+  if (action.id === 'move_out_young_adult') {
+    window._playSubTab = 'home';
+    const currentHome = typeof getCurrentHome === 'function' ? getCurrentHome() : null;
+    window._homeView = currentHome?.source === 'family' ? 'rent' : 'family_overview';
+    if (typeof switchTab === 'function') {
+      switchTab('activities', document.getElementById('nav-activities'));
+    }
     return { ok:true, skipRefresh:true, skipToast:true };
   }
 
-  if (action.customType === 'coming_soon_parent_action') {
-    return { ok:true, toast:'COMING SOON' };
+  if (action.id === 'contribute_financially_young_adult') {
+    if (typeof contributeBillsAtHome !== 'function') return { ok:false };
+    const result = contributeBillsAtHome();
+    return { ok:result.ok, toast:result.message };
+  }
+
+  if (action.id === 'ask_for_money_young_adult') {
+    openMoneyRequestOverlay(person.id, role);
+    return { ok:true, skipRefresh:true, skipToast:true };
   }
 
   if (action.customType === 'parent_learn') {
@@ -732,6 +1487,7 @@ function runClassmateRelationshipAction(action, person, role) {
   if (action.customType === 'classmate_rumour') {
     markPlayerAsBully('spreading rumours about', person);
   }
+  if (person.status === 'friend') normalizeFriendRelationshipState(person);
   logActivity(`${action.name} with ${person.firstName}`, delta);
   return { ok:true, toast:`${action.name} with ${person.firstName} ✓` };
 }
@@ -747,7 +1503,14 @@ function getAvailableActions(role, age = STATE.age, person = null) {
   return actionList.filter(a => {
     const minAge = a.minAge ?? 0;
     const maxAge = a.maxAge ?? Infinity;
-    if (!(minAge <= age && age <= maxAge)) return false;
+    const isAdultFriendCarryOver = role === 'Friend'
+      && age >= 18
+      && a.id.endsWith('_older');
+    if (!(minAge <= age && (isAdultFriendCarryOver || age <= maxAge))) return false;
+    if (a.id === 'contribute_financially_young_adult') {
+      const currentHome = typeof getCurrentHome === 'function' ? getCurrentHome() : null;
+      if (currentHome?.source !== 'family') return false;
+    }
     if (a.customType === 'sibling_help_kids' && !(person?.hasKids)) return false;
     if (a.customType === 'classmate_friend_request' && person?.status === 'friend') return false;
     return true;
@@ -780,6 +1543,8 @@ function triggerAction(actionId, personId, role) {
       ? runSiblingRelationshipAction(action, person, role)
       : runClassmateRelationshipAction(action, person, role);
   if (!result.ok) return;
+  if (person) markNpcInteraction(person);
+  if (person?.status === 'friend') syncFriendSnapshot(person);
   if (!result.skipRefresh) {
     updateAllUI();
     renderFamilyTab();
@@ -792,6 +1557,7 @@ function triggerAction(actionId, personId, role) {
 function requestMoneyFromParent(personId, role, amount) {
   const person = getParentById(personId);
   if (!person) return { ok:false, message:'Parent not found.' };
+  markNpcInteraction(person, `Asked ${person.firstName} for money.`);
 
   const roundedAmount = Math.max(0, Math.min(10000, Math.round(Number(amount) || 0)));
   const moneyRequests = STATE.family.moneyRequests || (STATE.family.moneyRequests = { total:0, byParent:{} });
@@ -1024,6 +1790,7 @@ function friendshipThreshold(classmate) {
 }
 
 function tryMakeFriend(classmate) {
+  ensureNpcCoreFields(classmate, { role: 'friend', socialGroup: STATE.school?.level === 'uni' ? 'university friend' : 'school friend' });
   const threshold   = friendshipThreshold(classmate);
   const relDelta    = classmate.relationship - threshold;
   let chance        = 80;
@@ -1051,6 +1818,7 @@ function tryMakeFriend(classmate) {
 
   if (Math.random()*100 < chance) {
     classmate.status = 'friend';
+    markNpcInteraction(classmate, `Became friends with ${STATE.firstName}.`);
     upsertPersistentFriend(classmate);
     STATE.relationships.friends = clamp(STATE.relationships.friends + 10);
     logActivity(`Became friends with ${classmate.firstName}`, 10);
@@ -1068,6 +1836,8 @@ function maybeReceiveClassmateFriendRequest() {
   if (Math.random() > 0.25) return;
   const classmate = pickRandom(candidates);
   classmate.status = 'friend';
+  ensureNpcCoreFields(classmate, { role: 'friend', socialGroup: STATE.school?.level === 'uni' ? 'university friend' : 'school friend' });
+  markNpcInteraction(classmate, `${classmate.firstName} reached out to you.`);
   upsertPersistentFriend(classmate);
   STATE.relationships.friends = clamp(STATE.relationships.friends + 10);
   logActivity(`${classmate.firstName} asked to be your friend. You said yes.`, 10);
@@ -1075,7 +1845,10 @@ function maybeReceiveClassmateFriendRequest() {
 
 // ── ANNUAL TICK ───────────────────────────────────────────
 function annualTick() {
+  ensureNpcSystemState();
   STATE.finances.balance += (STATE.finances.income - STATE.finances.expenses);
+
+  if (typeof runAnnualHomeTick === 'function') runAnnualHomeTick();
 
   if (STATE.age > 40) STATE.stats.looks  = clamp(STATE.stats.looks  - 1);
   if (STATE.age > 60) STATE.stats.health = clamp(STATE.stats.health - 2);
@@ -1130,6 +1903,7 @@ function annualTick() {
   STATE.family.siblings.forEach(s => s.age++);
   STATE.family.mum.age++;
   STATE.family.dad.age++;
+  ensureNpcSystemState();
 
   const bornNow = [];
   STATE.family.pendingSiblings = (STATE.family.pendingSiblings || []).filter(s => {
@@ -1167,6 +1941,8 @@ function annualTick() {
     STATE.school.rosterSnapshot = buildRosterSnapshot();
   }
 
+  runAnnualNpcLifeProgression();
+
   if (STATE.stats.health<=0 || STATE.age>=STATE.deathAge) return false;
   return true;
 }
@@ -1177,7 +1953,7 @@ function checkScholarship() {
 
   if (STATE.age === 11 && !STATE.school._privateSchoolChecked) {
     STATE.school._privateSchoolChecked = true;
-    if ((grade === 'A+' || grade === 'A') && Math.random() < 0.7) {
+    if (!isAlreadyPrivateTrack() && (grade === 'A+' || grade === 'A') && Math.random() < getPrivateSchoolOfferChance()) {
       STATE.school._privateSchoolEligible = true;
     }
   }
@@ -1185,9 +1961,9 @@ function checkScholarship() {
   if (STATE.age === 12 && STATE.school._appliedPrivate && !STATE.school._privateResolved) {
     STATE.school._privateResolved = true;
     if (STATE.school._appliedScholarship) {
-      STATE.school._scholarshipWon = Math.random() < 0.3;
+      STATE.school._scholarshipWon = Math.random() < getScholarshipChance();
     } else {
-      STATE.school._privateAccepted = Math.random() < 0.6;
+      STATE.school._privateAccepted = Math.random() < getPrivateSchoolAcceptanceChance();
       STATE.school._privateRejected = !STATE.school._privateAccepted;
     }
   }
@@ -1215,7 +1991,7 @@ function pickEvent() {
     if (e.type !== 'story') return false;
     if (STATE.age < e.minAge || STATE.age > e.maxAge) return false;
     if (STATE.usedEvents.includes(e.id)) return false;
-    if (e.id === 'private_school_offer' && !STATE.school._privateSchoolEligible) return false;
+    if (e.id === 'private_school_offer' && (!STATE.school._privateSchoolEligible || isAlreadyPrivateTrack())) return false;
     if (e.id === 'private_school_result' && (!STATE.school._appliedPrivate || STATE.school._appliedScholarship || !STATE.school._privateResolved)) return false;
     if (e.id === 'scholarship_result' && (!STATE.school._appliedScholarship || !STATE.school._privateResolved)) return false;
     return true;

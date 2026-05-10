@@ -19,6 +19,7 @@ function continueGame() {
     const { state, birthData } = JSON.parse(raw);
     STATE = state;
     _birthData = birthData;
+    if (typeof ensureNpcSystemState === 'function') ensureNpcSystemState();
     document.getElementById('screen-birth').classList.remove('active');
     document.getElementById('screen-game').classList.add('active');
     updateAllUI();
@@ -455,6 +456,7 @@ const JOB_INTERVIEW_EVENTS = [
 ];
 function switchTab(tab, el) {
   _currentTab = tab;
+  if (typeof ensureHomeState === 'function') ensureHomeState();
   if (tab !== 'learn') {
     _learnScreen = 'main';
     _learnClassmateId = null;
@@ -470,15 +472,19 @@ function switchTab(tab, el) {
 
   if (tab === 'family') renderFamilyTab();
   if (tab === 'learn')  renderLearnTab();
+  if (tab === 'activities') renderActivitiesTab();
 }
 
 // ── LIFE TAB ──────────────────────────────────────────────
 function updateAllUI() {
+  if (typeof ensureHomeState === 'function') ensureHomeState();
+  if (typeof ensureNpcSystemState === 'function') ensureNpcSystemState();
   ensureRelationshipOrderState();
   updateLifeTab();
   updateNavLearnLabel();
   if (_currentTab === 'family') renderFamilyTab();
   if (_currentTab === 'learn')  renderLearnTab();
+  if (_currentTab === 'activities') renderActivitiesTab();
 }
 function isWorkTabActive() {
   return STATE.age >= 18 && STATE.school.level !== 'uni';
@@ -629,7 +635,8 @@ function getActivityIcon(text) {
 }
 function renderActivityLog() {
   const list = document.getElementById('activity-list');
-  if (!STATE.activity.length) {
+  const peopleUpdates = STATE.npc?.annualUpdates || [];
+  if (!STATE.activity.length && !peopleUpdates.length) {
     list.innerHTML = '<div class="activity-empty">Nothing yet. Your life is just beginning.</div>';
     return;
   }
@@ -638,7 +645,19 @@ function renderActivityLog() {
     if (!grouped.has(a.age)) grouped.set(a.age, []);
     grouped.get(a.age).push(a);
   });
-  list.innerHTML = Array.from(grouped.entries()).map(([age, entries]) => `
+  const showPeopleBlock = peopleUpdates.length && !peopleUpdates.every(text =>
+    (STATE.activity || []).some(entry => entry.age === STATE.age && entry.text === text)
+  );
+  const peopleBlock = showPeopleBlock ? `
+    <div class="life-log-divider">People Updates</div>
+    ${peopleUpdates.map(text => `
+      <div class="life-log-item">
+        <div class="life-log-body">
+          <div class="life-log-text">${text}</div>
+        </div>
+      </div>`).join('')}
+  ` : '';
+  list.innerHTML = `${peopleBlock}${Array.from(grouped.entries()).map(([age, entries]) => `
     <div class="life-log-divider">Age ${age}</div>
     ${entries.map(a => `
       <div class="life-log-item">
@@ -646,7 +665,7 @@ function renderActivityLog() {
           <div class="life-log-text">${a.text}</div>
         </div>
       </div>`).join('')}
-  `).join('');
+  `).join('')}`;
 }
 
 // ── STAT SHEET ────────────────────────────────────────────
@@ -707,10 +726,30 @@ function getFriendEntries() {
   ensurePersistentFriendState();
   const liveFriends = STATE.school.classmates.filter(c => c.status === 'friend');
   liveFriends.forEach(upsertPersistentFriend);
-  const merged = STATE.social.friends.map(savedFriend =>
-    STATE.school.classmates.find(c => c.id === savedFriend.id) || savedFriend
-  );
-  return merged.map(friend => ({ person:friend, role:'Friend', rel:friend.relationship, traitPool:CLASSMATE_TRAITS_POOL }));
+  const merged = STATE.social.friends.map(savedFriend => {
+    const liveFriend = STATE.school.classmates.find(c => c.id === savedFriend.id);
+    if (!liveFriend) return savedFriend;
+    const stableRelationship = typeof getStableFriendRelationship === 'function'
+      ? getStableFriendRelationship(liveFriend, savedFriend.relationship ?? savedFriend.friendshipCloseness ?? 60)
+      : (savedFriend.relationship ?? liveFriend.relationship ?? 60);
+    return {
+      ...savedFriend,
+      ...liveFriend,
+      relationship: stableRelationship,
+      friendshipCloseness: stableRelationship,
+    };
+  });
+  merged.forEach(friend => {
+    if (typeof normalizeFriendRelationshipState === 'function') normalizeFriendRelationshipState(friend);
+  });
+  return merged.map(friend => ({
+    person:friend,
+    role:'Friend',
+    rel:(typeof getStableFriendRelationship === 'function'
+      ? getStableFriendRelationship(friend, 60)
+      : (friend.relationship ?? 60)),
+    traitPool:CLASSMATE_TRAITS_POOL,
+  }));
 }
 function getOrderedRelationshipEntries(listKey, entries) {
   ensureRelationshipOrderState();
@@ -824,10 +863,18 @@ function buildDotsIcon(color = '#5f5145') {
 function buildPersonCardExpandedBody(person, role, rel, traitPool) {
   const traits = buildPersonCardTraits(person, traitPool);
   const actions = getAvailableActions(role, STATE.age, person);
+  const actionLabel = action => {
+    if (action.id === 'move_out_young_adult') {
+      const currentHome = typeof getCurrentHome === 'function' ? getCurrentHome() : null;
+      return currentHome?.source === 'family' ? 'Move Out' : 'Ask To Move Back In';
+    }
+    if (action.id === 'contribute_financially_young_adult') return 'Contribute Bills';
+    return action.name;
+  };
   const actionButtons = actions.map(action => `
     <button onclick="triggerAction('${action.id}', '${person.id}', '${role}')"
       style="width:100%;padding:11px 14px;background:var(--surface-mid);border:1px solid var(--border);border-radius:11px;font-size:13px;font-weight:600;color:var(--text);text-align:left;cursor:pointer">
-      ${action.name}
+      ${actionLabel(action)}
     </button>
   `).join('');
   
@@ -983,6 +1030,449 @@ function buildEmptyState(emoji, title, subtitle) {
     <div style="font-size:13px;color:var(--text-faint)">${subtitle}</div>
   </div>`;
 }
+
+// ── PLAY / HOME TAB ──────────────────────────────────────
+function switchPlayTab(key) {
+  window._playSubTab = key;
+  renderActivitiesTab();
+}
+
+function switchHomeView(view) {
+  window._homeView = view;
+  renderActivitiesTab();
+}
+
+function runHomeAction(actionName, ...args) {
+  const action = window[actionName];
+  if (typeof action !== 'function') {
+    showToast('That action is unavailable.');
+    return;
+  }
+  const result = action(...args);
+  if (result?.message) showToast(result.message);
+  if (result?.ok !== false) {
+    saveGame();
+    updateAllUI();
+    renderActivitiesTab();
+  }
+}
+
+function clearPlaySelection() {
+  window._playSubTab = null;
+  window._homeView = null;
+  renderActivitiesTab();
+}
+
+function buildPlayHub() {
+  const options = [
+    { id:'health', label:'Health', icon:'❤️', subtitle:'Appointments, routines, recovery' },
+    { id:'shopping', label:'Shopping', icon:'🛍️', subtitle:'Clothes, treats, essentials' },
+    { id:'lifestyle', label:'Lifestyle', icon:'🌿', subtitle:'Habits, hobbies, routines' },
+    { id:'home', label:'Home', icon:'🏠', subtitle:'Where you live and who you live with' },
+    { id:'travel', label:'Travel', icon:'✈️', subtitle:'Trips, holidays, escapes' },
+    { id:'social', label:'Social', icon:'🥂', subtitle:'Plans, nights out, connection' },
+    { id:'beauty', label:'Beauty', icon:'✨', subtitle:'Hair, style, self-expression' },
+    { id:'vehicles', label:'Vehicles', icon:'🚗', subtitle:'Cars and transport later' },
+    { id:'pets', label:'Pets', icon:'🐾', subtitle:'Companions and care later' },
+    { id:'finance', label:'Finance', icon:'💳', subtitle:'Money tools and admin later' },
+  ];
+  return `
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#938678">Play</div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+        ${options.map(option => `
+          <button onclick="${option.id === 'home' ? `switchPlayTab('home')` : `showToast('${option.label} coming soon.')`}"
+            style="background:var(--surface);border:1px solid var(--border-light);border-radius:18px;padding:16px 14px;text-align:left;display:flex;flex-direction:column;gap:8px;cursor:pointer;box-shadow:0 8px 20px rgba(64,42,22,.05)">
+            <div style="font-size:28px;line-height:1">${option.icon}</div>
+            <div style="font-size:15px;font-weight:800;color:var(--text)">${option.label}</div>
+            <div style="font-size:12px;color:var(--text-muted);line-height:1.45">${option.subtitle}</div>
+          </button>
+        `).join('')}
+      </div>
+    </div>`;
+}
+
+function buildHomeMetricChip(label, value, accent = '#7b6b5f') {
+  return `
+    <div style="background:#fffaf1;border:1px solid rgba(224,210,193,.95);border-radius:14px;padding:10px 11px;display:flex;flex-direction:column;gap:3px;min-width:0">
+      <div style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9d8f82">${label}</div>
+      <div style="font-size:15px;font-weight:800;color:${accent};line-height:1.1">${value}</div>
+    </div>`;
+}
+
+function buildHomeResidentRow(resident, homeSource) {
+  const traits = (resident.traits || []).slice(0, 2).map(traitId => {
+    const trait = getHousemateTrait(traitId) || CLASSMATE_TRAITS_POOL.find(item => item.id === traitId) || PARENT_TRAITS_POOL.find(item => item.id === traitId);
+    if (!trait) return '';
+    return `<span class="trait-pill" style="font-size:10px;padding:3px 7px">${trait.label}</span>`;
+  }).join('');
+  const showContribution = resident.refType !== 'roommate';
+  const contribution = resident.contributionMonthly ? `${fmtMoney(resident.contributionMonthly)} / month` : 'No contribution';
+  const removeButton = ['rental', 'owner', 'guest'].includes(homeSource) && resident.refType !== 'partner'
+    ? `<button onclick="runHomeAction('askResidentToLeave','${resident.id}')" style="padding:8px 11px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:11px;font-weight:800;color:#7a6557;cursor:pointer">Ask To Leave</button>`
+    : '';
+  return `
+    <div style="background:var(--surface);border:1px solid var(--border-light);border-radius:14px;padding:12px 13px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+      <div style="min-width:0;flex:1">
+        <div style="font-size:14px;font-weight:800;color:var(--text)">${resident.name}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${resident.role} • ${resident.relationship || 0}% relationship</div>
+        ${traits ? `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">${traits}</div>` : ''}
+        ${showContribution ? `<div style="font-size:11px;color:#7d6a5c;margin-top:8px">${contribution}</div>` : ''}
+      </div>
+      ${removeButton}
+    </div>`;
+}
+
+function buildHomeMoveOption(option) {
+  const isBuy = option.propertyValue !== undefined;
+  const primaryCost = isBuy
+    ? `Deposit ${fmtMoney(option.deposit)}`
+    : option.upfront
+      ? `Upfront ${fmtMoney(option.upfront)}`
+      : `${fmtMoney(option.monthlyCost || option.playerMonthly || 0)} / month`;
+  const monthly = isBuy
+    ? `Mortgage ${fmtMoney(option.monthlyMortgage)} / month`
+    : `${fmtMoney(option.playerMonthly || option.monthlyCost || 0)} / month`;
+  const action = option.action || '';
+  const arg = option.arg ? `,'${option.arg}'` : '';
+  return `
+    <div style="background:var(--surface);border:1px solid var(--border-light);border-radius:16px;padding:14px 15px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+        <div style="min-width:0">
+          <div style="font-size:15px;font-weight:800;color:var(--text)">${option.icon || '🏠'} ${option.label}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:3px">${option.detail || option.type || ''}</div>
+        </div>
+        <span style="font-size:11px;font-weight:800;color:${option.enabled ? '#6a8e3f' : '#b46b5e'};text-transform:uppercase;letter-spacing:.08em">${option.enabled ? 'Available' : 'Locked'}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+        ${buildHomeMetricChip('Upfront', primaryCost, '#7b6b5f')}
+        ${buildHomeMetricChip('Ongoing', monthly, '#7b6b5f')}
+      </div>
+      <button onclick="${option.enabled ? `runHomeAction('${action}'${arg})` : `showToast('${option.lockReason || 'Not available yet.'}')`}"
+        style="width:100%;padding:12px 14px;border:1px solid ${option.enabled ? '#d9c5a2' : 'var(--border)'};border-radius:12px;background:${option.enabled ? '#fff4dc' : '#f7f2ea'};font-size:13px;font-weight:800;color:${option.enabled ? '#6f5335' : '#9d8c7d'};cursor:pointer">
+        ${option.buttonLabel || (option.enabled ? 'Choose This Home' : 'Unavailable')}
+      </button>
+    </div>`;
+}
+
+function buildHomeChoiceTabs() {
+  const current = window._homeView || 'rent';
+  const tabs = [
+    { id:'rent', label:'Rent a Home' },
+    { id:'buy', label:'Purchase a Home' },
+  ];
+  return `
+    <div class="job-tabs" style="margin-top:12px">
+      ${tabs.map(tab => `
+        <button class="job-tab ${current === tab.id ? 'active' : ''}" onclick="switchHomeView('${tab.id}')">
+          <span>${tab.label}</span>
+        </button>
+      `).join('')}
+    </div>`;
+}
+
+function buildCurrentHomeTabs() {
+  const current = window._homeView || 'current';
+  const tabs = [
+    { id:'current', label:'Current Home' },
+    { id:'rent', label:'Rent a Home' },
+    { id:'buy', label:'Purchase a Home' },
+  ];
+  return `
+    <div class="job-tabs" style="margin-top:12px">
+      ${tabs.map(tab => `
+        <button class="job-tab ${current === tab.id ? 'active' : ''}" onclick="switchHomeView('${tab.id}')">
+          <span>${tab.label}</span>
+        </button>
+      `).join('')}
+    </div>`;
+}
+
+function buildHomeHouseholdRoute() {
+  const home = getCurrentHome();
+  const entries = home?.source === 'family'
+    ? getFamilyPeopleEntries().filter(entry => entry.role !== 'Pet')
+    : getCurrentHomeResidents(home).map(resident => ({
+        person: resident.friendProfile || resident,
+        role: resident.refType === 'partner'
+          ? 'Partner'
+          : resident.refType === 'roommate'
+            ? 'Roommate'
+            : 'Friend',
+        rel: resident.relationship || 50,
+        traitPool: resident.refType === 'partner' ? HOUSEMATE_TRAITS_POOL : HOUSEMATE_TRAITS_POOL,
+      }));
+  return `
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <button onclick="switchHomeView('${home?.source === 'family' ? 'family_overview' : 'current'}')" style="padding:0;background:none;border:none;font-size:13px;font-weight:700;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer">
+          <span style="font-size:18px;line-height:1">‹</span><span>Back</span>
+        </button>
+        <div style="font-size:16px;font-weight:800;color:var(--text)">Household</div>
+        <div style="width:36px"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${entries.map(({ person, role, rel, traitPool }) => buildPersonCard(person, role, rel, traitPool)).join('')}
+      </div>
+    </div>`;
+}
+
+function buildFamilyHomeOverview(home, summary) {
+  const canContribute = STATE.age >= 16 && home.source === 'family';
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <button onclick="clearPlaySelection()" style="padding:0;background:none;border:none;font-size:13px;font-weight:700;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer">
+        <span style="font-size:18px;line-height:1">‹</span><span>Play</span>
+      </button>
+      <div style="font-size:16px;font-weight:800;color:var(--text)">Home</div>
+      <div style="width:36px"></div>
+    </div>
+    <div style="background:linear-gradient(180deg,#fff8ef 0%,#fffdf8 100%);border:1px solid rgba(225,209,190,.95);border-radius:20px;padding:18px;box-shadow:0 10px 28px rgba(84,55,24,.06);display:flex;flex-direction:column;gap:14px;margin-top:16px">
+      <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start">
+        <div style="display:flex;gap:12px;align-items:flex-start;min-width:0">
+          <div style="width:54px;height:54px;border-radius:16px;background:#fff1d7;border:1px solid #ecd3a8;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0">${home.icon}</div>
+          <div style="min-width:0">
+            <div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9a8d7f">Family Home</div>
+            <div style="font-size:22px;font-weight:800;letter-spacing:-.03em;color:#241d17;line-height:1.05">${home.name}</div>
+            <div style="font-size:13px;color:var(--text-muted);margin-top:5px">${home.type}</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+        ${buildHomeMetricChip('Comfort', `${summary.comfort}%`, '#7e6fb1')}
+        <button onclick="switchHomeView('household')" style="background:#fffaf1;border:1px solid rgba(224,210,193,.95);border-radius:14px;padding:10px 11px;text-align:left;cursor:pointer">
+          <div style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9d8f82">Household</div>
+          <div style="font-size:15px;font-weight:800;color:#7b6b5f;line-height:1.1;display:flex;align-items:center;justify-content:space-between;gap:8px"><span>${summary.occupantCount}</span><span style="font-size:18px;line-height:1">›</span></div>
+        </button>
+      </div>
+      <div style="font-size:13px;color:#6d6054;line-height:1.5">You live at home with your family.</div>
+      ${canContribute ? `
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+          <button onclick="switchHomeView('rent')" style="padding:12px 14px;border:1px solid var(--border-light);border-radius:12px;background:var(--surface);font-size:13px;font-weight:800;color:var(--text);cursor:pointer">Move Out</button>
+          <button onclick="runHomeAction('contributeBillsAtHome')" style="padding:12px 14px;border:1px solid var(--border-light);border-radius:12px;background:var(--surface);font-size:13px;font-weight:800;color:var(--text);cursor:pointer">Contribute Bills</button>
+        </div>` : ''}
+    </div>`;
+}
+
+function buildAdultHousingChooser(view) {
+  const rentals = getRentalOptions().map(option => ({
+    icon: option.icon,
+    label: option.name,
+    detail: option.type,
+    enabled: option.enabled,
+    lockReason: option.enabled ? '' : 'You need more money or income first.',
+    playerMonthly: option.playerMonthly,
+    upfront: option.upfront,
+    action: 'moveIntoRental',
+    arg: option.id,
+    buttonLabel: 'Rent This Home',
+  }));
+  const purchases = getPurchaseOptions().map(option => ({
+    icon: option.icon,
+    label: option.name,
+    detail: option.type,
+    enabled: option.enabled,
+    lockReason: option.enabled ? '' : 'You need a deposit, income, and approval.',
+    propertyValue: option.propertyValue,
+    deposit: option.deposit,
+    monthlyMortgage: option.monthlyMortgage,
+    action: 'buyHome',
+    arg: option.id,
+    buttonLabel: 'Buy This Home',
+  }));
+  const title = view === 'buy' ? 'Purchase a Home' : 'Rent a Home';
+  const sub = view === 'buy'
+    ? 'Deposit, approval, monthly mortgage.'
+    : 'Lower upfront cost, easier to move.';
+  const options = view === 'buy' ? purchases : rentals;
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <button onclick="${getCurrentHome()?.source === 'family' ? `switchHomeView('family_overview')` : `switchHomeView('current')`}" style="padding:0;background:none;border:none;font-size:13px;font-weight:700;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer">
+        <span style="font-size:18px;line-height:1">‹</span><span>Back</span>
+      </button>
+      <div style="font-size:16px;font-weight:800;color:var(--text)">${title}</div>
+      <div style="width:36px"></div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">${sub}</div>
+    ${buildHomeChoiceTabs()}
+    <div class="jobs-list" style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
+      ${options.map(buildHomeMoveOption).join('')}
+    </div>`;
+}
+
+function buildHomeSection(title, subtitle, body) {
+  return `
+    <section style="display:flex;flex-direction:column;gap:10px;margin-top:16px">
+      <div>
+        <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#938678">${title}</div>
+        ${subtitle ? `<div style="font-size:13px;color:var(--text-muted);margin-top:3px">${subtitle}</div>` : ''}
+      </div>
+      ${body}
+    </section>`;
+}
+
+function buildHomeTab() {
+  ensureHomeState();
+  const home = getCurrentHome();
+  const summary = getHomeSummary(home);
+  const residents = getCurrentHomeResidents(home);
+  const upgrades = getAvailableUpgradesForCurrentHome();
+  if (home.source === 'family' && STATE.age < 16) {
+    const view = window._homeView || 'family_overview';
+    if (view === 'household') return buildHomeHouseholdRoute();
+    return buildFamilyHomeOverview(home, summary);
+  }
+  if (home.source === 'family' && STATE.age >= 16) {
+    const view = window._homeView || 'family_overview';
+    if (view === 'household') return buildHomeHouseholdRoute();
+    if (view === 'buy' || view === 'rent') return buildAdultHousingChooser(view);
+    return `${buildFamilyHomeOverview(home, summary)}${buildHomeChoiceTabs()}`;
+  }
+  const view = window._homeView || 'current';
+  if (view === 'household') return `${buildCurrentHomeTabs()}${buildHomeHouseholdRoute()}`;
+  if (view === 'rent' || view === 'buy') return `${buildCurrentHomeTabs()}${buildAdultHousingChooser(view)}`;
+  const emergency = getEmergencyHousingOptions().map(option => {
+    const mapping = {
+      move_back_home: { action:'moveBackHome', buttonLabel:'Move Back Home' },
+      friend_sofa: { action:'stayWithFriend', buttonLabel:'Stay Here' },
+      sibling_spare_room: { action:'stayWithSibling', buttonLabel:'Stay Here' },
+      budget_room: { action:'takeTemporaryAccommodation', buttonLabel:'Take Room' },
+    };
+    const meta = mapping[option.type] || { action:'moveBackHome', buttonLabel:'Choose' };
+    return {
+      icon: option.type === 'move_back_home' ? '🏡' : option.type === 'friend_sofa' ? '🛏️' : option.type === 'sibling_spare_room' ? '🚪' : '🪟',
+      label: option.label,
+      detail: option.detail,
+      enabled: option.enabled,
+      lockReason: 'That option is not available right now.',
+      monthlyCost: option.monthlyCost,
+      upfront: option.upfront,
+      action: meta.action,
+      arg: option.refId || option.templateId || '',
+      buttonLabel: meta.buttonLabel,
+    };
+  });
+
+  const statusBadge = home.source === 'owner'
+    ? 'Owner'
+    : home.source === 'family'
+      ? 'Family Home'
+      : home.source === 'guest'
+        ? 'Staying With Someone'
+        : home.source === 'emergency'
+          ? 'Temporary'
+          : home.source === 'homeless'
+            ? 'Homeless'
+            : 'Renting';
+
+  const residentCards = residents.length
+    ? residents.map(resident => buildHomeResidentRow(resident, home.source)).join('')
+    : `<div style="background:var(--surface);border:1px solid var(--border-light);border-radius:14px;padding:14px 15px;font-size:13px;color:var(--text-muted)">You live alone right now.</div>`;
+
+  const upgradeCards = upgrades.length
+    ? upgrades.slice(0, 4).map(upgrade => `
+        <div style="background:var(--surface);border:1px solid var(--border-light);border-radius:15px;padding:13px 14px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+            <div>
+              <div style="font-size:14px;font-weight:800;color:var(--text)">${upgrade.label}</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${fmtMoney(upgrade.cost)} • +${upgrade.comfort} comfort • +${upgrade.prestige} prestige</div>
+            </div>
+            <button onclick="runHomeAction('applyHomeUpgradeById','${upgrade.id}')" style="padding:9px 11px;border:1px solid #d9c5a2;border-radius:10px;background:#fff4dc;font-size:11px;font-weight:800;color:#6f5335;cursor:pointer">Upgrade</button>
+          </div>
+        </div>
+      `).join('')
+    : `<div style="background:var(--surface);border:1px solid var(--border-light);border-radius:14px;padding:14px 15px;font-size:13px;color:var(--text-muted)">No upgrades available for this home right now.</div>`;
+
+  const currentHomeCard = `
+    <div style="background:linear-gradient(180deg,#fff8ef 0%,#fffdf8 100%);border:1px solid rgba(225,209,190,.95);border-radius:20px;padding:18px 18px 16px;box-shadow:0 10px 28px rgba(84,55,24,.06);display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start">
+        <div style="display:flex;gap:12px;align-items:flex-start;min-width:0">
+          <div style="width:54px;height:54px;border-radius:16px;background:#fff1d7;border:1px solid #ecd3a8;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0">${home.icon}</div>
+          <div style="min-width:0">
+            <div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9a8d7f">${statusBadge}</div>
+            <div style="font-size:22px;font-weight:800;letter-spacing:-.03em;color:#241d17;line-height:1.05">${home.name}</div>
+          <div style="font-size:13px;color:var(--text-muted);margin-top:5px">${home.type} • ${home.location}</div>
+        </div>
+      </div>
+        <div style="padding:7px 10px;border-radius:999px;background:${summary.happinessImpact >= 0 ? '#eef8df' : '#fff0eb'};font-size:11px;font-weight:800;color:${summary.happinessImpact >= 0 ? '#62873a' : '#b05e53'};white-space:nowrap">
+          ${summary.happinessImpact >= 0 ? '+' : ''}${summary.happinessImpact} happiness
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+        ${buildHomeMetricChip('Monthly Cost', `${fmtMoney(summary.cost.playerMonthly)} / month`, '#6f5335')}
+        ${buildHomeMetricChip('Comfort', `${summary.comfort}%`, '#7e6fb1')}
+        ${buildHomeMetricChip(home.source === 'rental' ? 'Enjoyment' : 'Prestige', `${home.source === 'rental' ? summary.enjoyment : summary.prestige}%`, '#9c7543')}
+        <button onclick="switchHomeView('household')" style="background:#fffaf1;border:1px solid rgba(224,210,193,.95);border-radius:14px;padding:10px 11px;text-align:left;cursor:pointer">
+          <div style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9d8f82">${home.source === 'rental' ? 'Household' : 'People Living Here'}</div>
+          <div style="font-size:15px;font-weight:800;color:#7b6b5f;line-height:1.1;display:flex;align-items:center;justify-content:space-between;gap:8px"><span>${summary.occupantCount}</span><span style="font-size:18px;line-height:1">›</span></div>
+        </button>
+        ${home.source === 'owner' ? buildHomeMetricChip('Condition', `${summary.overallCondition}%`, summary.overallCondition >= 60 ? '#6a8e3f' : '#b46b5e') : ''}
+      </div>
+      <div style="font-size:12px;color:#6d6054;line-height:1.5">
+        ${home.source === 'homeless'
+          ? 'Life feels unstable and exhausting right now. Finding safe housing should be a priority.'
+          : `You have lived here for ${home.yearsLived} ${home.yearsLived === 1 ? 'year' : 'years'}. Household relationship quality is ${summary.relationAverage}%, and household tension is ${summary.tension}%.`}
+      </div>
+    </div>`;
+
+  const actionButtons = home.source === 'rental'
+    ? `<div style="display:grid;grid-template-columns:minmax(0,1fr);gap:8px">
+        <button onclick="switchHomeView('rent')" style="padding:12px 14px;border:1px solid var(--border-light);border-radius:12px;background:var(--surface);font-size:13px;font-weight:800;color:var(--text);cursor:pointer">Move Out</button>
+      </div>`
+    : `<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+        <button onclick="runHomeAction('cleanCurrentHome')" style="padding:12px 14px;border:1px solid var(--border-light);border-radius:12px;background:var(--surface);font-size:13px;font-weight:800;color:var(--text);cursor:pointer">Clean Home</button>
+        <button onclick="runHomeAction('repairCurrentHome')" style="padding:12px 14px;border:1px solid var(--border-light);border-radius:12px;background:var(--surface);font-size:13px;font-weight:800;color:var(--text);cursor:pointer">Repair Home</button>
+        <button onclick="runHomeAction('inviteBestFriendToLive')" style="padding:12px 14px;border:1px solid var(--border-light);border-radius:12px;background:var(--surface);font-size:13px;font-weight:800;color:var(--text);cursor:pointer">Invite Someone</button>
+        <button onclick="runHomeAction('moveInWithPartner')" style="padding:12px 14px;border:1px solid var(--border-light);border-radius:12px;background:var(--surface);font-size:13px;font-weight:800;color:var(--text);cursor:pointer">Move In With Partner</button>
+        <button onclick="runHomeAction('moveBackHome')" style="padding:12px 14px;border:1px solid var(--border-light);border-radius:12px;background:var(--surface);font-size:13px;font-weight:800;color:var(--text);cursor:pointer">Move Back Home</button>
+        <button onclick="runHomeAction('sellCurrentHome')" style="padding:12px 14px;border:1px solid var(--border-light);border-radius:12px;background:var(--surface);font-size:13px;font-weight:800;color:var(--text);cursor:pointer">Sell Property</button>
+      </div>`;
+
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <button onclick="clearPlaySelection()" style="padding:0;background:none;border:none;font-size:13px;font-weight:700;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer">
+        <span style="font-size:18px;line-height:1">‹</span><span>Play</span>
+      </button>
+      <div style="font-size:16px;font-weight:800;color:var(--text)">Home</div>
+      <div style="width:36px"></div>
+    </div>
+    ${buildCurrentHomeTabs()}
+    ${buildHomeSection('Current Home', 'Your living situation right now.', currentHomeCard)}
+    ${home.source === 'owner' ? buildHomeSection('Household', 'Who lives here and how the home feels socially.', `<div style="display:flex;flex-direction:column;gap:10px">${residentCards}</div>`) : ''}
+    ${home.source === 'owner' ? buildHomeSection('Finances', 'Simple housing costs with no heavy micromanagement.', `
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+        ${buildHomeMetricChip('Rent / Mortgage', fmtMoney((home.baseMonthlyCost || 0) + (home.mortgageMonthly || 0)), '#6f5335')}
+        ${buildHomeMetricChip('Utilities', fmtMoney(home.utilitiesMonthly || 0), '#6f5335')}
+        ${buildHomeMetricChip('Upkeep', fmtMoney(summary.cost.upkeepMonthly), '#6f5335')}
+        ${buildHomeMetricChip('Household Contributions', fmtMoney(summary.cost.contributionsMonthly), '#6f5335')}
+      </div>
+    `) : ''}
+    ${home.source === 'owner' ? buildHomeSection('Property', 'Comfort, prestige, condition, and customisation.', `
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px">
+        ${buildHomeMetricChip('Cleanliness', `${summary.cleanliness}%`, '#507f7b')}
+        ${buildHomeMetricChip('Maintenance', `${summary.maintenance}%`, '#507f7b')}
+        ${buildHomeMetricChip('Overcrowding', `${summary.overcrowding}`, summary.overcrowding ? '#b46b5e' : '#6a8e3f')}
+        ${buildHomeMetricChip('Tension', `${summary.tension}%`, summary.tension >= 55 ? '#b46b5e' : '#6a8e3f')}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">${upgradeCards}</div>
+    `) : buildHomeSection('Make It Yours', 'Keep the fun personal upgrades.', `<div style="display:flex;flex-direction:column;gap:10px">${upgradeCards}</div>`)}
+    ${buildHomeSection('Actions', 'Small actions that keep the home feeling stable and personal.', actionButtons)}
+    ${home.source === 'homeless' ? buildHomeSection('Emergency Options', 'Safety nets that help you avoid homelessness.', `<div style="display:flex;flex-direction:column;gap:10px">${emergency.map(buildHomeMoveOption).join('')}</div>`) : ''}
+  `;
+}
+
+function renderActivitiesTab() {
+  const tab = document.getElementById('tab-activities');
+  if (!tab) return;
+  const current = window._playSubTab || null;
+  let body = '';
+  if (current === 'home') {
+    body = buildHomeTab();
+  } else {
+    body = buildPlayHub();
+  }
+  tab.innerHTML = body;
+}
 function educationLevelForAge(age) {
   if (age < 5)  return 'Pre-school';
   if (age < 12) return 'Primary school';
@@ -1043,6 +1533,7 @@ function reputationTone(value) {
 }
 function reputationValueFor(person, role) {
   if (person.isPet) return { label:'Reputation', value:clamp(person.happiness ?? person._rel ?? 50) };
+  if (person.reputation !== undefined) return { label:'Reputation', value:clamp(person.reputation) };
   if (person.npcStats?.reputation !== undefined) return { label:'Reputation', value:clamp(person.npcStats.reputation) };
   if (role === 'Mother' || role === 'Father')
     return { label:'Reputation', value:clamp(Math.round(((person.npcStats?.warmth ?? 50) + (person.npcStats?.generosity ?? 50)) / 2)) };
@@ -1070,10 +1561,14 @@ function openPersonSheet(personId, role) {
     const sib = STATE.family.siblings.find(s => s.id === personId);
     if (sib) person = { ...sib, _role:role, _rel:sib.relationship||60 };
     const cm  = STATE.school.classmates.find(c => c.id === personId);
-    if (cm)  person = { ...cm,  _role:role, _rel:cm.relationship };
+    if (cm)  person = { ...cm,  _role:role, _rel:(typeof getStableFriendRelationship === 'function' ? getStableFriendRelationship(cm, 60) : (cm.relationship ?? 60)) };
     if (!person && role === 'Friend') {
       const savedFriend = getPersistentFriendById(personId);
-      if (savedFriend) person = { ...savedFriend, _role:'Friend', _rel:savedFriend.relationship ?? 60 };
+      if (savedFriend) person = { ...savedFriend, _role:'Friend', _rel:(typeof getStableFriendRelationship === 'function' ? getStableFriendRelationship(savedFriend, 60) : (savedFriend.relationship ?? 60)) };
+    }
+    if (!person && role === 'Friend') {
+      const resident = typeof getHouseholdResidentById === 'function' ? getHouseholdResidentById(personId) : null;
+      if (resident?.friendProfile) person = { ...resident.friendProfile, _role:'Friend', _rel:resident.relationship ?? resident.friendProfile.relationship ?? 60 };
     }
     const teacher = STATE.school.teachers.find(t => t.id === personId);
     if (teacher) person = { ...teacher, _role:'Teacher', _rel:teacher.npcStats?.warmth ?? 50 };
@@ -1087,6 +1582,8 @@ function openPersonSheet(personId, role) {
   const avatarHTML = buildPersonSheetAvatar(person);
   const detailsHTML = buildPersonSheetDetails(person, role);
   const statsHTML = buildPersonSheetStats(person, role);
+  const lifeDetailsHTML = buildPersonSheetLifeDetails(person, role);
+  const lifeUpdatesHTML = buildPersonSheetLifeUpdates(person);
   const reputationHTML = buildPersonSheetReputation(person, role);
   const relLabel = role === 'Teacher' ? 'Warmth' : 'Relationship';
   const displayName = (role === 'Friend' || role === 'classmate') ? classmateDisplayName(person) : `${person.firstName}${person.surname ? ' '+person.surname : ''}`;
@@ -1112,11 +1609,13 @@ function openPersonSheet(personId, role) {
         </div>
       </div>
       ${detailsHTML}
+      ${lifeDetailsHTML ? `<div class="person-sheet-divider"></div>${lifeDetailsHTML}` : ''}
       <div class="person-sheet-divider"></div>
       ${statsHTML}
       ${traitsHTML ? `<div class="person-sheet-divider"></div><div class="sheet-section flat"><div class="sheet-section-title">Traits</div><div class="trait-pills person-sheet-traits">${traitsHTML}</div></div>` : ''}
       <div class="person-sheet-divider"></div>
       ${reputationHTML}
+      ${lifeUpdatesHTML ? `<div class="person-sheet-divider"></div>${lifeUpdatesHTML}` : ''}
     </div>`;
   if (sheet) {
     sheet.style.transform = '';
@@ -1163,10 +1662,10 @@ function npcStatConfigFor(role, person) {
   }
   if (role === 'Friend' || role === 'classmate') {
     return [
-      ['Popularity', 'warmth', person.npcStats?.popularity, '#9d87ff'],
+      ['Happiness', 'warmth', person.happiness, '#9d87ff'],
       ['Looks', 'looks', person.npcStats?.looks, '#ff89db'],
       ['Smarts', 'smarts', person.npcStats?.smarts, '#8fbffa'],
-      ['Reputation', 'reputation', person.npcStats?.reputation, '#4ecb71'],
+      ['Reputation', 'reputation', person.reputation ?? person.npcStats?.reputation, '#4ecb71'],
     ];
   }
   if (role === 'Teacher') {
@@ -1206,7 +1705,7 @@ function buildPersonSheetDetails(person, role) {
   const rows = [];
   if (person.age !== undefined) rows.push(['Age', buildSheetSymbolIcon('age', '#f2b48c'), `${person.age}`]);
   if (role === 'Mother' || role === 'Father') {
-    rows.push(['Job', buildSheetSymbolIcon('job', '#bc8f68'), person.job || 'None']);
+    rows.push(['Job', buildSheetSymbolIcon('job', '#bc8f68'), person.jobTitle || person.job || 'None']);
     const maritalStatus = STATE.family.maritalStatus || maritalStatusForSituation(STATE.family.situation);
     const maritalIcon = /divorc/i.test(maritalStatus) ? buildSheetSymbolIcon('divorced', '#ef7f88')
       : /married/i.test(maritalStatus) ? buildSheetSymbolIcon('married', '#d16a90')
@@ -1214,9 +1713,14 @@ function buildPersonSheetDetails(person, role) {
     rows.push(['Marital Status', maritalIcon, maritalStatus]);
   }
   if (role === 'Brother' || role === 'Sister') {
-    rows.push(['Education', buildSheetSymbolIcon('job', '#bc8f68'), educationLevelForAge(person.age)]);
+    rows.push(['Education', buildSheetSymbolIcon('job', '#bc8f68'), person.educationLevel || educationLevelForAge(person.age)]);
     rows.push(['Sibling Type', buildSheetSymbolIcon('single', '#ef98a5'), person.siblingType === 'half' ? 'Half sibling' : 'Full sibling']);
     if (person.familyStatus) rows.push(['Family Status', buildSheetSymbolIcon('single', '#ef98a5'), person.familyStatus]);
+  }
+  if (role === 'Friend' || role === 'classmate') {
+    rows.push(['Job', buildSheetSymbolIcon('job', '#bc8f68'), person.jobTitle && person.jobTitle !== 'None' ? person.jobTitle : 'Not working yet']);
+    rows.push(['Education', buildSheetSymbolIcon('job', '#bc8f68'), person.educationLevel || 'Unknown']);
+    rows.push(['Status', buildSheetSymbolIcon('single', '#ef98a5'), person.relationshipStatus || 'Single']);
   }
   if (role === 'Teacher') {
     rows.push(['Subject', buildSheetSymbolIcon('job', '#bc8f68'), person.subject || 'Unknown']);
@@ -1234,6 +1738,46 @@ function buildPersonSheetDetails(person, role) {
           <div class="person-sheet-metric-value">${value}</div>
           <div class="person-sheet-metric-label">${label}</div>
         </div>`).join('')}
+    </div>`;
+}
+
+function buildPersonSheetLifeDetails(person, role) {
+  if (person.isPet || role === 'Teacher') return '';
+  const rows = [];
+  if (person.jobTitle || role === 'Mother' || role === 'Father') rows.push(['Job', person.jobTitle || person.job || 'None']);
+  if (person.educationLevel) rows.push(['Education', person.currentEducation ? `${person.educationLevel} • ${person.currentEducation}` : person.educationLevel]);
+  if (person.relationshipStatus) rows.push(['Relationship', person.relationshipStatus]);
+  if (person.housingStatus) rows.push(['Housing', person.housingStatus]);
+  if (person.socialGroup && (role === 'Friend' || role === 'classmate')) rows.push(['Social Group', person.socialGroup]);
+  if (person.salary && person.salary > 0 && (role === 'Mother' || role === 'Father' || role === 'Friend' || role === 'Brother' || role === 'Sister')) rows.push(['Income', fmtMoney(person.salary)]);
+  if (person.careerPath && person.jobTitle && person.jobTitle !== 'None') rows.push(['Career Path', person.careerPath]);
+  if (!rows.length) return '';
+  return `
+    <div class="sheet-section flat">
+      <div class="sheet-section-title">Life Details</div>
+      <div class="detail-card">
+        ${rows.slice(0, 6).map(([label, value]) => `
+          <div class="detail-row">
+            <span class="detail-label">${label}</span>
+            <span class="detail-val bold">${value}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function buildPersonSheetLifeUpdates(person) {
+  const updates = person.lifeUpdates || [];
+  if (!updates.length) return '';
+  return `
+    <div class="sheet-section flat">
+      <div class="sheet-section-title">Life Updates</div>
+      <div class="detail-card">
+        ${updates.map(update => `
+          <div class="detail-row" style="align-items:flex-start">
+            <span class="detail-label">Age ${update.age}</span>
+            <span class="detail-val" style="max-width:72%;text-align:right;font-family:inherit">${update.text}</span>
+          </div>`).join('')}
+      </div>
     </div>`;
 }
 function buildPersonSheetReputation(person, role) {
@@ -1333,6 +1877,7 @@ function interactClassmate(cmId, action) {
   const cm = STATE.school.classmates.find(c => c.id === cmId);
   if (!cm) return;
   if (action === 'chat') {
+    if (typeof markNpcInteraction === 'function') markNpcInteraction(cm, `Spent time chatting with ${cm.firstName}.`);
     cm.relationship = clamp(cm.relationship + Math.floor(Math.random()*8) + 3);
     logActivity(`Chatted with ${cm.firstName}`, 5);
     showToast(`Chatted with ${cm.firstName} ✓`);
@@ -2980,6 +3525,13 @@ function acceptUniversityOffer(type) {
   STATE.school.level = 'uni';
   STATE.school.current = formatUniversityType(type);
   logActivity(`Accepted a place to study ${postSchool.uniApplication.course} at ${formatUniversityType(type)}.`, null);
+  if (typeof getCurrentHome === 'function' && getCurrentHome()?.source === 'family' && typeof makeRentalHome === 'function' && typeof addHomeToHistory === 'function' && typeof setCurrentHome === 'function') {
+    const studentHome = addHomeToHistory(makeRentalHome('rental_student_house'));
+    setCurrentHome(studentHome, 'Moved out for university and into a shared student house.');
+    window._playSubTab = 'home';
+    window._homeView = 'household';
+    showToast('You have moved into shared student housing.');
+  }
   saveGame();
   closeMilestone();
   updateAllUI();
@@ -4265,6 +4817,7 @@ function openFinanceSheet() {
   const f   = STATE.finances;
   const tax = Math.round(f.income * 0.2);
   const net = f.income - tax - f.expenses;
+  const home = typeof getCurrentHome === 'function' ? getCurrentHome() : null;
   document.getElementById('finance-inner').innerHTML = `
     <div class="hub-hero">
       <div class="hub-hero-label">Net Worth</div>
@@ -4275,7 +4828,7 @@ function openFinanceSheet() {
     <div class="detail-card">
       <div class="detail-row"><span class="detail-label">Income (${f.job||'None'})</span><span class="detail-val pos">+${fmtMoney(f.income)}</span></div>
       <div class="detail-row"><span class="detail-label">Tax (~20%)</span><span class="detail-val neg">-${fmtMoney(tax)}</span></div>
-      <div class="detail-row"><span class="detail-label">Housing</span><span class="detail-val neg">-${fmtMoney(f.expenses)}</span></div>
+      <div class="detail-row"><span class="detail-label">Housing${home ? ` (${home.name})` : ''}</span><span class="detail-val neg">-${fmtMoney(f.expenses)}</span></div>
       <div class="detail-row total"><span class="detail-label">Net / year</span><span class="detail-val bold">${net >= 0 ? '+' : ''}${fmtMoney(net)}</span></div>
     </div>`;
   document.getElementById('finance-overlay').classList.add('open');
@@ -4434,6 +4987,10 @@ function openEvent(ev) {
   document.getElementById('event-overlay').classList.add('open');
 }
 function handleChoice(ev, choice) {
+  if (choice.beforeChoose) {
+    const allowed = choice.beforeChoose();
+    if (allowed === false) return;
+  }
   const effects    = choice.effects || {};
   const totalDelta = Object.values(effects).reduce((s, v) => s + v, 0);
   applyEffects(effects);
