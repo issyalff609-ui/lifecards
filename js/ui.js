@@ -4213,51 +4213,74 @@ function buildLearnClassmateActions(c) {
     </div>`;
 }
 
-function buildLearnHeroSchool(edu, grade, avgGrade, gradeAboveAvg) {
-  const primaryIllustration = 'data/primary_school_hero_card.png';
-  const schoolType = edu.type?.primary || 'State Primary';
-  const reputationByType = {
+function getLearnSchoolReputation(type) {
+  return {
     'State Primary': 3,
-    'Prep School': 4,
+    'State Secondary': 3,
+    'State Sixth Form': 3,
+    'Grammar School': 4,
+    'Grammar Sixth Form': 4,
+    'Private School': 4,
+    'Private Sixth Form': 4,
     'Elite Prep School': 5,
+    'Elite Boarding School': 5,
+    'Elite Sixth Form': 5,
+  }[type] || 3;
+}
+
+function getLearnSchoolYearLabel(level, age) {
+  if (level === 'primary') return `Year ${clamp(age - 5, 1, 6)}`;
+  if (level === 'secondary') return `Year ${clamp(age - 5, 7, 11)}`;
+  if (level === 'college') return `Year ${clamp(age - 4, 12, 13)}`;
+  return 'School';
+}
+
+function getLearnSchoolGradeTone(grade) {
+  if (['A+', 'A', 'B'].includes(grade)) {
+    return {
+      background: 'linear-gradient(180deg, #e8f7d8 0%, #d8f0c6 100%)',
+      color: '#6abf4b',
+    };
+  }
+  if (['C', 'D'].includes(grade)) {
+    return {
+      background: 'linear-gradient(180deg, #fde7c4 0%, #f9d6a0 100%)',
+      color: '#e48c1f',
+    };
+  }
+  return {
+    background: 'linear-gradient(180deg, #f9d7d3 0%, #f4c2bc 100%)',
+    color: '#de5547',
   };
-  const schoolReputation = reputationByType[schoolType] || 3;
-  const stageLabels = { pre:'Pre-School', primary:'Primary School', secondary:'Secondary School', college:'Sixth Form / College', uni:'University' };
-  const currentYear = Math.min(Math.max((STATE.age - 4), 1), 6);
-  const totalYears = 6;
+}
+
+function buildLearnSchoolStars(type) {
+  return `<span class="learn-school-stars">${Array.from({ length: getLearnSchoolReputation(type) }, () => '★').join('')}</span>`;
+}
+
+function buildLearnHeroSchool(edu, grade) {
+  const illustration = 'data/state_primary.png';
+  const schoolType = edu.type?.[edu.level] || 'State Primary';
+  const gradeTone = getLearnSchoolGradeTone(grade);
   const schoolName = edu.current || 'School';
-  const schoolStage = stageLabels[edu.level] || 'School';
-  const starIcons = Array.from({ length: 5 }, (_, i) =>
-    `<span style="color:${i < schoolReputation ? '#ffb703' : '#e6ded4'};font-size:20px;letter-spacing:.02em">★</span>`
-  ).join('');
+  const yearLabel = getLearnSchoolYearLabel(edu.level, STATE.age);
   return `
-    <div style="display:flex;flex-direction:column;min-height:206px">
-      <div style="position:relative;display:flex;justify-content:space-between;align-items:flex-start;gap:18px">
-        <div style="display:flex;flex-direction:column;flex:1;min-width:0;padding-top:2px;position:relative;z-index:2;max-width:52%">
-          <div style="display:inline-flex;align-items:center;width:fit-content;background:#ece8e3;border-radius:999px;padding:6px 14px;font-size:12px;font-weight:700;color:#5f5a54">
-            ${schoolStage}
+    <div class="learn-school-hero">
+      <div class="learn-school-hero-inner">
+        <div class="learn-school-hero-copy">
+          <div class="learn-school-name">${schoolName}</div>
+          <div class="learn-school-meta">
+            <span>${schoolType}</span>
+            ${buildLearnSchoolStars(schoolType)}
           </div>
-          <div style="font-size:26px;font-weight:800;letter-spacing:-.045em;line-height:1.03;color:#121212;margin-top:12px">${schoolName}</div>
-          <div style="font-size:13px;font-weight:700;color:#6a6661;margin-top:10px">Year ${currentYear} of ${totalYears}</div>
-          <div style="height:38px"></div>
+          <div class="learn-school-yearline">${yearLabel} • Age ${STATE.age}</div>
         </div>
-        <img src="${primaryIllustration}" alt="Primary school illustration" style="position:absolute;right:-18px;top:-44px;width:280px;height:330px;object-fit:contain;display:block;z-index:1;pointer-events:none" />
-      </div>
-      <div style="margin-top:auto;padding-top:10px;border-top:1px solid rgba(44,33,23,.12);display:flex;align-items:flex-start">
-        <div style="display:flex;align-items:flex-start;gap:10px;flex:1;padding-right:20px">
-          <iconify-icon icon="material-symbols:location-city-rounded" style="font-size:20px;color:#b8aea3;flex-shrink:0;margin-top:1px"></iconify-icon>
-          <div style="min-width:0">
-            <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9a9085">School Type</div>
-            <div style="font-size:14px;font-weight:800;color:#1a1814;margin-top:4px;line-height:1.1;white-space:nowrap">${schoolType}</div>
+        <div class="learn-school-hero-side">
+          <div class="learn-school-grade" style="background:${gradeTone.background}">
+            <div class="learn-school-grade-label">Grade</div>
+            <div class="learn-school-grade-value" style="color:${gradeTone.color}">${grade}</div>
           </div>
-        </div>
-        <div style="width:1px;align-self:stretch;background:rgba(44,33,23,.12)"></div>
-        <div style="display:flex;align-items:flex-start;gap:10px;flex:1;padding-left:20px">
-          <iconify-icon icon="material-symbols:kid-star-rounded" style="font-size:20px;color:#ffb703;flex-shrink:0;margin-top:1px"></iconify-icon>
-          <div style="min-width:0">
-            <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9a9085">School Reputation</div>
-            <div style="display:flex;align-items:center;gap:3px;margin-top:5px;line-height:1;white-space:nowrap">${starIcons}</div>
-          </div>
+          <img src="${illustration}" alt="School illustration" class="learn-school-illustration" />
         </div>
       </div>
     </div>
@@ -4832,46 +4855,168 @@ function buildLearnClassmateDetailScreen(c) {
 
 function buildLearnTeacherRow(t) {
   return `
-    <div onclick="openPersonSheet('${t.id}','Teacher')" style="background:var(--surface);border:1px solid var(--border-light);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px;cursor:pointer">
-      <div style="width:40px;height:40px;border-radius:50%;background:transparent;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden">
-        ${getCharacterHTML(t.appearance, 35, 40, { showBg: false })}
+    <div class="learn-school-teacher-card">
+      <div class="learn-school-teacher-avatar">
+        ${getCharacterHTML(t.appearance, 35, 52, { showBg: false })}
       </div>
-      <div style="flex:1">
-        <div style="font-size:14px;font-weight:700">${t.title} ${t.surname}</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${t.subject}</div>
+      <div class="learn-school-teacher-copy">
+        <div class="learn-school-teacher-title">${t.title} ${t.surname}</div>
+        <div class="learn-school-teacher-sub">${t.subject} teacher</div>
       </div>
     </div>`;
 }
 
-function buildLearnToggleSection(id, label, contentHTML) {
+function buildLearnSchoolNavIcon(icon) {
+  const icons = {
+    action: `<svg viewBox="0 0 24 24"><path fill="#fff" d="M15.425 2.25c.841 0 1.404.798 1.212 1.563l-.049.153L14.49 9.35H17c.985 0 1.532 1.054 1.1 1.854l-.1.156l-7.47 10.047c-.54.725-1.621.224-1.527-.605l.785-6.91H7c-.907 0-1.487-.924-1.155-1.735l.005-.011l3.906-9.128a1.25 1.25 0 0 1 1.151-.768z"/></svg>`,
+  };
+  return icons[icon] || `<iconify-icon icon="${icon}"></iconify-icon>`;
+}
+
+function buildLearnSchoolNavCard({ screen, icon, title, subtitle, color, shadow }) {
   return `
-    <div class="${id}-section">
-      <button onclick="toggleLearnSection('${id}-inner')"
-        style="width:100%;padding:13px 16px;background:var(--surface);border:1px solid var(--border-light);border-radius:14px;font-size:13px;font-weight:700;color:var(--text);display:flex;justify-content:space-between;align-items:center">
-        <span>${label}</span><span>›</span>
-      </button>
-      <div id="${id}-inner" style="display:none;margin-top:8px;flex-direction:column;gap:8px">
-        ${contentHTML}
+    <button class="learn-school-nav-card" onclick="openLearnScreen('${screen}')">
+      <div class="learn-school-nav-main">
+        <div class="learn-school-nav-icon" style="background:${color}">
+  ${buildLearnSchoolNavIcon(icon)}
+</div>
+        <div class="learn-school-nav-copy">
+          <div class="learn-school-nav-title">${title}</div>
+          <div class="learn-school-nav-sub">${subtitle}</div>
+        </div>
       </div>
+      <span class="learn-school-nav-arrow">›</span>
+    </button>`;
+}
+
+function buildLearnSchoolMainScreen(edu) {
+  return `
+    <div class="learn-school-actions">
+      ${buildLearnSchoolNavCard({
+        screen: 'actions',
+        icon: 'material-symbols:bolt-rounded',
+        title: 'Actions',
+        subtitle: 'Choose what to do',
+        color: 'linear-gradient(180deg, #ffb34f 0%, #ff962d 100%)',
+        shadow: '0 12px 22px rgba(255, 150, 45, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
+      })}
+      ${buildLearnSchoolNavCard({
+        screen: 'clubs',
+        icon: 'material-symbols:masks-rounded',
+        title: 'Clubs',
+        subtitle: 'Activities and school clubs',
+        color: 'linear-gradient(180deg, #95dc76 0%, #72c85c 100%)',
+        shadow: '0 12px 22px rgba(114, 200, 92, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
+      })}
+      ${buildLearnSchoolNavCard({
+        screen: 'classmates',
+        icon: 'material-symbols:groups-rounded',
+        title: `Classmates (${edu.classmates.length})`,
+        subtitle: 'See your classmates and relationships',
+        color: 'linear-gradient(180deg, #b390f7 0%, #9670ea 100%)',
+        shadow: '0 12px 22px rgba(150, 112, 234, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
+      })}
+      ${buildLearnSchoolNavCard({
+        screen: 'teachers',
+        icon: 'material-symbols:person-rounded',
+        title: 'Teachers',
+        subtitle: 'View your teachers',
+        color: 'linear-gradient(180deg, #73aff7 0%, #4d8fe7 100%)',
+        shadow: '0 12px 22px rgba(77, 143, 231, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
+      })}
+    </div>`;
+}
+
+function buildLearnSchoolPageHeader(title, subtitle) {
+  return `
+    <div class="learn-school-page-head">
+      <button class="learn-school-back" onclick="closeLearnSubscreen()"><span style="font-size:20px;line-height:1">‹</span></button>
+      <div>
+        <div class="learn-school-page-title">${title}</div>
+        <div class="learn-school-page-sub">${subtitle}</div>
+      </div>
+    </div>`;
+}
+
+function buildLearnPlaceholderItems(items) {
+  return items.map(item => `
+    <div class="learn-school-placeholder-card">
+      <div class="learn-school-placeholder-copy">
+        <div class="learn-school-placeholder-title">${item.title}</div>
+        <div class="learn-school-placeholder-sub">${item.subtitle}</div>
+      </div>
+      <div class="learn-school-pill">${item.tag || 'Placeholder'}</div>
+    </div>`).join('');
+}
+
+function buildLearnActionsPlaceholderPage() {
+  return `
+    <div class="learn-school-page">
+      ${buildLearnSchoolPageHeader('Actions', 'Placeholder actions built on the new school page foundation.')}
+      <div class="learn-school-note-card">
+        <div class="learn-school-note-label">Placeholder</div>
+        <div class="learn-school-note-copy">These actions are temporary, but the page structure is ready for the real school action system.</div>
+      </div>
+      ${buildLearnPlaceholderItems([
+        { title: 'Study harder', subtitle: 'Spend more time on homework and revision.', tag: 'Action' },
+        { title: 'Ask for extra help', subtitle: 'Get support from a teacher after class.', tag: 'Action' },
+        { title: 'Revise for a test', subtitle: 'Prepare early and protect your grade.', tag: 'Action' },
+      ])}
+    </div>`;
+}
+
+function buildLearnClubsPlaceholderPage() {
+  return `
+    <div class="learn-school-page">
+      ${buildLearnSchoolPageHeader('Clubs', 'Placeholder activities and school clubs.')}
+      <div class="learn-school-note-card">
+        <div class="learn-school-note-label">Placeholder</div>
+        <div class="learn-school-note-copy">This page is temporary, but the layout is ready for a larger clubs and activities system.</div>
+      </div>
+      ${buildLearnPlaceholderItems([
+        { title: 'Join the drama club', subtitle: 'Meet new people and perform on stage.', tag: 'Club' },
+        { title: 'Try the football team', subtitle: 'Build teamwork and school spirit.', tag: 'Club' },
+        { title: 'Sign up for the chess club', subtitle: 'Develop strategy and focus after class.', tag: 'Club' },
+      ])}
+    </div>`;
+}
+
+function buildLearnTeachersPlaceholderPage(edu) {
+  return `
+    <div class="learn-school-page">
+      ${buildLearnSchoolPageHeader('Teachers', 'View your teachers.')}
+      <div class="learn-school-note-card">
+        <div class="learn-school-note-label">Placeholder</div>
+        <div class="learn-school-note-copy">Teacher profiles are staying lightweight for now. The two existing teachers are shown below.</div>
+      </div>
+      ${(edu.teachers || []).map(t => buildLearnTeacherRow(t)).join('')}
     </div>`;
 }
 
 let _learnScreen = 'main';
 
-function openLearnClassmatesScreen() {
-  _learnScreen = 'classmates';
+function openLearnScreen(screen) {
+  _learnScreen = screen;
+  if (screen !== 'classmate') _learnClassmateId = null;
+  renderLearnTab();
+  const tab = document.getElementById('tab-learn');
+  if (tab) tab.scrollTop = 0;
+}
+
+function closeLearnSubscreen() {
+  _learnScreen = 'main';
   _learnClassmateId = null;
   renderLearnTab();
   const tab = document.getElementById('tab-learn');
   if (tab) tab.scrollTop = 0;
 }
 
+function openLearnClassmatesScreen() {
+  openLearnScreen('classmates');
+}
+
 function closeLearnClassmatesScreen() {
-  _learnScreen = 'main';
-  _learnClassmateId = null;
-  renderLearnTab();
-  const tab = document.getElementById('tab-learn');
-  if (tab) tab.scrollTop = 0;
+  closeLearnSubscreen();
 }
 
 function renderLearnTab() {
@@ -4880,6 +5025,7 @@ function renderLearnTab() {
   const isPostSchoolPlanning = age >= 18 && edu.level === 'finished_school';
   const isGraduatePlanning = age >= 18 && edu.level === 'graduated';
   const isEmployed = age >= 18 && STATE.career?.job && STATE.career.job !== 'None' && edu.level !== 'uni';
+  const isSchoolStage = ['primary', 'secondary', 'college'].includes(edu.level);
   if (_learnScreen === 'classmates' && !(age >= 5 && age <= 18 && edu.classmates.length)) {
     _learnScreen = 'main';
   }
@@ -4887,14 +5033,11 @@ function renderLearnTab() {
     _learnScreen = age >= 5 && age <= 18 && edu.classmates.length ? 'classmates' : 'main';
     _learnClassmateId = null;
   }
+  if (!isSchoolStage && ['actions', 'clubs', 'teachers'].includes(_learnScreen)) {
+    _learnScreen = 'main';
+  }
   const grade       = (age >= 5 && age <= 18) ? gradeFromScore(edu.gradeScore) : null;
-  const avgScore    = edu.classmates.length
-    ? Math.round(edu.classmates.reduce((s, c) => s + c.gradeScore, 0) / edu.classmates.length)
-    : edu.gradeScore;
-  const avgGrade      = gradeFromScore(avgScore);
-  const gradeAboveAvg = grade && edu.gradeScore >= avgScore;
 
-  // ── Hero card ─────────────────────────────────────────
   const tab = document.getElementById('tab-learn');
   const hero = document.querySelector('#tab-learn .hub-hero');
   const gradeBlockWrap = document.getElementById('grade-block-wrap');
@@ -4907,6 +5050,9 @@ function renderLearnTab() {
   const existingClassmateDetailScreen = document.getElementById('learn-classmate-detail-screen');
   if (existingClassmateDetailScreen) existingClassmateDetailScreen.remove();
   container.querySelectorAll('.uni-apply-screen').forEach(el => el.remove());
+  hero.style.padding = '';
+  hero.style.borderRadius = '';
+  hero.style.boxShadow = '';
 
   if (isPostSchoolPlanning) {
     hero.style.background = 'linear-gradient(135deg, #485563, #29323c)';
@@ -4921,30 +5067,27 @@ function renderLearnTab() {
     hero.style.background = 'linear-gradient(180deg, rgba(255,255,255,0.99), rgba(247,243,252,0.99))';
     hero.style.border = '1px solid rgba(221,212,232,0.95)';
     hero.innerHTML = buildUniversityHeroCard();
-  } else if (grade) {
-    hero.style.background = edu.level === 'primary'
-      ? 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,243,238,0.98))'
-      : '#fef9c3';
-    hero.style.border     = edu.level === 'primary'
-      ? '1px solid rgba(218, 208, 197, 0.9)'
-      : '1px solid #fde047';
-    hero.innerHTML = buildLearnHeroSchool(edu, grade, avgGrade, gradeAboveAvg);
+  } else if (grade && isSchoolStage) {
+    hero.style.background = 'transparent';
+    hero.style.border = 'none';
+    hero.style.padding = '0';
+    hero.style.borderRadius = '0';
+    hero.style.boxShadow = 'none';
+    hero.innerHTML = buildLearnHeroSchool(edu, grade);
   } else {
+    hero.style.padding = '';
+    hero.style.borderRadius = '';
+    hero.style.boxShadow = '';
     hero.style.background = '';
     hero.style.border     = '';
     hero.innerHTML = buildLearnHeroPreschool(edu);
   }
 
-  // ── Performance strip ─────────────────────────────────
   gradeBlockWrap.innerHTML = edu.level === 'uni'
     ? `${buildUniversityPerformanceSection()}${buildUniversityImportantPeopleSection()}`
-    : (!isPostSchoolPlanning && !isGraduatePlanning && grade ? `${buildLearnPerformanceSection(edu, grade)}${buildLearnImportantPeopleSection(edu)}` : '');
-
-  // ── Roster toggle ─────────────────────────────────────
-  rosterToggleWrap.style.display =
-    (edu.level !== 'uni' && age >= 5 && age <= 18 && edu.classmates.length) ? 'block' : 'none';
-
-  // ── Dynamic sections: clear and rebuild ───────────────
+    : '';
+  gradeBlockWrap.style.display = edu.level === 'uni' ? '' : 'none';
+  rosterToggleWrap.style.display = 'none';
   container.querySelectorAll('.actions-section, .cm-section, .tch-section').forEach(el => el.remove());
   sectionTitle.style.display = 'none';
   learnActions.innerHTML = '';
@@ -4967,38 +5110,40 @@ function renderLearnTab() {
     return;
   }
 
-  if (_learnScreen === 'classmates') {
+  if (isSchoolStage && _learnScreen === 'main') {
+    hero.style.display = '';
+    learnActions.style.display = '';
+    learnActions.innerHTML = buildLearnSchoolMainScreen(edu);
+    return;
+  }
+
+  if (_learnScreen === 'classmates' && isSchoolStage) {
     hero.style.display = 'none';
     gradeBlockWrap.style.display = 'none';
     rosterToggleWrap.style.display = 'none';
-    learnActions.style.display = 'none';
+    learnActions.style.display = '';
     const classmatesScreen = document.createElement('div');
     classmatesScreen.id = 'learn-classmates-screen';
     classmatesScreen.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <button onclick="closeLearnClassmatesScreen()"
-          style="padding:0;background:none;border:none;font-size:13px;font-weight:700;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer">
-          <span style="font-size:18px;line-height:1">‹</span>
-          <span>Back</span>
-        </button>
-        <div style="font-size:16px;font-weight:800;color:var(--text)">Classmates</div>
-        <div style="font-size:12px;font-weight:700;color:var(--text-faint)">${edu.classmates.length}</div>
+      <div class="learn-school-page">
+        ${buildLearnSchoolPageHeader(`Classmates (${edu.classmates.length})`, 'See your classmates and relationships.')}
+        <div style="display:flex;flex-direction:column;gap:10px">
+          ${edu.classmates.map(c => buildLearnClassmateRow(c)).join('')}
+        </div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        ${edu.classmates.map(c => buildLearnClassmateRow(c)).join('')}
-      </div>`;
+      `;
     container.appendChild(classmatesScreen);
     if (tab) tab.scrollTop = 0;
     return;
   }
 
-  if (_learnScreen === 'classmate') {
+  if (_learnScreen === 'classmate' && isSchoolStage) {
     const classmate = edu.classmates.find(c => c.id === _learnClassmateId);
     if (!classmate) return;
     hero.style.display = 'none';
     gradeBlockWrap.style.display = 'none';
     rosterToggleWrap.style.display = 'none';
-    learnActions.style.display = 'none';
+    learnActions.style.display = '';
     const classmateDetailScreen = document.createElement('div');
     classmateDetailScreen.id = 'learn-classmate-detail-screen';
     classmateDetailScreen.innerHTML = buildLearnClassmateDetailScreen(classmate);
@@ -5033,13 +5178,31 @@ function renderLearnTab() {
     return;
   }
 
+  if (_learnScreen === 'actions' && isSchoolStage) {
+    hero.style.display = 'none';
+    learnActions.style.display = '';
+    learnActions.innerHTML = buildLearnActionsPlaceholderPage();
+    return;
+  }
+
+  if (_learnScreen === 'clubs' && isSchoolStage) {
+    hero.style.display = 'none';
+    learnActions.style.display = '';
+    learnActions.innerHTML = buildLearnClubsPlaceholderPage();
+    return;
+  }
+
+  if (_learnScreen === 'teachers' && isSchoolStage) {
+    hero.style.display = 'none';
+    learnActions.style.display = '';
+    learnActions.innerHTML = buildLearnTeachersPlaceholderPage(edu);
+    return;
+  }
+
   hero.style.display = '';
-  gradeBlockWrap.style.display = '';
-  rosterToggleWrap.style.display =
-    (edu.level !== 'uni' && age >= 5 && age <= 18 && edu.classmates.length) ? 'block' : 'none';
+  gradeBlockWrap.style.display = edu.level === 'uni' ? '' : 'none';
   learnActions.style.display = '';
 
-  // Actions
   if (isPostSchoolPlanning || isGraduatePlanning) {
     const postSchoolWrapper = document.createElement('div');
     postSchoolWrapper.className = 'actions-section';
@@ -5057,48 +5220,8 @@ function renderLearnTab() {
   }
 
   if (!notStartedSchool && edu.level !== 'uni') {
-    const acts = EDUCATION_ACTIONS;
-    const actionsWrapper = document.createElement('div');
-    actionsWrapper.className = 'actions-section';
-    actionsWrapper.innerHTML = buildLearnToggleSection(
-      'actions',
-      '⚡ Actions',
-      `<div class="action-list" id="learn-actions-inner">${acts.map(a => buildActionHTML(a)).join('')}</div>`
-    );
-    container.appendChild(actionsWrapper);
-    wireActions(actionsWrapper.querySelector('#learn-actions-inner'), acts, () => { updateAllUI(); renderLearnTab(); });
+    learnActions.innerHTML = '';
   }
-
-  // Classmates
-  if (age >= 5 && age <= 18 && edu.classmates.length) {
-    const cmWrapper = document.createElement('div');
-    cmWrapper.className = 'cm-section';
-    cmWrapper.innerHTML = `
-      <button onclick="openLearnClassmatesScreen()"
-        style="width:100%;padding:13px 16px;background:var(--surface);border:1px solid var(--border-light);border-radius:14px;font-size:13px;font-weight:700;color:var(--text);display:flex;justify-content:space-between;align-items:center">
-        <span>👥 Classmates (${edu.classmates.length})</span><span>›</span>
-      </button>`;
-    container.appendChild(cmWrapper);
-  }
-
-  // Teachers
-  if (edu.teachers && edu.teachers.length) {
-    const tchWrapper = document.createElement('div');
-    tchWrapper.className = 'tch-section';
-    tchWrapper.innerHTML = buildLearnToggleSection(
-      'tch',
-      '👩‍🏫 Teachers',
-      edu.teachers.map(t => buildLearnTeacherRow(t)).join('')
-    );
-    container.appendChild(tchWrapper);
-  }
-}
-
-function toggleLearnSection(id) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  const isOpen = el.style.display !== 'none' && el.style.display !== '';
-  el.style.display = isOpen ? 'none' : 'flex';
 }
 
 let _rosterOpen = false;

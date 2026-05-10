@@ -987,11 +987,13 @@ function maybeUpdateNpcCareer(entry, updates) {
     + (hasNpcTrait(npc, 'toxic') ? 0.04 : 0)
     - Math.max(0, rep - 55) * 0.0013;
   let careerChangeChance = 0.05 + (ambitious > 72 && npc.yearsInRole >= 3 ? 0.08 : 0) + (npc.happiness < 42 ? 0.04 : 0);
+  let effectiveJobLossChance = jobLossChance;
   if (entry.role === 'parent') {
-    careerChangeChance *= 0.22;
+    careerChangeChance *= 0.11;
+    effectiveJobLossChance *= 0.5;
   }
 
-  if (Math.random() < jobLossChance) {
+  if (Math.random() < effectiveJobLossChance) {
     npc.employmentStatus = 'Unemployed';
     npc.jobTitle = 'None';
     npc.job = 'None';
@@ -2216,7 +2218,7 @@ function transitionSchool(newLevel) {
   const newCount = Math.max(0, 9 - kept.length);
   STATE.school.classmates     = [...kept, ...generateClassmates(newCount)];
   STATE.school.level          = newLevel;
-  STATE.school.current        = pickUKSchoolName(STATE.socialClass, newLevel === 'college' ? 'college' : 'secondary');
+  STATE.school.current        = pickUKSchoolNameByType(STATE.school.type?.[newLevel], newLevel);
   STATE.school.rosterSnapshot = buildRosterSnapshot();
   STATE.school.teachers       = generateTeachers();
 }
@@ -2272,7 +2274,7 @@ function maybeGraduateUniversity() {
 
 function startPrimarySchool() {
   STATE.school.level          = 'primary';
-  STATE.school.current        = pickUKSchoolName(STATE.socialClass, 'primary');
+  STATE.school.current        = pickUKSchoolNameByType(STATE.school.type?.primary, 'primary');
   STATE.school.classmates     = generateClassmates(9);
   STATE.school.rosterSnapshot = buildRosterSnapshot();
   STATE.school.teachers       = generateTeachers();
@@ -2405,7 +2407,7 @@ function annualTick() {
 
   if (STATE.age === 5  && STATE.school.level==='pre')       startPrimarySchool();
   if (STATE.age === 12 && STATE.school.level==='primary')   transitionSchool('secondary');
-  if (STATE.age === 17 && STATE.school.level==='secondary') transitionSchool('college');
+  if (STATE.age === 16 && STATE.school.level==='secondary') transitionSchool('college');
   if (STATE.age === 18 && STATE.school.level==='college')   finishSchool();
   if (STATE.age >= 18 && !STATE.school.postSchool) STATE.school.postSchool = { schoolFinishedShown:false, uniApplication:null };
   maybeGraduateUniversity();

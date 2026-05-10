@@ -133,6 +133,8 @@ const EVENTS = [
       onChoose: () => {
         if (STATE.school._privateAccepted) {
           applyEffects({ smarts:+5, happy:+8, rep:+5 });
+          STATE.school.type.secondary = 'Private School';
+          STATE.school.type.college = 'Private Sixth Form';
           STATE.school.current = pickRandom(SCHOOL_NAMES_UK.private);
         } else {
           applyEffects({ happy:-4, smarts:+2 });
@@ -156,6 +158,8 @@ const EVENTS = [
       onChoose: () => {
         if (STATE.school._scholarshipWon) {
           applyEffects({ smarts:+8, happy:+10, rep:+8, balance:+500 });
+          STATE.school.type.secondary = 'Private School';
+          STATE.school.type.college = 'Private Sixth Form';
           STATE.school.current = pickRandom(SCHOOL_NAMES_UK.private);
         } else {
           applyEffects({ happy:-5, smarts:+2 });

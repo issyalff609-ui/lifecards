@@ -52,12 +52,14 @@ const SCHOOL_TYPES_UK = {
 
 const SCHOOL_NAMES_UK = {
   state_primary:   ['Meadowbrook Primary','Oakwood Primary','Kingsmead Primary'],
-  state_secondary: ['Hillcrest Secondary','St. George\'s Academy','Brooksbridge Community College'],
-  grammar:         ['King Edward\'s Grammar School','Hillcrest Grammar School','St. Catherine\'s Grammar'],
+  state_secondary: ['Hillcrest Secondary','St. George\'s Academy','Brooksbridge College'],
+  grammar:         ['King Edward\'s Grammar','Hillcrest Grammar','St. Catherine\'s'],
   prep:            ['Harlington House','Cavendish House','Westminster House'],
   private:         ['Harlington House','Cavendish House','Westminster House'],
+  private_sixth:   ['Harlington Sixth Form','Cavendish Sixth Form','Westminster Sixth Form'],
   boarding:        ['Westminster House','Cavendish House','Ashbury Independent School'],
   sixth_form:      ['Northgate Sixth Form','Westfield Sixth Form','Kingsmead Sixth Form'],
+  grammar_sixth:   ['King Edward\'s Sixth Form','Hillcrest Grammar Sixth Form','St. Catherine\'s Sixth Form'],
   elite_prep:      ['Westminster Prep', 'Harlington Prep'],
   elite_sixth:     ['Westminster Upper School','Cavendish Upper School','Harlington Upper School'],
 };
@@ -66,11 +68,33 @@ function pickUKSchoolName(socialClass, level) {
   const map = {
     lower:        { primary:'state_primary', secondary:'state_secondary', college:'sixth_form' },
     working:      { primary:'state_primary', secondary:'state_secondary', college:'sixth_form' },
-    middle:       { primary:'state_primary', secondary:'grammar',         college:'sixth_form' },
-    upper_middle: { primary:'prep',          secondary:'private',         college:'sixth_form' },
+    middle:       { primary:'state_primary', secondary:'grammar',         college:'grammar_sixth' },
+    upper_middle: { primary:'prep',          secondary:'private',         college:'private_sixth' },
     elite:        { primary:'elite_prep',    secondary:'boarding',        college:'elite_sixth' },
   };
   const poolKey = (map[socialClass] || map.working)[level];
+  const pool = SCHOOL_NAMES_UK[poolKey] || ['School'];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function pickUKSchoolNameByType(typeLabel, level) {
+  const label = String(typeLabel || '').toLowerCase();
+  let poolKey = 'state_primary';
+  if (level === 'primary') {
+    if (label.includes('elite prep')) poolKey = 'elite_prep';
+    else if (label.includes('prep') || label.includes('private')) poolKey = 'prep';
+    else poolKey = 'state_primary';
+  } else if (level === 'secondary') {
+    if (label.includes('boarding')) poolKey = 'boarding';
+    else if (label.includes('grammar')) poolKey = 'grammar';
+    else if (label.includes('private')) poolKey = 'private';
+    else poolKey = 'state_secondary';
+  } else if (level === 'college') {
+    if (label.includes('elite')) poolKey = 'elite_sixth';
+    else if (label.includes('private')) poolKey = 'private_sixth';
+    else if (label.includes('grammar')) poolKey = 'grammar_sixth';
+    else poolKey = 'sixth_form';
+  }
   const pool = SCHOOL_NAMES_UK[poolKey] || ['School'];
   return pool[Math.floor(Math.random() * pool.length)];
 }
