@@ -4869,8 +4869,11 @@ function buildLearnTeacherRow(t) {
 function buildLearnSchoolNavIcon(icon) {
   const icons = {
     action: `<svg viewBox="0 0 24 24"><path fill="#fff" d="M15.425 2.25c.841 0 1.404.798 1.212 1.563l-.049.153L14.49 9.35H17c.985 0 1.532 1.054 1.1 1.854l-.1.156l-7.47 10.047c-.54.725-1.621.224-1.527-.605l.785-6.91H7c-.907 0-1.487-.924-1.155-1.735l.005-.011l3.906-9.128a1.25 1.25 0 0 1 1.151-.768z"/></svg>`,
+    clubs: `<svg viewBox="0 0 48 48"><path fill="#fff" fill-rule="evenodd" d="M5.447 2.501C7.614 2.022 11.65 1.5 19 1.5s11.386.522 13.553 1.001c2.048.453 3.204 2.173 3.414 3.985c.116.997.246 2.308.349 3.85a134 134 0 0 0-4.01-1.138C25.09 7.265 20.825 6.67 18.31 6.558c-3.636-.16-6.212 2.238-7.25 4.857a85 85 0 0 0-3.035 9.188a24.7 24.7 0 0 0-.577 10.053C3.636 26.759 1.5 21.395 1.5 15.8c0-3.938.297-7.28.533-9.314C2.243 4.674 3.4 2.954 5.447 2.5m26.081 9.596c-7.1-1.903-11.133-2.443-13.35-2.54c-2.096-.093-3.657 1.269-4.329 2.964a82 82 0 0 0-2.926 8.859c-2.003 7.476.056 15.583 5.853 20.845c1.788 1.624 3.836 3.181 5.694 3.679s4.41.173 6.77-.34c7.651-1.658 13.488-7.65 15.49-15.125a82 82 0 0 0 1.897-9.135c.266-1.804-.405-3.765-2.267-4.732c-1.968-1.024-5.731-2.573-12.832-4.475m.952 12.62c-.754.4-1.62.614-2.242-.202c-.522-.683-.337-1.665.346-2.15a4 4 0 0 1 .488-.298a5.6 5.6 0 0 1 1.292-.492c1.115-.274 2.633-.282 4.258.656s2.377 2.257 2.696 3.359c.156.538.208 1.016.22 1.366c.01.264-.003.461-.014.57c-.078.835-.836 1.486-1.689 1.376c-1.017-.132-1.265-.988-1.295-1.841a2.6 2.6 0 0 0-.103-.636c-.14-.482-.466-1.106-1.315-1.596c-.85-.49-1.553-.461-2.04-.341a2.6 2.6 0 0 0-.602.228m-5.266-3.254c.348.76.018 1.704-.776 2.035c-.947.395-1.59-.223-2.042-.947a2.7 2.7 0 0 0-.407-.498c-.362-.348-.956-.725-1.937-.725s-1.575.377-1.938.725a2.7 2.7 0 0 0-.406.498a2 2 0 0 0-.09.16a1.5 1.5 0 0 1-1.953.787c-.794-.33-1.124-1.274-.775-2.035q.023-.051.06-.125a5.7 5.7 0 0 1 1.087-1.45c.828-.794 2.139-1.56 4.015-1.56s3.187.766 4.015 1.56c.404.388.687.776.873 1.073c.14.224.228.402.273.502m-7.97 7.139a1.5 1.5 0 0 1 1.703 1.266c.202 1.377.812 2.91 1.642 4.162c.862 1.297 1.784 2.03 2.47 2.214s1.852.01 3.247-.683c1.345-.668 2.64-1.691 3.504-2.783a1.5 1.5 0 0 1 2.352 1.862c-1.164 1.471-2.82 2.763-4.521 3.608c-1.651.82-3.63 1.357-5.358.894s-3.173-1.917-4.193-3.453c-1.05-1.582-1.838-3.529-2.111-5.385a1.5 1.5 0 0 1 1.266-1.702" clip-rule="evenodd"/></svg>`,
+    classmates: `<svg viewBox="0 0 24 24"><path fill="#fff" d="M12 5.5A3.5 3.5 0 0 1 15.5 9a3.5 3.5 0 0 1-3.5 3.5A3.5 3.5 0 0 1 8.5 9A3.5 3.5 0 0 1 12 5.5M5 8c.56 0 1.08.15 1.53.42c-.15 1.43.27 2.85 1.13 3.96C7.16 13.34 6.16 14 5 14a3 3 0 0 1-3-3a3 3 0 0 1 3-3m14 0a3 3 0 0 1 3 3a3 3 0 0 1-3 3c-1.16 0-2.16-.66-2.66-1.62a5.54 5.54 0 0 0 1.13-3.96c.45-.27.97-.42 1.53-.42M5.5 18.25c0-2.07 2.91-3.75 6.5-3.75s6.5 1.68 6.5 3.75V20h-13zM0 20v-1.5c0-1.39 1.89-2.56 4.45-2.9c-.59.68-.95 1.62-.95 2.65V20zm24 0h-3.5v-1.75c0-1.03-.36-1.97-.95-2.65c2.56.34 4.45 1.51 4.45 2.9z" stroke="#fff" stroke-width="0.2"/></svg>`,
+    teachers: `<svg viewBox="0 0 48 48"><path fill="#fff" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="m15 36l6-23h6l6 23l-9 8zm6-32h6l3 2l-3 7h-6l-3-7z"/></svg>`,
   };
-  return icons[icon] || `<iconify-icon icon="${icon}"></iconify-icon>`;
+  return icons[icon] || icons.action;
 }
 
 function buildLearnSchoolNavCard({ screen, icon, title, subtitle, color, shadow }) {
@@ -4894,35 +4897,35 @@ function buildLearnSchoolMainScreen(edu) {
     <div class="learn-school-actions">
       ${buildLearnSchoolNavCard({
         screen: 'actions',
-        icon: 'material-symbols:bolt-rounded',
+        icon: 'action',
         title: 'Actions',
         subtitle: 'Choose what to do',
-        color: 'linear-gradient(180deg, #ffb34f 0%, #ff962d 100%)',
-        shadow: '0 12px 22px rgba(255, 150, 45, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
+        color: '#f79e45',
+        shadow: '0 12px 22px rgba(247, 158, 69, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
       })}
       ${buildLearnSchoolNavCard({
         screen: 'clubs',
-        icon: 'material-symbols:masks-rounded',
+        icon: 'clubs',
         title: 'Clubs',
         subtitle: 'Activities and school clubs',
-        color: 'linear-gradient(180deg, #95dc76 0%, #72c85c 100%)',
-        shadow: '0 12px 22px rgba(114, 200, 92, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
+        color: '#87c469',
+        shadow: '0 12px 22px rgba(135, 196, 105, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
       })}
       ${buildLearnSchoolNavCard({
         screen: 'classmates',
-        icon: 'material-symbols:groups-rounded',
+        icon: 'classmates',
         title: `Classmates (${edu.classmates.length})`,
         subtitle: 'See your classmates and relationships',
-        color: 'linear-gradient(180deg, #b390f7 0%, #9670ea 100%)',
-        shadow: '0 12px 22px rgba(150, 112, 234, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
+        color: '#a887d9',
+        shadow: '0 12px 22px rgba(168, 135, 217, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
       })}
       ${buildLearnSchoolNavCard({
         screen: 'teachers',
-        icon: 'material-symbols:person-rounded',
+        icon: 'teachers',
         title: 'Teachers',
         subtitle: 'View your teachers',
-        color: 'linear-gradient(180deg, #73aff7 0%, #4d8fe7 100%)',
-        shadow: '0 12px 22px rgba(77, 143, 231, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
+        color: '#6098e4',
+        shadow: '0 12px 22px rgba(96, 152, 228, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
       })}
     </div>`;
 }
