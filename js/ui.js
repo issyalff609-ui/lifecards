@@ -179,8 +179,242 @@ function startGame() {
 let _currentTab = 'life';
 let _lastRenderedAvatarAge = null;
 let _lastRenderedAvatarStage = null;
+const PART_TIME_JOB_LIST = [
+  { title:'Cafe Team Member', company:'Maple Street Cafe', rate:11, icon:'mdi:coffee-outline', accent:'#cf7a47' },
+  { title:'Retail Assistant', company:'Willow Market', rate:12, icon:'mdi:shopping-outline', accent:'#4f8a74' },
+  { title:'Warehouse Picker', company:'ParcelHub Depot', rate:13, icon:'mdi:package-variant-closed', accent:'#7f91a7' },
+  { title:'Fast Food Crew', company:'Sunny Bites', rate:11, icon:'mdi:hamburger', accent:'#dd7a54' },
+  { title:'Delivery Rider', company:'ZipDrop', rate:14, icon:'mdi:scooter', accent:'#6f7ee8' },
+  { title:'Call Centre Agent', company:'BrightLine Support', rate:12, icon:'mdi:headset', accent:'#9b73b5' },
+  { title:'Supermarket Cashier', company:'Fresh Basket', rate:11, icon:'mdi:cart-outline', accent:'#5b9f64' },
+  { title:'Office Assistant', company:'Oak & Co.', rate:12, icon:'mdi:clipboard-text-outline', accent:'#9a785e' },
+];
+const FULL_TIME_GENERAL_JOBS = [
+  { title:'Receptionist', company:'Cedar House Clinic', salary:'£21,500/year', icon:'mdi:deskphone', accent:'#b37867' },
+  { title:'Admin Assistant', company:'Northgate Services', salary:'£22,500/year', icon:'mdi:clipboard-text-outline', accent:'#7b829d' },
+  { title:'Customer Service Advisor', company:'ClearCall Support', salary:'£21,000/year', icon:'mdi:headset', accent:'#896fc2' },
+  { title:'Warehouse Supervisor', company:'ParcelHub Logistics', salary:'£23,500/year', icon:'mdi:warehouse', accent:'#74859b' },
+  { title:'Retail Supervisor', company:'Parklane Home', salary:'£22,400/year', icon:'mdi:shopping-outline', accent:'#5f8b73' },
+  { title:'Care Assistant', company:'Bluebird Care', salary:'£23,000/year', icon:'mdi:hand-heart-outline', accent:'#bc6f7f' },
+];
+const FULL_TIME_ANY_DEGREE_JOBS = [
+  { title:'Pilot Trainee', company:'SkyReach Academy', salary:'£24,500/year', icon:'mdi:airplane', accent:'#5f89c9' },
+  { title:'Teacher Trainee', company:'Northfield Trust', salary:'£23,200/year', icon:'mdi:school-outline', accent:'#8a74bf' },
+  { title:'Civil Service Officer', company:'Cabinet Office', salary:'£27,000/year', icon:'mdi:office-building-outline', accent:'#677c96' },
+  { title:'Police Graduate Scheme', company:'Metropolitan Police', salary:'£28,000/year', icon:'mdi:shield-account-outline', accent:'#4d6ea8' },
+  { title:'Charity Officer', company:'Bright Futures', salary:'£24,000/year', icon:'mdi:hand-heart-outline', accent:'#c3748e' },
+  { title:'Project Coordinator', company:'Westbridge Projects', salary:'£25,500/year', icon:'mdi:clipboard-flow-outline', accent:'#8d7a67' },
+];
+const FULL_TIME_NO_DEGREE_GROWTH_JOBS = [
+  { title:'Police Officer', company:'Greater London Police', salary:'£29,000/year', icon:'mdi:shield-account-outline', accent:'#4d6ea8' },
+  { title:'Firefighter', company:'City Fire Service', salary:'£30,000/year', icon:'mdi:fire-truck', accent:'#d26b4b' },
+  { title:'Estate Agent', company:'Ashdown Estates', salary:'£24,000/year', icon:'mdi:home-city-outline', accent:'#9f7f58' },
+  { title:'Sales Executive', company:'Orbit Telecom', salary:'£23,800/year', icon:'mdi:chart-line', accent:'#5a9e76' },
+  { title:'Recruitment Consultant', company:'TalentBridge', salary:'£24,500/year', icon:'mdi:account-search-outline', accent:'#8a6fb0' },
+  { title:'Content Creator', company:'Creator Studio', salary:'£20,000/year', icon:'mdi:video-outline', accent:'#ca7a63' },
+  { title:'Actor', company:'Open Casting', salary:'£19,500/year', icon:'mdi:movie-open-outline', accent:'#b48457' },
+  { title:'Musician', company:'Indie Sound', salary:'£19,000/year', icon:'mdi:music-note-outline', accent:'#9167b9' },
+  { title:'Personal Trainer', company:'Peakform Gym', salary:'£22,000/year', icon:'mdi:dumbbell', accent:'#5f9b7b' },
+  { title:'Electrician Apprentice', company:'BrightSpark Trades', salary:'£19,000/year', icon:'mdi:lightning-bolt-outline', accent:'#d28f3f' },
+  { title:'Plumber Apprentice', company:'BluePipe Services', salary:'£19,200/year', icon:'mdi:pipe-wrench', accent:'#5f89b7' },
+];
+const FULL_TIME_DEGREE_JOB_POOLS = {
+  Law: [
+    { title:'Paralegal', company:'Hawthorne Legal', salary:'£24,000/year', icon:'mdi:scale-balance', accent:'#7c6a91' },
+    { title:'Legal Assistant', company:'Avery & Co.', salary:'£23,500/year', icon:'mdi:file-document-outline', accent:'#897667' },
+    { title:'Legal Secretary', company:'Crown Chambers', salary:'£22,800/year', icon:'mdi:typewriter', accent:'#a07a62' },
+    { title:'Trainee Solicitor', company:'Marlow Partners', salary:'£28,000/year', icon:'mdi:briefcase-outline', accent:'#5f74b7' },
+    { title:'Trainee Solicitor', company:'Blackwell Legal', salary:'£31,000/year', icon:'mdi:briefcase-outline', accent:'#4c6db5' },
+    { title:'Trainee Solicitor', company:'Kingsley Stone', salary:'£34,000/year', icon:'mdi:briefcase-outline', accent:'#395ea8' },
+    { title:'Junior Solicitor', company:'Blackwell Legal', salary:'£36,000/year', icon:'mdi:scale-balance', accent:'#4969b0' },
+    { title:'Compliance Assistant', company:'Westbridge Risk', salary:'£24,500/year', icon:'mdi:shield-check-outline', accent:'#6078a3' },
+    { title:'Court Clerk', company:'Central Courts', salary:'£23,200/year', icon:'mdi:gavel', accent:'#906f59' },
+    { title:'Claims Handler', company:'Alder Insurance', salary:'£23,700/year', icon:'mdi:file-check-outline', accent:'#7f8aa4' },
+  ],
+  Business: [
+    { title:'Finance Assistant', company:'Northbank Finance', salary:'£24,500/year', icon:'mdi:cash-multiple', accent:'#5e9a77' },
+    { title:'Marketing Assistant', company:'Kindred Media', salary:'£23,500/year', icon:'mdi:bullhorn-outline', accent:'#cf7a5f' },
+    { title:'Sales Executive', company:'Orbit Telecom', salary:'£23,800/year', icon:'mdi:chart-line', accent:'#5a9e76' },
+    { title:'Operations Analyst', company:'Westbridge Projects', salary:'£26,000/year', icon:'mdi:cog-outline', accent:'#687d9a' },
+    { title:'HR Assistant', company:'Harbour People', salary:'£23,600/year', icon:'mdi:account-group-outline', accent:'#b9738f' },
+    { title:'Recruitment Consultant', company:'TalentBridge', salary:'£24,500/year', icon:'mdi:account-search-outline', accent:'#8a6fb0' },
+    { title:'Management Trainee', company:'Northstar Retail', salary:'£25,500/year', icon:'mdi:briefcase-account-outline', accent:'#9a7b5b' },
+  ],
+  Medicine: [
+    { title:'Junior Doctor', company:'St. Rowan Hospital', salary:'£31,500/year', icon:'mdi:stethoscope', accent:'#6a92bc' },
+    { title:'Junior Doctor', company:'Northgate NHS Trust', salary:'£34,000/year', icon:'mdi:stethoscope', accent:'#5f89b7' },
+    { title:'Junior Doctor', company:'Westbridge Teaching Hospital', salary:'£37,000/year', icon:'mdi:stethoscope', accent:'#4b78ab' },
+    { title:'Healthcare Assistant', company:'St. Rowan Hospital', salary:'£22,800/year', icon:'mdi:medical-bag', accent:'#6fa08a' },
+    { title:'Lab Assistant', company:'Northgate Labs', salary:'£24,000/year', icon:'mdi:flask-outline', accent:'#7c95bf' },
+  ],
+  Art: [
+    { title:'Graphic Designer', company:'Kindred Studio', salary:'£24,000/year', icon:'mdi:palette-outline', accent:'#c06d82' },
+    { title:'Illustrator', company:'Paper Moon Press', salary:'£22,500/year', icon:'mdi:draw', accent:'#b98457' },
+    { title:'Content Creator', company:'Creator Studio', salary:'£20,000/year', icon:'mdi:video-outline', accent:'#ca7a63' },
+    { title:'Gallery Assistant', company:'Willow Gallery', salary:'£21,500/year', icon:'mdi:image-outline', accent:'#8a73b8' },
+  ],
+  Education: [
+    { title:'Teacher Trainee', company:'Northfield Trust', salary:'£23,200/year', icon:'mdi:school-outline', accent:'#8a74bf' },
+    { title:'Classroom Support Officer', company:'Westbrook Academy', salary:'£22,400/year', icon:'mdi:book-open-page-variant-outline', accent:'#8a7d63' },
+  ],
+  Engineering: [
+    { title:'Operations Analyst', company:'Westbridge Projects', salary:'£26,000/year', icon:'mdi:cog-outline', accent:'#687d9a' },
+    { title:'Electrical Trainee', company:'BrightSpark Systems', salary:'£24,500/year', icon:'mdi:lightning-bolt-outline', accent:'#d28f3f' },
+  ],
+  History: [
+    { title:'Court Clerk', company:'Central Courts', salary:'£23,200/year', icon:'mdi:gavel', accent:'#906f59' },
+    { title:'Civil Service Officer', company:'Cabinet Office', salary:'£27,000/year', icon:'mdi:office-building-outline', accent:'#677c96' },
+  ],
+  Music: [
+    { title:'Content Creator', company:'Creator Studio', salary:'£20,000/year', icon:'mdi:video-outline', accent:'#ca7a63' },
+    { title:'Musician', company:'Indie Sound', salary:'£19,000/year', icon:'mdi:music-note-outline', accent:'#9167b9' },
+  ],
+  'Computer Science': [
+    { title:'Project Coordinator', company:'Westbridge Projects', salary:'£25,500/year', icon:'mdi:clipboard-flow-outline', accent:'#8d7a67' },
+    { title:'Operations Analyst', company:'Westbridge Projects', salary:'£26,000/year', icon:'mdi:cog-outline', accent:'#687d9a' },
+  ],
+};
+let _jobBoardCategory = 'full-time';
+let _cachedFullTimeJobs = [];
+let _cachedFullTimeSignature = '';
+let _jobFlowState = null;
+const JOB_INTERVIEW_QUESTION_POOLS = {
+  retail: [
+    { question:'A customer starts shouting at you. What do you do?', answers:[
+      { text:'Stay calm and try to help', effects:{ interviewScore:+8, calmness:+2, reliability:+1 } },
+      { text:'Ask a manager to step in', effects:{ interviewScore:+4, teamwork:+1, calmness:+1 } },
+      { text:'Argue back', effects:{ interviewScore:-8, calmness:-2, judgement:-2 } },
+      { text:'Ignore them', effects:{ interviewScore:-6, reliability:-2 } },
+    ]},
+    { question:'The shift suddenly gets very busy. What do you focus on?', answers:[
+      { text:'Keep moving and help the team where needed', effects:{ interviewScore:+7, workEthic:+2, teamwork:+2 } },
+      { text:'Focus only on your own task', effects:{ interviewScore:+1, reliability:+1 } },
+      { text:'Panic and hope it slows down', effects:{ interviewScore:-5, calmness:-2 } },
+      { text:'Take a quick break first', effects:{ interviewScore:-6, workEthic:-2 } },
+    ]},
+    { question:'Your co-worker is struggling on shift. What do you do?', answers:[
+      { text:'Help them if you can', effects:{ interviewScore:+6, teamwork:+2 } },
+      { text:'Tell the supervisor early', effects:{ interviewScore:+4, judgement:+1, reliability:+1 } },
+      { text:'Leave them to figure it out', effects:{ interviewScore:-4, teamwork:-2 } },
+      { text:'Complain that they are slowing you down', effects:{ interviewScore:-7, teamwork:-2, judgement:-1 } },
+    ]},
+  ],
+  office: [
+    { question:'You realise you made a mistake on a file. What do you do?', answers:[
+      { text:'Own it and fix it quickly', effects:{ interviewScore:+8, reliability:+2, judgement:+2 } },
+      { text:'Tell someone once you know the fix', effects:{ interviewScore:+5, reliability:+1 } },
+      { text:'Hope nobody notices', effects:{ interviewScore:-7, reliability:-2 } },
+      { text:'Blame the system', effects:{ interviewScore:-6, judgement:-2 } },
+    ]},
+    { question:'How do you handle a tight deadline?', answers:[
+      { text:'Prioritise, stay organised, and keep people updated', effects:{ interviewScore:+8, workEthic:+2, reliability:+2 } },
+      { text:'Work through it quietly on your own', effects:{ interviewScore:+3, workEthic:+1 } },
+      { text:'Leave it until the last minute', effects:{ interviewScore:-7, workEthic:-2 } },
+      { text:'Ask for extra time immediately', effects:{ interviewScore:-2, calmness:-1 } },
+    ]},
+    { question:'What makes you reliable at work?', answers:[
+      { text:'I stay organised and follow through', effects:{ interviewScore:+7, reliability:+2 } },
+      { text:'I do what I am told and keep it simple', effects:{ interviewScore:+3, reliability:+1 } },
+      { text:'I usually figure things out somehow', effects:{ interviewScore:-1, judgement:-1 } },
+      { text:'I get bored easily but I try', effects:{ interviewScore:-5, workEthic:-2 } },
+    ]},
+  ],
+  creative: [
+    { question:'How do you handle criticism of your work?', answers:[
+      { text:'Listen, improve, and keep your style', effects:{ interviewScore:+8, creativity:+2, calmness:+1 } },
+      { text:'Take what is useful and move on', effects:{ interviewScore:+5, creativity:+1 } },
+      { text:'Defend every decision', effects:{ interviewScore:-5, calmness:-2 } },
+      { text:'Lose confidence completely', effects:{ interviewScore:-6, creativity:-1 } },
+    ]},
+    { question:'What matters most in creative work?', answers:[
+      { text:'Originality that still solves the brief', effects:{ interviewScore:+8, creativity:+2, judgement:+1 } },
+      { text:'Doing what is popular', effects:{ interviewScore:+1 } },
+      { text:'Working fast, whatever the result', effects:{ interviewScore:-3, reliability:-1 } },
+      { text:'Only making what you personally like', effects:{ interviewScore:-4, teamwork:-1 } },
+    ]},
+    { question:'Your first idea is not working. What next?', answers:[
+      { text:'Iterate and try a new angle', effects:{ interviewScore:+7, creativity:+2, workEthic:+1 } },
+      { text:'Ask for feedback early', effects:{ interviewScore:+5, teamwork:+1 } },
+      { text:'Start over from scratch in a panic', effects:{ interviewScore:-3, calmness:-1 } },
+      { text:'Submit it anyway', effects:{ interviewScore:-6, judgement:-2 } },
+    ]},
+  ],
+  emergency: [
+    { question:'How do you react under pressure?', answers:[
+      { text:'Stay focused and follow training', effects:{ interviewScore:+9, calmness:+2, judgement:+2 } },
+      { text:'Act fast and trust instinct', effects:{ interviewScore:+4, bravery:+1, judgement:-1 } },
+      { text:'Wait for someone else to lead', effects:{ interviewScore:-4, bravery:-1 } },
+      { text:'Freeze up', effects:{ interviewScore:-8, calmness:-2 } },
+    ]},
+    { question:'What matters most in emergency work?', answers:[
+      { text:'Teamwork and good judgement', effects:{ interviewScore:+8, teamwork:+2, judgement:+2 } },
+      { text:'Being fearless', effects:{ interviewScore:+2, bravery:+2, judgement:-1 } },
+      { text:'Doing what you want in the moment', effects:{ interviewScore:-7, judgement:-2 } },
+      { text:'Looking impressive', effects:{ interviewScore:-6, reliability:-2 } },
+    ]},
+    { question:'A colleague makes a risky call. What do you do?', answers:[
+      { text:'Challenge it calmly if safety is at risk', effects:{ interviewScore:+8, judgement:+2, calmness:+1 } },
+      { text:'Back them publicly, discuss later', effects:{ interviewScore:+3, teamwork:+1 } },
+      { text:'Do nothing', effects:{ interviewScore:-5, reliability:-1 } },
+      { text:'Call them out aggressively', effects:{ interviewScore:-6, teamwork:-2 } },
+    ]},
+  ],
+  sales: [
+    { question:'How do you handle rejection?', answers:[
+      { text:'Reset quickly and keep going', effects:{ interviewScore:+8, workEthic:+2, calmness:+1 } },
+      { text:'Learn from it and try again later', effects:{ interviewScore:+6, judgement:+1 } },
+      { text:'Take it personally', effects:{ interviewScore:-6, calmness:-2 } },
+      { text:'Push harder until they give in', effects:{ interviewScore:-3, judgement:-1 } },
+    ]},
+    { question:'What makes someone good at sales?', answers:[
+      { text:'Listening, persistence, and confidence', effects:{ interviewScore:+8, teamwork:+1, reliability:+1 } },
+      { text:'Talking fast and sounding impressive', effects:{ interviewScore:+1 } },
+      { text:'Only chasing easy wins', effects:{ interviewScore:-4, workEthic:-1 } },
+      { text:'Putting pressure on people', effects:{ interviewScore:-5, judgement:-1 } },
+    ]},
+    { question:'You are behind target. What do you do?', answers:[
+      { text:'Review what is working and push smarter', effects:{ interviewScore:+8, judgement:+2, workEthic:+1 } },
+      { text:'Work longer and hope it turns', effects:{ interviewScore:+3, workEthic:+1 } },
+      { text:'Blame the market', effects:{ interviewScore:-4, reliability:-1 } },
+      { text:'Give up on the month', effects:{ interviewScore:-7, workEthic:-2 } },
+    ]},
+  ],
+  corporate: [
+    { question:'Tell us about a time you solved a difficult problem.', answers:[
+      { text:'Break it down, analyse options, then act', effects:{ interviewScore:+9, judgement:+2, reliability:+1 } },
+      { text:'Work hard until something clicks', effects:{ interviewScore:+4, workEthic:+2 } },
+      { text:'Ask someone smarter to solve it', effects:{ interviewScore:-2, reliability:-1 } },
+      { text:'Go with instinct immediately', effects:{ interviewScore:-5, judgement:-2 } },
+    ]},
+    { question:'What helps you perform in competitive environments?', answers:[
+      { text:'Preparation, consistency, and learning fast', effects:{ interviewScore:+8, workEthic:+2, calmness:+1 } },
+      { text:'Networking and confidence', effects:{ interviewScore:+5, reliability:+1 } },
+      { text:'Natural talent alone', effects:{ interviewScore:-4, workEthic:-1 } },
+      { text:'Pressure usually makes me spiral', effects:{ interviewScore:-7, calmness:-2 } },
+    ]},
+    { question:'A project starts going off track. What do you do?', answers:[
+      { text:'Escalate early with a clear plan', effects:{ interviewScore:+8, judgement:+2, reliability:+2 } },
+      { text:'Work privately to fix it first', effects:{ interviewScore:+3, workEthic:+1 } },
+      { text:'Hope it sorts itself out', effects:{ interviewScore:-6, reliability:-2 } },
+      { text:'Find someone else to take over', effects:{ interviewScore:-5, judgement:-1 } },
+    ]},
+  ],
+};
+const JOB_INTERVIEW_EVENTS = [
+  { text:'Traffic slowed you down and you arrived slightly late.', score:-5, categories:['retail','office','sales','corporate','creative','emergency'] },
+  { text:'The interviewer seems to like your energy straight away.', score:+5, categories:['retail','sales','creative'] },
+  { text:'The interviewer is in a bad mood for no clear reason.', score:-4, categories:['office','corporate','sales'] },
+  { text:'Another candidate performs badly before you go in.', score:+4, categories:['office','sales','corporate'] },
+  { text:'A fire alarm interrupts the interview and throws everyone off.', score:0, categories:['emergency','office','corporate'] },
+  { text:'The interviewer recognises your name from somewhere positive.', score:+4, categories:['retail','office','sales','creative'] },
+  { text:'You spill coffee just before the interview starts.', score:-3, categories:['office','corporate','sales'] },
+];
 function switchTab(tab, el) {
   _currentTab = tab;
+  if (tab !== 'learn') {
+    _learnScreen = 'main';
+    _learnClassmateId = null;
+  }
   ['life','family','learn','activities'].forEach(t => {
     const tabEl = document.getElementById(`tab-${t}`);
     tabEl.style.display = t === tab ? (t === 'life' ? 'flex' : 'flex') : 'none';
@@ -196,15 +430,32 @@ function switchTab(tab, el) {
 
 // ── LIFE TAB ──────────────────────────────────────────────
 function updateAllUI() {
+  ensureRelationshipOrderState();
   updateLifeTab();
   updateNavLearnLabel();
   if (_currentTab === 'family') renderFamilyTab();
   if (_currentTab === 'learn')  renderLearnTab();
 }
+function isWorkTabActive() {
+  return STATE.age >= 18 && STATE.school.level !== 'uni';
+}
+function isGraduate() {
+  return STATE.school.level === 'graduated' || STATE.school.postSchool?.uniApplication?.status === 'graduated';
+}
+function getDegreeCourse() {
+  const application = STATE.school.postSchool?.uniApplication;
+  return isGraduate() ? (application?.degreeAwarded || application?.course || null) : null;
+}
 function updateNavLearnLabel() {
-  const isWork = STATE.age >= 18;
-  document.getElementById('nav-learn-label').textContent = isWork ? 'Work' : 'Learn';
-  document.getElementById('nav-learn').querySelector('.icon').textContent = isWork ? 'work' : 'school';
+  const label = document.getElementById('nav-learn-label');
+  const icon = document.getElementById('nav-learn').querySelector('.icon');
+  if (isWorkTabActive()) {
+    label.textContent = 'Work';
+    icon.textContent = 'work';
+    return;
+  }
+  label.textContent = 'Learn';
+  icon.textContent = 'school';
 }
 function updateLifeTab() {
   const avatarEl = document.getElementById('profile-avatar');
@@ -391,7 +642,12 @@ function switchFamilyTab(key) {
   window._familySubTab = key;
   renderFamilyTab();
 }
-function renderFamilyPeople() {
+function ensureRelationshipOrderState() {
+  if (!STATE.relationshipOrder) STATE.relationshipOrder = {};
+  if (!Array.isArray(STATE.relationshipOrder.family)) STATE.relationshipOrder.family = [];
+  if (!Array.isArray(STATE.relationshipOrder.friends)) STATE.relationshipOrder.friends = [];
+}
+function getFamilyPeopleEntries() {
   const people = [];
   if (!['single_dad'].includes(STATE.family.situation))
     people.push({ person:STATE.family.mum, role:'Mother', rel:STATE.family.mum.relationship ?? STATE.relationships.family, traitPool:PARENT_TRAITS_POOL });
@@ -401,18 +657,47 @@ function renderFamilyPeople() {
     people.push({ person:s, role:s.gender==='male'?'Brother':'Sister', rel:s.relationship||60, traitPool:CLASSMATE_TRAITS_POOL }));
   STATE.family.pets.filter(p => !p.dead).forEach(p =>
     people.push({ person:{...p, firstName:p.name, traits:[]}, role:'Pet', rel:p.happiness, traitPool:[] }));
+  return people;
+}
+function getFriendEntries() {
+  ensurePersistentFriendState();
+  const liveFriends = STATE.school.classmates.filter(c => c.status === 'friend');
+  liveFriends.forEach(upsertPersistentFriend);
+  const merged = STATE.social.friends.map(savedFriend =>
+    STATE.school.classmates.find(c => c.id === savedFriend.id) || savedFriend
+  );
+  return merged.map(friend => ({ person:friend, role:'Friend', rel:friend.relationship, traitPool:CLASSMATE_TRAITS_POOL }));
+}
+function getOrderedRelationshipEntries(listKey, entries) {
+  ensureRelationshipOrderState();
+  const ids = entries.map(({ person }) => person.id);
+  const saved = STATE.relationshipOrder[listKey].filter(id => ids.includes(id));
+  const nextOrder = [...saved, ...ids.filter(id => !saved.includes(id))];
+  STATE.relationshipOrder[listKey] = nextOrder;
+  const byId = new Map(entries.map(entry => [entry.person.id, entry]));
+  return nextOrder.map(id => byId.get(id)).filter(Boolean);
+}
+function renderRelationshipList(listKey, heading, entries) {
+  const orderedEntries = getOrderedRelationshipEntries(listKey, entries);
+  const listId = `relationship-list-${listKey}`;
   document.getElementById('family-tab-content').innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint)">Immediate Family</span>
-      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint)">${people.length} contacts</span>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint)">${heading}</span>
+      </div>
+      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint)">${orderedEntries.length} contacts</span>
     </div>
-    <div style="display:flex;flex-direction:column;gap:8px">
-      ${people.map(({ person, role, rel, traitPool }) => buildPersonCard(person, role, rel, traitPool)).join('')}
+    <div class="relationship-list" id="${listId}" data-reorder-list="${listKey}">
+      ${orderedEntries.map(({ person, role, rel, traitPool }) => buildPersonCard(person, role, rel, traitPool, { reorderable:true, listKey })).join('')}
     </div>
-    <div class="family-find-card" onclick="showToast('Coming soon!')">
+    ${listKey === 'family' ? `<div class="family-find-card" onclick="showToast('Coming soon!')">
       <span style="font-size:18px">＋</span>
       <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Find Extended Family</span>
-    </div>`;
+    </div>` : ''}`;
+  wireRelationshipReorder(listId, listKey);
+}
+function renderFamilyPeople() {
+  renderRelationshipList('family', 'Immediate Family', getFamilyPeopleEntries());
 }
 function renderFamilyPartner() {
   const r = STATE.relationships;
@@ -421,16 +706,12 @@ function renderFamilyPartner() {
     : buildEmptyState('💑', 'No partner yet.', 'Download a dating app. You never know.');
 }
 function renderFamilyFriends() {
-  const friends = STATE.school.classmates.filter(c => c.status === 'friend');
-  document.getElementById('family-tab-content').innerHTML = friends.length
-    ? `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-         <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint)">Friends</span>
-         <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint)">${friends.length} contacts</span>
-       </div>
-       <div style="display:flex;flex-direction:column;gap:8px">
-         ${friends.map(c => buildPersonCard(c, 'Friend', c.relationship, CLASSMATE_TRAITS_POOL)).join('')}
-       </div>`
-    : buildEmptyState('👥', 'No friends yet.', 'Make your first friend at school.');
+  const friends = getFriendEntries();
+  if (!friends.length) {
+    document.getElementById('family-tab-content').innerHTML = buildEmptyState('👥', 'No friends yet.', 'Make your first friend at school.');
+    return;
+  }
+  renderRelationshipList('friends', 'Friends', friends);
 }
 function renderFamilyQuick() {
   document.getElementById('family-tab-content').innerHTML = `
@@ -446,6 +727,8 @@ function renderFamilyQuick() {
 
 // ── PERSON CARD BUILDERS ──────────────────────────────────
 let _expandedCardId = null;
+let _relationshipDrag = null;
+let _personSheetDrag = null;
 
 function buildPersonCardAvatar(person) {
   const accent = familyRoleAccent(person._roleCard || person._role || '');
@@ -494,7 +777,6 @@ function buildDotsIcon(color = '#5f5145') {
     <circle cx="13" cy="8" r="1.5" fill="${color}"></circle>
   </svg>`;
 }
-
 function buildPersonCardExpandedBody(person, role, rel, traitPool) {
   const traits = buildPersonCardTraits(person, traitPool);
   const actions = getAvailableActions(role, STATE.age, person);
@@ -520,7 +802,7 @@ function buildPersonCardExpandedBody(person, role, rel, traitPool) {
 
 
 
-function buildPersonCard(person, role, rel, traitPool) {
+function buildPersonCard(person, role, rel, traitPool, options = {}) {
   person._roleCard = role;
   const isExpanded = _expandedCardId === person.id;
   const avatar     = buildPersonCardAvatar(person);
@@ -532,7 +814,7 @@ function buildPersonCard(person, role, rel, traitPool) {
   const accent     = familyRoleAccent(role);
   const ageLabel   = person.age !== undefined ? ` <strong style="font-weight:800;color:var(--text)">•</strong> <strong style="font-weight:800;color:var(--text)">Age ${person.age}</strong>` : '';
   return `
-    <div class="person-card" style="flex-direction:column;align-items:stretch;gap:0;cursor:default">
+    <div class="person-card" data-person-id="${person.id}" data-list-key="${options.listKey || ''}" style="flex-direction:column;align-items:stretch;gap:0;cursor:default">
       <div style="display:flex;align-items:center;gap:14px">
         ${avatar}
         <div style="flex:1;min-width:0">
@@ -542,14 +824,108 @@ function buildPersonCard(person, role, rel, traitPool) {
           ${relBar}
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-          <button onclick="togglePersonCard('${person.id}')"
+          <button onclick="event.stopPropagation();togglePersonCard('${person.id}')"
             style="width:38px;height:38px;border-radius:99px;background:${accent.bg};border:1px solid ${accent.outline};box-shadow:0 3px 10px rgba(26,24,20,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">${buildSpeechBubbleIcon(accent.icon)}</button>
-          <button onclick="openPersonSheet('${person.id}','${role}')"
+          <button onclick="event.stopPropagation();openPersonSheet('${person.id}','${role}')"
             style="width:38px;height:38px;border-radius:99px;background:#fff8ea;border:1px solid #e7d7bf;box-shadow:0 3px 10px rgba(26,24,20,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">${buildDotsIcon()}</button>
         </div>
       </div>
       ${expanded}
     </div>`;
+}
+
+function getRelationshipDragAfterElement(list, pointerY) {
+  const items = [...list.querySelectorAll('.person-card[data-person-id]:not(.is-dragging)')];
+  let closest = { offset: Number.NEGATIVE_INFINITY, element: null };
+  items.forEach(item => {
+    const rect = item.getBoundingClientRect();
+    const offset = pointerY - (rect.top + rect.height / 2);
+    if (offset < 0 && offset > closest.offset) closest = { offset, element:item };
+  });
+  return closest.element;
+}
+function persistRelationshipOrder(listEl, listKey) {
+  STATE.relationshipOrder[listKey] = [...listEl.querySelectorAll('.person-card[data-person-id]')].map(el => el.dataset.personId);
+  saveGame();
+}
+function onRelationshipDragMove(event) {
+  if (!_relationshipDrag) return;
+  if (event.cancelable) event.preventDefault();
+  const drag = _relationshipDrag;
+  drag.card.style.transform = `translateY(${event.clientY - drag.startY}px) scale(1.01)`;
+  const afterElement = getRelationshipDragAfterElement(drag.list, event.clientY);
+  if (!afterElement) drag.list.appendChild(drag.card);
+  else if (afterElement !== drag.card.nextElementSibling) drag.list.insertBefore(drag.card, afterElement);
+}
+function beginRelationshipDrag(card, list, listKey, startY) {
+  _relationshipDrag = { card, list, listKey, startY };
+  card.classList.add('is-dragging');
+  card.style.transition = 'none';
+  card.style.zIndex = '5';
+  document.body.classList.add('is-reordering-people');
+  window.addEventListener('pointermove', onRelationshipDragMove, { passive:false });
+  window.addEventListener('pointerup', endRelationshipDrag);
+  window.addEventListener('pointercancel', endRelationshipDrag);
+}
+function endRelationshipDrag() {
+  const drag = _relationshipDrag;
+  if (!drag) return;
+  drag.card.classList.remove('is-dragging');
+  drag.card.style.transform = '';
+  drag.card.style.transition = '';
+  drag.card.style.zIndex = '';
+  document.body.classList.remove('is-reordering-people');
+  persistRelationshipOrder(drag.list, drag.listKey);
+  _relationshipDrag = null;
+  window.removeEventListener('pointermove', onRelationshipDragMove);
+  window.removeEventListener('pointerup', endRelationshipDrag);
+  window.removeEventListener('pointercancel', endRelationshipDrag);
+}
+function wireRelationshipReorder(listId, listKey) {
+  const list = document.getElementById(listId);
+  if (!list) return;
+  list.querySelectorAll('.person-card[data-person-id]').forEach(card => {
+    card.onpointerdown = event => {
+      if (event.button !== undefined && event.button !== 0) return;
+      if (event.target.closest('button')) return;
+      const startX = event.clientX;
+      const startY = event.clientY;
+      const isTouch = event.pointerType === 'touch';
+      let cancelled = false;
+      let active = false;
+      let holdTimer = null;
+      const cleanupPending = () => {
+        clearTimeout(holdTimer);
+        window.removeEventListener('pointermove', trackPending);
+        window.removeEventListener('pointerup', cancelPending);
+        window.removeEventListener('pointercancel', cancelPending);
+      };
+      const startDrag = moveEvent => {
+        if (cancelled || active || _relationshipDrag) return;
+        active = true;
+        cleanupPending();
+        beginRelationshipDrag(card, list, listKey, startY);
+        if (moveEvent && moveEvent !== event) onRelationshipDragMove(moveEvent);
+      };
+      const trackPending = moveEvent => {
+        const moved = Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY);
+        if (isTouch && moved > 8) {
+          cancelled = true;
+          cleanupPending();
+          return;
+        }
+        if (!isTouch && moved > 5) startDrag(moveEvent);
+      };
+      const cancelPending = () => {
+        cancelled = true;
+        cleanupPending();
+      };
+      holdTimer = setTimeout(() => startDrag(event), isTouch ? 260 : 180);
+      window.addEventListener('pointermove', trackPending, { passive:true });
+      window.addEventListener('pointerup', cancelPending);
+      window.addEventListener('pointercancel', cancelPending);
+    };
+  });
 }
 
 function togglePersonCard(personId) {
@@ -577,7 +953,70 @@ function compatibilityFor(person) {
     .reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
   return 35 + (seed % 55);
 }
+function sheetRoleMeta(role) {
+  const map = {
+    Mother: { icon:'👩', label:'Family' },
+    Father: { icon:'👨', label:'Family' },
+    Brother: { icon:'🧒', label:'Sibling' },
+    Sister: { icon:'🧒', label:'Sibling' },
+    Friend: { icon:'✨', label:'Friendship' },
+    classmate: { icon:'🏫', label:'School' },
+    Teacher: { icon:'📚', label:'Teacher' },
+    Pet: { icon:'🐾', label:'Companion' },
+    Partner: { icon:'💞', label:'Relationship' },
+  };
+  return map[role] || { icon:'✨', label:'Connection' };
+}
+function buildSheetSymbolIcon(type, color = '#8f7362') {
+  const common = 'display:block;width:18px;height:18px';
+  const icons = {
+    job: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="${common}"><path fill="${color}" d="M184 48h144c4.4 0 8 3.6 8 8v40H176V56c0-4.4 3.6-8 8-8m-56 8v40H64c-35.3 0-64 28.7-64 64v96h512v-96c0-35.3-28.7-64-64-64h-64V56c0-30.9-25.1-56-56-56H184c-30.9 0-56 25.1-56 56m384 232H320v32c0 17.7-14.3 32-32 32h-64c-17.7 0-32-14.3-32-32v-32H0v128c0 35.3 28.7 64 64 64h384c35.3 0 64-28.7 64-64z"/></svg>`,
+    age: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="${common}"><path fill="${color}" d="M184 48h144c4.4 0 8 3.6 8 8v40H176V56c0-4.4 3.6-8 8-8m-56 8v40H64c-35.3 0-64 28.7-64 64v96h512v-96c0-35.3-28.7-64-64-64h-64V56c0-30.9-25.1-56-56-56H184c-30.9 0-56 25.1-56 56m384 232H320v32c0 17.7-14.3 32-32 32h-64c-17.7 0-32-14.3-32-32v-32H0v128c0 35.3 28.7 64 64 64h384c35.3 0 64-28.7 64-64z"/></svg>`,
+    divorced: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="${common}"><path fill="${color}" d="M8.106 18.247C5.298 16.083 2 13.542 2 9.137c0-4.6 4.923-7.935 9.264-4.323L9.81 8.204a.75.75 0 0 0 .253.906l2.833 2.024l-2.466 2.878a.75.75 0 0 0 .039 1.018l1.7 1.7l-.91 3.64c-.756-.253-1.516-.843-2.298-1.46q-.417-.326-.856-.663"/><path fill="${color}" d="M12.812 20.345c.732-.265 1.469-.837 2.226-1.434q.417-.328.856-.664C18.702 16.083 22 13.542 22 9.137c0-4.515-4.741-7.81-9.02-4.518l-1.553 3.622l3.009 2.149a.75.75 0 0 1 .133 1.098l-2.548 2.973l1.51 1.509a.75.75 0 0 1 .197.712z"/></svg>`,
+    married: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" style="${common}"><g fill="none" stroke="${color}" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"><circle cx="25" cy="29" r="15"/><path fill="${color}" d="m18 8l3-4h8.054L32 8l-7 6z"/></g></svg>`,
+    single: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="${common}"><path fill="${color}" d="M12 8s0 0 .76-1c.88-1.16 2.18-2 3.74-2c2.49 0 4.5 2.01 4.5 4.5c0 .93-.28 1.79-.76 2.5c-.81 1.21-8.24 9-8.24 9s-7.43-7.79-8.24-9c-.48-.71-.76-1.57-.76-2.5C3 7.01 5.01 5 7.5 5c1.56 0 2.87.84 3.74 2c.76 1 .76 1 .76 1"/></svg>`,
+    compatibility: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="${common}"><path fill="${color}" d="M10.92 2.868a1.25 1.25 0 0 1 2.16 0l2.795 4.798l5.428 1.176a1.25 1.25 0 0 1 .667 2.054l-3.7 4.141l.56 5.525a1.25 1.25 0 0 1-1.748 1.27L12 19.592l-5.082 2.24a1.25 1.25 0 0 1-1.748-1.27l.56-5.525l-3.7-4.14a1.25 1.25 0 0 1 .667-2.055l5.428-1.176z"/></svg>`,
+    generosity: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="${common}"><path fill="${color}" d="M80 416a64 64 0 0 0 64 64h92a4 4 0 0 0 4-4V292a4 4 0 0 0-4-4H88a8 8 0 0 0-8 8Zm160-164V144h32v108a4 4 0 0 0 4 4h140a47.9 47.9 0 0 0 16-2.75A48.09 48.09 0 0 0 464 208v-16a48 48 0 0 0-48-48h-40.54a2 2 0 0 1-1.7-3A72 72 0 0 0 256 58.82A72 72 0 0 0 138.24 141a2 2 0 0 1-1.7 3H96a48 48 0 0 0-48 48v16a48.09 48.09 0 0 0 32 45.25A47.9 47.9 0 0 0 96 256h140a4 4 0 0 0 4-4m32-148a40 40 0 1 1 40 40h-40Zm-74.86-39.9A40 40 0 0 1 240 104v40h-40a40 40 0 0 1-2.86-79.89ZM276 480h92a64 64 0 0 0 64-64V296a8 8 0 0 0-8-8H276a4 4 0 0 0-4 4v184a4 4 0 0 0 4 4"/></svg>`,
+    reputation: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" style="${common}"><path fill="${color}" d="m23.103 20.817l-2.588 5.247a1 1 0 0 1-.753.547l-6.675.97a1 1 0 0 0-.554 1.706l4.83 4.708a1 1 0 0 1 .287.885l-1.14 6.648a1 1 0 0 0 1.452 1.054l5.97-3.138a1 1 0 0 1 .931 0l5.97 3.138a1 1 0 0 0 1.45-1.054l-1.14-6.648a1 1 0 0 1 .288-.885l4.83-4.708a1 1 0 0 0-.554-1.706l-6.675-.97a1 1 0 0 1-.753-.547l-2.985-6.048a1 1 0 0 0-1.794 0M36 4H12v10l12 5l12-5z"/></svg>`,
+  };
+  return `<span class="person-inline-svg-icon">${icons[type] || ''}</span>`;
+}
+function buildHomeStatIcon(type) {
+  if (type === 'smarts') return '<span class="brain-icon person-home-stat-icon"></span>';
+  if (type === 'warmth') return '<span class="sunny-icon person-home-stat-icon"></span>';
+  if (type === 'looks') return '<span class="looks-icon person-home-stat-icon"></span>';
+  return '';
+}
+function relationshipBarColor(role) {
+  if (role === 'Teacher') return '#ef9f47';
+  if (role === 'Friend' || role === 'classmate') return '#ff6f91';
+  return '#e85d8f';
+}
+function reputationTone(value) {
+  if (value >= 67) return { tone:'good', color:'#43a85b', soft:'rgba(67,168,91,.18)', label:'Loved by people' };
+  if (value >= 34) return { tone:'mixed', color:'#e3a43a', soft:'rgba(227,164,58,.2)', label:'Mixed reputation' };
+  return { tone:'bad', color:'#d46152', soft:'rgba(212,97,82,.18)', label:'Needs work' };
+}
+function reputationValueFor(person, role) {
+  if (person.isPet) return { label:'Reputation', value:clamp(person.happiness ?? person._rel ?? 50) };
+  if (person.npcStats?.reputation !== undefined) return { label:'Reputation', value:clamp(person.npcStats.reputation) };
+  if (role === 'Mother' || role === 'Father')
+    return { label:'Reputation', value:clamp(Math.round(((person.npcStats?.warmth ?? 50) + (person.npcStats?.generosity ?? 50)) / 2)) };
+  if (role === 'Brother' || role === 'Sister') {
+    const warmth = person.npcStats?.warmth ?? 50;
+    const trouble = person.npcStats?.trouble ?? 50;
+    return { label:'Reputation', value:clamp(Math.round((warmth * 0.62) + ((100 - trouble) * 0.38))) };
+  }
+  if (role === 'Teacher') {
+    const warmth = person.npcStats?.warmth ?? 50;
+    const strictness = person.npcStats?.strictness ?? 50;
+    return { label:'Reputation', value:clamp(Math.round((warmth * 0.58) + ((100 - strictness) * 0.42))) };
+  }
+  return { label:'Reputation', value:clamp(person._rel ?? 50) };
+}
 function openPersonSheet(personId, role) {
+  const overlay = document.getElementById('person-overlay');
+  if (overlay) overlay.dataset.closing = 'false';
   let person = null;
   if (personId === STATE.family.mum.id)
     person = { ...STATE.family.mum, _role:'Mother', _rel:STATE.family.mum.relationship ?? STATE.relationships.family };
@@ -588,54 +1027,60 @@ function openPersonSheet(personId, role) {
     if (sib) person = { ...sib, _role:role, _rel:sib.relationship||60 };
     const cm  = STATE.school.classmates.find(c => c.id === personId);
     if (cm)  person = { ...cm,  _role:role, _rel:cm.relationship };
+    if (!person && role === 'Friend') {
+      const savedFriend = getPersistentFriendById(personId);
+      if (savedFriend) person = { ...savedFriend, _role:'Friend', _rel:savedFriend.relationship ?? 60 };
+    }
     const teacher = STATE.school.teachers.find(t => t.id === personId);
     if (teacher) person = { ...teacher, _role:'Teacher', _rel:teacher.npcStats?.warmth ?? 50 };
     const pet = STATE.family.pets.find(p => p.id === personId);
     if (pet) person = { ...pet, _role:'Pet', _rel:pet.happiness, isPet:true };
   }
   if (!person) return;
+  const sheet = document.getElementById('person-sheet');
+  const backdrop = document.querySelector('#person-overlay .overlay-backdrop');
   const traitsHTML = buildPersonSheetTraits(person, role);
   const avatarHTML = buildPersonSheetAvatar(person);
   const detailsHTML = buildPersonSheetDetails(person, role);
   const statsHTML = buildPersonSheetStats(person, role);
-  const actionsHTML = buildPersonSheetActions(person, role, personId);
+  const reputationHTML = buildPersonSheetReputation(person, role);
   const relLabel = role === 'Teacher' ? 'Warmth' : 'Relationship';
   const displayName = (role === 'Friend' || role === 'classmate') ? classmateDisplayName(person) : `${person.firstName}${person.surname ? ' '+person.surname : ''}`;
+  const relColor = relationshipBarColor(person._role);
   document.getElementById('person-inner').innerHTML = `
-    <div class="person-profile-header">
-      <div class="person-profile-emoji">${avatarHTML}</div>
-      <div style="flex:1">
-        <div style="font-size:20px;font-weight:800;letter-spacing:-.02em">${displayName}</div>
-        <div style="font-size:13px;color:var(--text-muted);margin-top:2px">${person._role}${person.job ? ' · '+person.job : ''}</div>
-        <div class="rel-bar-wrap" style="margin-top:6px">
-          <div style="font-size:11px;color:var(--text-faint);margin-bottom:4px">${relLabel}</div>
-          <div class="rel-bar"><div class="rel-fill" style="width:${person._rel}%"></div></div>
-          <span style="font-family:var(--mono);font-size:11px;color:var(--text-faint)">${person._rel}</span>
+    <div class="person-sheet-shell">
+      <div class="person-sheet-topbar">
+        <div></div>
+        <button class="person-sheet-close" type="button" onclick="closePerson()" aria-label="Close profile">✕</button>
+      </div>
+      <div class="person-sheet-hero">
+        <div class="person-profile-emoji person-sheet-avatar">${avatarHTML}</div>
+        <div class="person-sheet-hero-copy">
+          <div class="person-sheet-name">${displayName}</div>
+          <div class="person-sheet-role-inline">${person._role}</div>
+          <div class="person-sheet-progress compact">
+            <div class="person-sheet-progress-head">
+              <span>${relLabel}</span>
+              <span>${person._rel}%</span>
+            </div>
+            <div class="person-sheet-progress-track"><div class="person-sheet-progress-fill" style="width:${person._rel}%;background:${relColor}"></div></div>
+          </div>
         </div>
       </div>
-    </div>
-    ${person.gradeScore !== undefined ? `<div style="font-size:12px;color:var(--text-muted)">Grade: <strong style="color:${gradeColor(person.grade)}">${person.grade}</strong> · Compatibility: ${person.compatibility}%</div>` : ''}
-    ${detailsHTML}
-    ${statsHTML}
-    ${traitsHTML ? `<div class="trait-pills">${traitsHTML}</div>` : ''}
-    ${actionsHTML}`;
-  if (person.isPet) {
-    wireActions(document.getElementById('person-inner'), PET_ACTIONS, () => {
-      updateAllUI();
-      renderFamilyTab();
-      openPersonSheet(personId, role);
-    }, personId);
+      ${detailsHTML}
+      <div class="person-sheet-divider"></div>
+      ${statsHTML}
+      ${traitsHTML ? `<div class="person-sheet-divider"></div><div class="sheet-section flat"><div class="sheet-section-title">Traits</div><div class="trait-pills person-sheet-traits">${traitsHTML}</div></div>` : ''}
+      <div class="person-sheet-divider"></div>
+      ${reputationHTML}
+    </div>`;
+  if (sheet) {
+    sheet.style.transform = '';
+    sheet.style.transition = '';
   }
-  if (role === 'Mother' || role === 'Father' || role === 'Brother' || role === 'Sister' || role === 'Friend' || role === 'classmate') {
-    document.getElementById('person-inner').querySelectorAll('.action-card:not(.locked)').forEach(el => {
-      const actionId = el.dataset.id;
-      el.onclick = () => {
-        triggerAction(actionId, personId, role);
-        openPersonSheet(personId, role);
-      };
-    });
-  }
+  if (backdrop) backdrop.style.opacity = '';
   document.getElementById('person-overlay').classList.add('open');
+  initPersonSheetDrag();
 }
 
 function buildPersonSheetAvatar(person) {
@@ -658,114 +1103,132 @@ function buildPersonSheetTraits(person, role) {
 function npcStatConfigFor(role, person) {
   if (role === 'Mother' || role === 'Father') {
     return [
-      ['Looks', person.npcStats?.looks, '#ec4899'],
-      ['Smarts', person.npcStats?.smarts, '#3b82f6'],
-      ['Warmth', person.npcStats?.warmth, '#f59e0b'],
-      ['Generosity', person.npcStats?.generosity, '#22c55e'],
+      ['Looks', 'looks', person.npcStats?.looks, '#ff89db'],
+      ['Smarts', 'smarts', person.npcStats?.smarts, '#8fbffa'],
+      ['Warmth', 'warmth', person.npcStats?.warmth, '#ffd52a'],
+      ['Generosity', 'generosity', person.npcStats?.generosity, '#4ecb71'],
     ];
   }
   if (role === 'Brother' || role === 'Sister') {
     return [
-      ['Looks', person.npcStats?.looks, '#ec4899'],
-      ['Smarts', person.npcStats?.smarts, '#3b82f6'],
-      ['Warmth', person.npcStats?.warmth, '#f59e0b'],
-      ['Trouble', person.npcStats?.trouble, '#dc2626'],
+      ['Looks', 'looks', person.npcStats?.looks, '#ff89db'],
+      ['Smarts', 'smarts', person.npcStats?.smarts, '#8fbffa'],
+      ['Warmth', 'warmth', person.npcStats?.warmth, '#ffd52a'],
+      ['Trouble', 'generosity', person.npcStats?.trouble, '#ef6b63'],
     ];
   }
   if (role === 'Friend' || role === 'classmate') {
     return [
-      ['Popularity', person.npcStats?.popularity, '#8b5cf6'],
-      ['Looks', person.npcStats?.looks, '#ec4899'],
-      ['Smarts', person.npcStats?.smarts, '#3b82f6'],
-      ['Reputation', person.npcStats?.reputation, '#22c55e'],
+      ['Popularity', 'warmth', person.npcStats?.popularity, '#9d87ff'],
+      ['Looks', 'looks', person.npcStats?.looks, '#ff89db'],
+      ['Smarts', 'smarts', person.npcStats?.smarts, '#8fbffa'],
+      ['Reputation', 'reputation', person.npcStats?.reputation, '#4ecb71'],
     ];
   }
   if (role === 'Teacher') {
     return [
-      ['Looks', person.npcStats?.looks, '#ec4899'],
-      ['Smarts', person.npcStats?.smarts, '#3b82f6'],
-      ['Warmth', person.npcStats?.warmth, '#f59e0b'],
-      ['Strictness', person.npcStats?.strictness, '#dc2626'],
+      ['Looks', 'looks', person.npcStats?.looks, '#ff89db'],
+      ['Smarts', 'smarts', person.npcStats?.smarts, '#8fbffa'],
+      ['Warmth', 'warmth', person.npcStats?.warmth, '#ffd52a'],
+      ['Strictness', 'generosity', person.npcStats?.strictness, '#ef6b63'],
     ];
   }
   return [];
 }
 
 function buildPersonSheetStats(person, role) {
-  const stats = npcStatConfigFor(role, person).filter(([, value]) => value !== undefined);
+  const stats = npcStatConfigFor(role, person).filter(([, , value]) => value !== undefined);
   if (!stats.length) return '';
   return `
-    <div class="detail-card">
-      ${stats.map(([label, value, color]) => `
-        <div style="display:flex;flex-direction:column;gap:6px;padding:6px 0">
-          <div style="display:flex;justify-content:space-between;align-items:center">
+    <div class="sheet-section flat">
+      <div class="sheet-section-title">Stats</div>
+      <div class="person-stat-list">
+      ${stats.map(([label, icon, value, color]) => `
+        <div class="person-stat-row">
+          <div class="person-stat-label-wrap">
+            ${icon === 'generosity' ? buildSheetSymbolIcon('generosity', color) : icon === 'reputation' ? buildSheetSymbolIcon('reputation', color) : buildHomeStatIcon(icon)}
             <span class="detail-label">${label}</span>
-            <span style="font-family:var(--mono);font-size:11px;color:var(--text-faint)">${value}%</span>
           </div>
-          <div style="height:7px;background:var(--surface-mid);border-radius:99px;overflow:hidden">
-            <div style="width:${value}%;height:100%;background:${color};border-radius:99px"></div>
+          <div class="person-stat-track">
+            <div class="person-stat-fill" style="width:${value}%;background:${color}"></div>
           </div>
+          <span class="person-stat-value">${value}%</span>
         </div>`).join('')}
+      </div>
     </div>`;
 }
 
 function buildPersonSheetDetails(person, role) {
   const rows = [];
-  if (person.age !== undefined) rows.push(['Age', person.age]);
+  if (person.age !== undefined) rows.push(['Age', buildSheetSymbolIcon('age', '#f2b48c'), `${person.age}`]);
   if (role === 'Mother' || role === 'Father') {
-    rows.push(['Job', person.job || 'None']);
-    rows.push(['Marital status', STATE.family.maritalStatus || maritalStatusForSituation(STATE.family.situation)]);
+    rows.push(['Job', buildSheetSymbolIcon('job', '#bc8f68'), person.job || 'None']);
+    const maritalStatus = STATE.family.maritalStatus || maritalStatusForSituation(STATE.family.situation);
+    const maritalIcon = /divorc/i.test(maritalStatus) ? buildSheetSymbolIcon('divorced', '#ef7f88')
+      : /married/i.test(maritalStatus) ? buildSheetSymbolIcon('married', '#d16a90')
+      : buildSheetSymbolIcon('single', '#ef98a5');
+    rows.push(['Marital Status', maritalIcon, maritalStatus]);
   }
   if (role === 'Brother' || role === 'Sister') {
-    rows.push(['Education', educationLevelForAge(person.age)]);
-    rows.push(['Sibling type', person.siblingType === 'half' ? 'Half sibling' : 'Full sibling']);
-    if (person.familyStatus) rows.push(['Family status', person.familyStatus]);
+    rows.push(['Education', buildSheetSymbolIcon('job', '#bc8f68'), educationLevelForAge(person.age)]);
+    rows.push(['Sibling Type', buildSheetSymbolIcon('single', '#ef98a5'), person.siblingType === 'half' ? 'Half sibling' : 'Full sibling']);
+    if (person.familyStatus) rows.push(['Family Status', buildSheetSymbolIcon('single', '#ef98a5'), person.familyStatus]);
   }
   if (role === 'Teacher') {
-    rows.push(['Subject', person.subject || 'Unknown']);
-    rows.push(['Title', person.title || 'Teacher']);
+    rows.push(['Subject', buildSheetSymbolIcon('job', '#bc8f68'), person.subject || 'Unknown']);
+    rows.push(['Title', buildSheetSymbolIcon('job', '#bc8f68'), person.title || 'Teacher']);
   }
-  if (!person.isPet && role !== 'Teacher') rows.push(['Compatibility', `${compatibilityFor(person)}%`]);
+  if (!person.isPet && role !== 'Teacher') rows.push(['Compatible', buildSheetSymbolIcon('compatibility', '#f0b14f'), `${compatibilityFor(person)}%`]);
+  const compactRows = rows.slice(0, 4);
+  while (compactRows.length < 4) compactRows.push(['', '', '']);
   if (!rows.length) return '';
   return `
-    <div class="detail-card">
-      ${rows.map(([label, value]) => `
-        <div class="detail-row">
-          <span class="detail-label">${label}</span>
-          <span class="detail-val">${value}</span>
+    <div class="person-sheet-metric-grid">
+      ${compactRows.map(([label, icon, value]) => `
+        <div class="person-sheet-metric">
+          <div class="person-sheet-metric-icon">${icon}</div>
+          <div class="person-sheet-metric-value">${value}</div>
+          <div class="person-sheet-metric-label">${label}</div>
         </div>`).join('')}
     </div>`;
 }
-
-function buildPersonSheetActions(person, role, personId) {
-  if (role === 'Mother' || role === 'Father') {
-    const actions = getAvailableActions(role, STATE.age, person);
-    return `
-      <div class="section-title">Actions</div>
-      <div class="action-list">${actions.map(a => buildActionHTML(a)).join('')}</div>`;
-  }
-  if (role === 'Brother' || role === 'Sister') {
-    const actions = getAvailableActions(role, STATE.age, person);
-    return `
-      <div class="section-title">Actions</div>
-      <div class="action-list">${actions.map(a => buildActionHTML(a)).join('')}</div>`;
-  }
-  if (role === 'Friend' || role === 'classmate') {
-    const actions = getAvailableActions(role, STATE.age, person);
-    return `
-      <div class="section-title">Actions</div>
-      <div class="action-list">${actions.map(a => buildActionHTML(a)).join('')}</div>`;
-  }
-  if (person.isPet) {
-    return `
-      <div class="section-title">Actions</div>
-      <div class="action-list">${PET_ACTIONS.map(a => buildActionHTML(a)).join('')}</div>`;
-  }
-  return '';
+function buildPersonSheetReputation(person, role) {
+  const rep = reputationValueFor(person, role);
+  const tone = reputationTone(rep.value);
+  return `
+    <div class="sheet-section flat">
+      <div class="sheet-section-title">Reputation</div>
+      <div class="person-reputation-inline">
+        ${buildSheetSymbolIcon('reputation', tone.color)}
+        <span class="person-reputation-label">${rep.label}</span>
+        <div class="person-reputation-track">
+          <div class="person-reputation-fill" style="width:${rep.value}%;background:${tone.color};box-shadow:0 8px 18px ${tone.soft}"></div>
+        </div>
+        <div class="person-reputation-score" style="color:${tone.color}">${rep.value} / 100</div>
+      </div>
+    </div>`;
 }
 
 function closePerson() {
-  document.getElementById('person-overlay').classList.remove('open');
+  const overlay = document.getElementById('person-overlay');
+  if (!overlay || overlay.dataset.closing === 'true' || !overlay.classList.contains('open')) return;
+  overlay.dataset.closing = 'true';
+  const sheet = document.getElementById('person-sheet');
+  const backdrop = overlay.querySelector('.overlay-backdrop');
+  if (sheet) {
+    sheet.style.transition = 'transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)';
+    sheet.style.transform = 'translateY(110%)';
+  }
+  if (backdrop) backdrop.style.opacity = '0';
+  setTimeout(() => {
+    overlay.classList.remove('open');
+    overlay.dataset.closing = 'false';
+  }, 220);
+}
+
+function initPersonSheetDrag() {
+  const handle = document.getElementById('person-sheet-handle');
+  if (handle) handle.onpointerdown = null;
 }
 
 let _pendingMoneyRequest = null;
@@ -845,36 +1308,1695 @@ function interactClassmate(cmId, action) {
 
 // ── LEARN TAB BUILDERS ────────────────────────────────────
 
-function buildLearnHeroSchool(edu, grade, avgGrade, gradeAboveAvg) {
-  const qualityMap   = { lower:2, working:2, middle:3, upper_middle:4, elite:5 };
-  const quality      = qualityMap[STATE.socialClass] || 2;
-  const isTarget     = quality >= 4;
-  const qualityLabel = quality >= 4 ? 'High' : quality === 3 ? 'Average' : 'Low';
-  const stageLabels  = { pre:'Pre-School', primary:'Primary School', secondary:'Secondary School', college:'Sixth Form / College', uni:'University' };
-  const stageLabel   = stageLabels[edu.level] || 'School';
-  const gradeBubbleBg = gradeAboveAvg ? '#16a34a' : '#dc2626';
+let _learnClassmateId = null;
+let _uniApplyDraft = null;
+const UNI_PREVIEW_IMAGE = 'data/uni_preview.png';
+
+const UNI_COURSES = [
+  { id:'Law', icon:'mdi:scale-balance', blurb:'Become a laywer.', perks:[['High salary potential', '#53a35d'], ['High stress', '#d45b55']] },
+  { id:'Medicine', icon:'mdi:stethoscope', blurb:'Become a doctor.', perks:[['Very high job security', '#53a35d'], ['Very high stress', '#d45b55']] },
+  { id:'Business', icon:'mdi:briefcase', blurb:'Build an empire.', perks:[['High income potential', '#53a35d'], ['Medium stress', '#d39b36']] },
+  { id:'Computer Science', icon:'mdi:laptop', blurb:'Build systems.', perks:[['Strong career outlook', '#53a35d'], ['Medium stress', '#d39b36']] },
+  { id:'Art', icon:'mdi:palette', blurb:'Express yourself.', perks:[['Creative freedom', '#53a35d'], ['Unclear path', '#d39b36']] },
+  { id:'Education', icon:'mdi:brain', blurb:'Become a teacher.', perks:[['People-focused career', '#53a35d'], ['Long training path', '#d39b36']] },
+  { id:'Engineering', icon:'mdi:cog', blurb:'Build the future.', perks:[['High demand', '#53a35d'], ['Medium stress', '#d39b36']] },
+  { id:'History', icon:'mdi:castle', blurb:'Study the past.', perks:[['Strong writing skills', '#53a35d'], ['Niche career paths', '#d39b36']] },
+  { id:'Music', icon:'mdi:music', blurb:'Create and perform.', perks:[['Creative network', '#53a35d'], ['Harder path', '#d45b55']] },
+];
+const UNI_TYPES = [
+  { id:'Elite Universities', icon:'mdi:crown', tag:'Very Competitive', tagBg:'#f8e8bd', tagColor:'#3a2a1a', bullets:['Highest reputation', 'Best career outcomes', 'Hardest to get into'], stress:4, cardBg:'#16233a', cardText:'#fffaf2', accent:'#f0b43f' },
+  { id:'Top Universities', icon:'mdi:shield-academic', tag:'Strong Outcomes', tagBg:'#eef2ff', tagColor:'#314784', bullets:['Strong reputation', 'High graduate employability', 'Moderate competition'], stress:3, cardBg:'#9f8a8aff', cardText:'#1a1814', accent:'#355f9c' },
+  { id:'Standard Universities', icon:'mdi:bank', tag:'Accessible', tagBg:'#eef7e8', tagColor:'#426d3d', bullets:['Lower entry requirements', 'Good graduate employability', 'Decent competition'], stress:2, cardBg:'#ffffff', cardText:'#1a1814', accent:'#5b9156' },
+  { id:'Local Universities', icon:'mdi:home-city', tag:'Close to Home', tagBg:'#fff1e3', tagColor:'#9a5f2c', bullets:['Lowest living costs', 'Less pressure', 'Low competition'], stress:1, cardBg:'#ffffff', cardText:'#1a1814', accent:'#c07b2d' },
+];
+const UNI_FUNDING = [
+  { id:'Student loan', icon:'mdi:bank-outline', blurb:'Take out a loan and repay after graduation.', tag:'Most Common', tagBg:'#eee7ff', tagColor:'#6753b3', accent:'#7d67d9' },
+  { id:'Ask parents', icon:'mdi:account-group', blurb:'They might help, or expect something in return.', tag:'If you\'re lucky', tagBg:'#ffe9e9', tagColor:'#ca5f5d', accent:'#ef7b78' },
+  { id:'Self fund', icon:'mdi:briefcase', blurb:'Work hard, study hard. No debt, but little rest.', tag:'Harder Path', tagBg:'#e8f5e7', tagColor:'#4f8850', accent:'#5ca55f' },
+];
+
+const UNI_TYPE_PREVIEW = {
+  'Elite Universities': { fee:'£9,250 / year', studentLife:[['Debt', 'High', '#d48b2b', 82], ['Stress', 'High', '#d45b55', 85], ['Social Life', 'Medium', '#e08e2d', 56], ['Career Prospects', 'Very High', '#4f9a57', 92]], blurb:'Elite universities open the strongest doors, but they ask the most from you.' },
+  'Top Universities': { fee:'£9,250 / year', studentLife:[['Debt', 'Medium', '#d48b2b', 64], ['Stress', 'High', '#d45b55', 76], ['Social Life', 'Medium', '#e08e2d', 58], ['Career Prospects', 'High', '#4f9a57', 81]], blurb:'Top universities balance strong outcomes with a slightly more reachable path.' },
+  'Standard Universities': { fee:'£9,250 / year', studentLife:[['Debt', 'Medium', '#d48b2b', 58], ['Stress', 'Medium', '#e08e2d', 52], ['Social Life', 'Good', '#e08e2d', 64], ['Career Prospects', 'Solid', '#4f9a57', 67]], blurb:'A practical route with good campus life and a less punishing admissions path.' },
+  'Local Universities': { fee:'£9,250 / year', studentLife:[['Debt', 'Low', '#d48b2b', 36], ['Stress', 'Low', '#e08e2d', 38], ['Social Life', 'Steady', '#e08e2d', 47], ['Career Prospects', 'Fair', '#4f9a57', 55]], blurb:'Staying local keeps costs lower and family closer while you find your footing.' },
+};
+
+function ensurePostSchoolState() {
+  if (!STATE.school.postSchool) STATE.school.postSchool = { schoolFinishedShown:false, uniApplication:null };
+  return STATE.school.postSchool;
+}
+
+function openUniApplication() {
+  _learnScreen = 'uniApplyBasics';
+  const postSchool = ensurePostSchoolState();
+  _uniApplyDraft = postSchool.uniApplication?.status === 'draft'
+    ? { ...postSchool.uniApplication }
+    : { course:null, uniType:null, funding:null, status:'draft' };
+  renderLearnTab();
+  const tab = document.getElementById('tab-learn');
+  if (tab) tab.scrollTop = 0;
+}
+
+function closeUniApplication() {
+  _learnScreen = 'main';
+  _uniApplyDraft = null;
+  renderLearnTab();
+}
+
+function openJobBoard(category = 'full-time') {
+  _jobBoardCategory = category;
+  _learnScreen = 'jobsBoard';
+  renderLearnTab();
+  const tab = document.getElementById('tab-learn');
+  if (tab) tab.scrollTop = 0;
+}
+
+function closeJobBoard() {
+  _learnScreen = 'main';
+  renderLearnTab();
+  const tab = document.getElementById('tab-learn');
+  if (tab) tab.scrollTop = 0;
+}
+
+function sampleUniqueJobs(pool, count, usedTitles = new Set()) {
+  const available = pool.filter(job => !usedTitles.has(getJobKey(job)));
+  const shuffled = [...available].sort(() => Math.random() - 0.5);
+  const picked = shuffled.slice(0, count);
+  picked.forEach(job => usedTitles.add(getJobKey(job)));
+  return picked;
+}
+
+function getJobKey(job) {
+  return [job.title, job.companyName || job.company, job.salary || job.rate || '', job.type || ''].join('|');
+}
+
+function inferJobCategory(job, type = 'full-time') {
+  const text = `${job.title} ${job.companyName || job.company}`.toLowerCase();
+  if (/police|firefighter|doctor/.test(text)) return 'emergency';
+  if (/sales|estate agent|recruitment/.test(text)) return 'sales';
+  if (/designer|illustrator|creator|actor|musician|gallery/.test(text)) return 'creative';
+  if (/solicitor|paralegal|compliance|finance|operations analyst|civil service|project coordinator|pilot trainee/.test(text)) return 'corporate';
+  if (/assistant|receptionist|admin|customer service|clerk|claims|lab/.test(text)) return 'office';
+  if (/cafe|retail|cashier|warehouse|fast food|delivery|supermarket|care assistant|trainer|apprentice/.test(text)) return type === 'part-time' ? 'retail' : 'office';
+  return type === 'part-time' ? 'retail' : 'office';
+}
+
+function buildJobDescription(job, type, category) {
+  const companyName = job.companyName || job.company;
+  const lines = {
+    retail: `A fast-moving role at ${companyName} where being calm, helpful, and reliable matters.`,
+    office: `A steady role at ${companyName} with everyday tasks, routine pressure, and room to prove yourself.`,
+    creative: `A creative opening at ${companyName} where ideas, feedback, and consistency all matter.`,
+    emergency: `A pressure-heavy role at ${companyName} where judgement and teamwork matter more than talk.`,
+    sales: `A target-driven role at ${companyName} where confidence, resilience, and people skills can pay off.`,
+    corporate: `A competitive opening at ${companyName} with stronger long-term upside if you can break in.`,
+  };
+  return job.description || lines[category] || `A role at ${companyName}.`;
+}
+
+function normalizeJob(job, type = 'full-time') {
+  const companyName = job.companyName || job.company;
+  const category = inferJobCategory(job, type);
+  const payLabel = type === 'full-time' ? job.salary : `£${job.rate} / hr`;
+  const difficultyBase = type === 'full-time' ? 44 + Math.max(0, parseSalaryValue(job.salary) - 20000) / 1200 : 22 + Math.max(0, (job.rate || 10) - 10) * 3.5;
+  const categoryDifficulty = { retail:0, office:6, creative:8, emergency:14, sales:9, corporate:18 }[category] || 0;
+  const difficulty = Math.round(difficultyBase + categoryDifficulty);
+  const immediateHire = type === 'part-time' || (/warehouse|fast food|retail assistant|delivery|cashier|cafe/i.test(job.title) && difficulty < 38);
+  return {
+    ...job,
+    id: getJobKey({ ...job, companyName, type }),
+    companyName,
+    payLabel,
+    type: type === 'full-time' ? 'Full-Time' : 'Part-Time',
+    jobCategory: category,
+    description: buildJobDescription({ ...job, companyName }, type, category),
+    requiresInterview: immediateHire ? false : (job.requiresInterview ?? difficulty >= 34),
+    applicationDifficulty: difficulty,
+    hiringChance: Math.round(66 - difficulty * 0.45 + (type === 'part-time' ? 10 : 0)),
+    interviewQuestionPool: JOB_INTERVIEW_QUESTION_POOLS[category] || JOB_INTERVIEW_QUESTION_POOLS.office,
+  };
+}
+
+function getPartTimeJobs() {
+  return PART_TIME_JOB_LIST.map(job => normalizeJob(job, 'part-time'));
+}
+
+function parseSalaryValue(salary) {
+  return Number(String(salary || '').replace(/[^\d]/g, '')) || 0;
+}
+
+function getUniversityStanding() {
+  const acceptedType = STATE.school.postSchool?.uniApplication?.acceptedType;
+  const scoreMap = {
+    'Elite Universities': 1,
+    'Top Universities': 0.8,
+    'Standard Universities': 0.45,
+    'Local Universities': 0.25,
+  };
+  return scoreMap[acceptedType] || 0;
+}
+
+function getYearsSinceGraduation() {
+  const graduatedAge = STATE.school.postSchool?.uniApplication?.graduatedAge;
+  if (!graduatedAge) return 0;
+  return Math.max(0, STATE.age - graduatedAge);
+}
+
+function getJobPoolType(job) {
+  if (FULL_TIME_GENERAL_JOBS.includes(job)) return 'general';
+  if (FULL_TIME_ANY_DEGREE_JOBS.includes(job)) return 'any-degree';
+  if (FULL_TIME_NO_DEGREE_GROWTH_JOBS.includes(job)) return 'no-degree-growth';
+  return 'degree-linked';
+}
+
+function scoreFullTimeJob(job, degree) {
+  const salary = parseSalaryValue(job.salary);
+  const poolType = getJobPoolType(job);
+  const standing = getUniversityStanding();
+  const experienceYears = getYearsSinceGraduation();
+  let score = 1 + Math.max(0, salary - 18000) / 2500;
+
+  if (degree && (FULL_TIME_DEGREE_JOB_POOLS[degree] || []).includes(job)) score += 3.2;
+  if (poolType === 'any-degree') score += degree ? 1.1 : 0.2;
+  if (poolType === 'general') score += 0.8;
+  if (poolType === 'no-degree-growth') score += degree ? 0.9 : 1.8;
+
+  if (degree) {
+    score += standing * Math.max(0, salary - 24000) / 3500;
+    score += Math.min(experienceYears, 8) * Math.max(0, salary - 26000) / 12000;
+    if (standing < 0.5) score -= Math.max(0, salary - 30000) / 7000;
+  }
+
+  return Math.max(0.2, score);
+}
+
+function weightedUniqueSample(pool, count, usedTitles, degree) {
+  const picked = [];
+  while (picked.length < count) {
+    const available = pool.filter(job => !usedTitles.has(getJobKey(job)) && !picked.some(p => getJobKey(p) === getJobKey(job)));
+    if (!available.length) break;
+    const weighted = available.map(job => ({ job, weight: scoreFullTimeJob(job, degree) }));
+    const choice = weightedRandom(weighted.map(item => ({ ...item.job, weight:item.weight })));
+    picked.push(choice);
+    usedTitles.add(getJobKey(choice));
+  }
+  return picked;
+}
+
+function buildFullTimeSignature() {
+  return JSON.stringify({
+    age: STATE.age,
+    level: STATE.school.level,
+    degree: getDegreeCourse(),
+    standing: getUniversityStanding(),
+    gradYears: getYearsSinceGraduation(),
+  });
+}
+
+function generateFullTimeJobs() {
+  const usedTitles = new Set();
+  const degree = getDegreeCourse();
+  const degreePool = FULL_TIME_DEGREE_JOB_POOLS[degree] || [];
+  const jobs = [];
+
+  if (degreePool.length) {
+    jobs.push(...weightedUniqueSample(degreePool, 6, usedTitles, degree));
+    jobs.push(...weightedUniqueSample(FULL_TIME_ANY_DEGREE_JOBS, 3, usedTitles, degree));
+    jobs.push(...weightedUniqueSample(FULL_TIME_NO_DEGREE_GROWTH_JOBS, 4, usedTitles, degree));
+    jobs.push(...weightedUniqueSample(FULL_TIME_GENERAL_JOBS, 3, usedTitles, degree));
+  } else {
+    jobs.push(...weightedUniqueSample(FULL_TIME_NO_DEGREE_GROWTH_JOBS, 7, usedTitles, degree));
+    jobs.push(...weightedUniqueSample(FULL_TIME_GENERAL_JOBS, 5, usedTitles, degree));
+    jobs.push(...weightedUniqueSample(FULL_TIME_ANY_DEGREE_JOBS, 4, usedTitles, degree));
+  }
+
+  const fallbackPools = [
+    ...FULL_TIME_GENERAL_JOBS,
+    ...FULL_TIME_NO_DEGREE_GROWTH_JOBS,
+    ...FULL_TIME_ANY_DEGREE_JOBS,
+    ...degreePool,
+  ];
+  if (jobs.length < 16) jobs.push(...weightedUniqueSample(fallbackPools, 16 - jobs.length, usedTitles, degree));
+  return jobs
+    .sort((a, b) => parseSalaryValue(b.salary) - parseSalaryValue(a.salary))
+    .slice(0, 16);
+}
+
+function getFullTimeJobs() {
+  const signature = buildFullTimeSignature();
+  if (_cachedFullTimeSignature !== signature || !_cachedFullTimeJobs.length) {
+    _cachedFullTimeSignature = signature;
+    _cachedFullTimeJobs = generateFullTimeJobs();
+  }
+  return _cachedFullTimeJobs.map(job => normalizeJob(job, 'full-time'));
+}
+
+function getJobListByCategory(category = 'full-time') {
+  return category === 'part-time' ? getPartTimeJobs() : getFullTimeJobs();
+}
+
+function getCurrentCareerExperience() {
+  const base = STATE.career.experience || 0;
+  const currentYears = STATE.career.job && STATE.career.job !== 'None'
+    ? Math.max(0, STATE.age - (STATE.career.startedAge ?? STATE.age))
+    : 0;
+  return base + currentYears;
+}
+
+function getPlayerApplicationScore(job) {
+  const degree = getDegreeCourse();
+  const gradeScore = STATE.school.gradeScore || 50;
+  const reputation = clamp(STATE.stats.rep || 0, -100, 100);
+  const smarts = clamp(STATE.stats.smarts || 0, 0, 100);
+  const experience = getCurrentCareerExperience();
+  const work = STATE.career?.work;
+  let score = 46;
+
+  if (STATE.school.level === 'graduated') score += 10;
+  else if (STATE.school.level === 'finished_school') score += 3;
+  score += (smarts - 50) * 0.16;
+  score += (gradeScore - 50) * 0.1;
+  score += reputation * 0.06;
+  score += experience * 3.5;
+  score += (STATE.career.level || 0) * 4;
+  if (work) {
+    score += (work.performance - 50) * 0.14;
+    score += (work.reputation - 50) * 0.16;
+    score += (work.satisfaction - 50) * 0.05;
+    score -= Math.max(0, work.stress - 65) * 0.08;
+  }
+
+  if (job.type === 'Full-Time' && degree) score += 6;
+  if (job.type === 'Full-Time' && degree && (FULL_TIME_DEGREE_JOB_POOLS[degree] || []).some(item => item.title === job.title)) score += 12;
+  if (job.type === 'Full-Time' && job.jobCategory === 'corporate' && !degree) score -= 10;
+
+  if (STATE.traits.includes('hardworking')) score += 8;
+  if (STATE.traits.includes('lazy')) score -= 10;
+  if (STATE.traits.includes('creative') && job.jobCategory === 'creative') score += 8;
+  if (STATE.traits.includes('charismatic') && ['retail','sales'].includes(job.jobCategory)) score += 7;
+  if (STATE.traits.includes('empathetic') && ['retail','emergency','office'].includes(job.jobCategory)) score += 6;
+  if (STATE.traits.includes('resilient') && ['emergency','sales','corporate'].includes(job.jobCategory)) score += 6;
+  if (STATE.traits.includes('cautious') && ['office','corporate','emergency'].includes(job.jobCategory)) score += 4;
+  if (STATE.traits.includes('ambitious') && ['sales','corporate'].includes(job.jobCategory)) score += 5;
+  if (STATE.traits.includes('intelligent') && ['office','corporate'].includes(job.jobCategory)) score += 5;
+  if (STATE.traits.includes('anxious') && ['sales','emergency','corporate'].includes(job.jobCategory)) score -= 5;
+  if (STATE.traits.includes('risk_taker')) score += ['creative','sales'].includes(job.jobCategory) ? 4 : -5;
+
+  score += Math.floor(Math.random() * 19) - 9;
+  score -= job.applicationDifficulty * 0.55;
+  return Math.round(score);
+}
+
+function buildInterviewQuestions(job) {
+  const pool = [...(job.interviewQuestionPool || JOB_INTERVIEW_QUESTION_POOLS.office)];
+  const count = Math.min(3, job.applicationDifficulty >= 64 || job.jobCategory === 'corporate' ? 3 : (job.applicationDifficulty >= 42 ? 2 : 1));
+  return pool.sort(() => Math.random() - 0.5).slice(0, count);
+}
+
+function buildInterviewEvent(job) {
+  if (Math.random() > 0.18) return null;
+  const category = job.jobCategory;
+  const matches = JOB_INTERVIEW_EVENTS.filter(event => event.categories.includes(category));
+  if (!matches.length) return null;
+  const picked = { ...pickRandom(matches) };
+  if (picked.text.includes('recognises your name') && (STATE.stats.rep || 0) < 5) picked.score = 0;
+  return picked;
+}
+
+function calculateInterviewOutcome(job, applicationScore, metrics, interviewEvent) {
+  const metricsScore =
+    (metrics.reliability || 0) * 1.2 +
+    (metrics.judgement || 0) * 1.15 +
+    (metrics.workEthic || 0) +
+    (metrics.calmness || 0) * 1.15 +
+    (metrics.teamwork || 0) * 0.9 +
+    (metrics.creativity || 0) * (job.jobCategory === 'creative' ? 1.4 : 0.5) +
+    (metrics.bravery || 0) * (job.jobCategory === 'emergency' ? 1.3 : 0.35);
+  const finalScore = applicationScore + metricsScore + (interviewEvent?.score || 0) + (Math.floor(Math.random() * 13) - 6);
+  const hireLine = 56 - getUniversityStanding() * 6 - Math.min(getYearsSinceGraduation(), 6) * 1.5;
+  const waitlistLine = hireLine - 7;
+  if (finalScore >= hireLine) return 'hired';
+  if (finalScore >= waitlistLine) return 'waitlisted';
+  return 'rejected';
+}
+
+function getJobAnnualIncome(job) {
+  if (job.type === 'Part-Time') return Math.round((job.rate || 0) * 18 * 52);
+  return parseSalaryValue(job.salary);
+}
+
+function getCareerLevelForJob(job) {
+  const pay = getJobAnnualIncome(job);
+  if (pay >= 34000) return 4;
+  if (pay >= 28000) return 3;
+  if (pay >= 23000) return 2;
+  return 1;
+}
+
+function buildWorkPerson(role, genderHint) {
+  const gender = genderHint || (Math.random() > 0.5 ? 'male' : 'female');
+  return {
+    id: uid(),
+    role,
+    firstName: pickRandom(NAMES_UK[gender]),
+    surname: pickRandom(NAMES_UK.surnames),
+    appearance: generateAppearance(gender),
+    relationship: 44 + Math.floor(Math.random() * 28),
+  };
+}
+
+function getWorkPerson(work, role) {
+  return (work.people || []).find(person => person.role === role) || null;
+}
+
+function adjustWorkRelationship(work, role, amount) {
+  const person = getWorkPerson(work, role);
+  if (!person) return;
+  person.relationship = clamp((person.relationship || 50) + amount);
+}
+
+function maybeTriggerWorkplaceEvent(work, actionId, apply) {
+  if (Math.random() > 0.24) return;
+
+  const boss = getWorkPerson(work, 'Boss');
+  const coworker = getWorkPerson(work, 'Coworker');
+  const mentor = getWorkPerson(work, 'Mentor');
+  const rival = getWorkPerson(work, 'Office Rival');
+  const eventPools = {
+    work_hard: [
+      {
+        text: `${boss?.firstName || 'Your boss'} noticed how much effort you put in.`,
+        toast: 'Your effort got noticed.',
+        effects: { performance:+3, reputation:+5, satisfaction:+2, publicRep:+1 },
+      },
+      {
+        text: `${mentor?.firstName || 'Your mentor'} gave you advice that made your work sharper.`,
+        toast: 'Your mentor backed you.',
+        effects: { performance:+4, stress:-2, satisfaction:+3 },
+      },
+    ],
+    slack_off: [
+      {
+        text: `${rival?.firstName || 'A coworker'} noticed you coasting and mentioned it to the team.`,
+        toast: 'People noticed you checked out.',
+        effects: { reputation:-6, satisfaction:-1 },
+      },
+      {
+        text: `${boss?.firstName || 'Your boss'} caught you doing the bare minimum.`,
+        toast: 'Your boss is unimpressed.',
+        effects: { performance:-4, reputation:-5, stress:+3 },
+      },
+    ],
+    socialise: [
+      {
+        text: `${coworker?.firstName || 'A coworker'} invited you into the group chat after work.`,
+        toast: 'You feel more included at work.',
+        effects: { satisfaction:+5, relationships:+6, reputation:+3, happy:+2 },
+      },
+      {
+        text: `${mentor?.firstName || 'Your mentor'} started taking you more seriously.`,
+        toast: 'You made a useful connection.',
+        effects: { satisfaction:+3, reputation:+4, performance:+1 },
+      },
+    ],
+    ask_raise: [
+      {
+        text: `${boss?.firstName || 'Your boss'} respected how directly you made your case.`,
+        toast: 'You came across confidently.',
+        effects: { reputation:+3, satisfaction:+2 },
+      },
+      {
+        text: `${boss?.firstName || 'Your boss'} thought your timing was off.`,
+        toast: 'The conversation landed awkwardly.',
+        effects: { stress:+4, reputation:-3, satisfaction:-3 },
+      },
+    ],
+    stay_late: [
+      {
+        text: `${boss?.firstName || 'Your boss'} praised your commitment in front of the team.`,
+        toast: 'Staying late paid off.',
+        effects: { reputation:+5, performance:+2, satisfaction:+2 },
+      },
+      {
+        text: 'You pushed through, but by the end of the night you were running on fumes.',
+        toast: 'You are feeling drained.',
+        effects: { health:-2, energy:-6, stress:+4 },
+      },
+    ],
+    call_sick: [
+      {
+        text: `${coworker?.firstName || 'A coworker'} covered for you and kept things smooth.`,
+        toast: 'Someone had your back.',
+        effects: { stress:-4, health:+2, satisfaction:+2 },
+      },
+      {
+        text: `${boss?.firstName || 'Your boss'} sounded doubtful when you called in.`,
+        toast: 'Your boss seemed suspicious.',
+        effects: { reputation:-4, stress:+2 },
+      },
+    ],
+  };
+
+  const pool = eventPools[actionId];
+  if (!pool?.length) return;
+  const event = pickRandom(pool);
+  apply(event.effects || {});
+  logActivity(event.text, (event.effects?.reputation || 0) + (event.effects?.satisfaction || 0) > 0 ? 5 : -3);
+  if (event.toast) showToast(event.toast);
+}
+
+function getCareerPathForJob(jobTitle) {
+  const exactPaths = {
+    'Legal Assistant': ['Legal Assistant', 'Paralegal', 'Senior Paralegal', 'Trainee Solicitor'],
+    'Paralegal': ['Legal Assistant', 'Paralegal', 'Senior Paralegal', 'Trainee Solicitor'],
+    'Trainee Solicitor': ['Paralegal', 'Senior Paralegal', 'Trainee Solicitor', 'Junior Solicitor'],
+    'Junior Solicitor': ['Paralegal', 'Senior Paralegal', 'Trainee Solicitor', 'Junior Solicitor'],
+    'Junior Doctor': ['Healthcare Assistant', 'Lab Assistant', 'Junior Doctor', 'Senior Doctor'],
+    'Finance Assistant': ['Finance Assistant', 'Operations Analyst', 'Management Trainee', 'Finance Manager'],
+    'Marketing Assistant': ['Marketing Assistant', 'Project Coordinator', 'Management Trainee', 'Marketing Manager'],
+    'Receptionist': ['Receptionist', 'Admin Assistant', 'Office Coordinator', 'Office Manager'],
+    'Admin Assistant': ['Admin Assistant', 'Office Coordinator', 'Operations Analyst', 'Office Manager'],
+    'Customer Service Advisor': ['Customer Service Advisor', 'Team Lead', 'Office Coordinator', 'Operations Manager'],
+    'Sales Executive': ['Sales Executive', 'Senior Sales Executive', 'Sales Manager', 'Regional Manager'],
+    'Estate Agent': ['Estate Agent', 'Senior Estate Agent', 'Branch Manager', 'Agency Director'],
+    'Recruitment Consultant': ['Recruitment Consultant', 'Senior Consultant', 'Team Lead', 'Branch Manager'],
+    'Teacher Trainee': ['Teacher Trainee', 'Classroom Teacher', 'Head of Year', 'Senior Teacher'],
+    'Police Officer': ['Police Officer', 'Senior Officer', 'Sergeant', 'Inspector'],
+    'Firefighter': ['Firefighter', 'Senior Firefighter', 'Crew Manager', 'Station Manager'],
+    'Graphic Designer': ['Graphic Designer', 'Senior Designer', 'Art Lead', 'Creative Director'],
+    'Content Creator': ['Content Creator', 'Channel Partner', 'Brand Creator', 'Studio Lead'],
+    'Retail Supervisor': ['Retail Supervisor', 'Assistant Manager', 'Store Manager', 'Area Manager'],
+    'Warehouse Supervisor': ['Warehouse Supervisor', 'Operations Lead', 'Depot Manager', 'Regional Manager'],
+    'Care Assistant': ['Care Assistant', 'Senior Carer', 'Shift Lead', 'Care Manager'],
+  };
+  if (exactPaths[jobTitle]) return exactPaths[jobTitle];
+  if (/doctor/i.test(jobTitle)) return ['Healthcare Assistant', 'Lab Assistant', 'Junior Doctor', 'Senior Doctor'];
+  if (/solicitor|legal|paralegal/i.test(jobTitle)) return ['Legal Assistant', 'Paralegal', 'Senior Paralegal', 'Trainee Solicitor'];
+  if (/sales|recruitment|estate/i.test(jobTitle)) return ['Sales Executive', 'Senior Sales Executive', 'Sales Manager', 'Regional Manager'];
+  if (/office|admin|reception|customer/i.test(jobTitle)) return ['Receptionist', 'Admin Assistant', 'Office Coordinator', 'Office Manager'];
+  if (/creator|designer|illustrator|actor|musician/i.test(jobTitle)) return ['Creative Assistant', 'Graphic Designer', 'Senior Designer', 'Creative Director'];
+  return ['Entry Role', 'Skilled Role', 'Senior Role', 'Lead Role'];
+}
+
+function getCareerPathIndex(path, jobTitle) {
+  const exact = path.indexOf(jobTitle);
+  if (exact >= 0) return exact;
+  return Math.min(path.length - 1, Math.max(0, STATE.career.level - 1));
+}
+
+function ensureCareerState(job = null) {
+  if (!STATE.career) STATE.career = { job:'None', salary:0, level:0 };
+  if (!STATE.career.work) {
+    const currentJob = job || { title: STATE.career.job, jobCategory: STATE.career.category || 'office' };
+    STATE.career.work = {
+      performance: clamp(52 + Math.floor(Math.random() * 18)),
+      stress: clamp(28 + Math.floor(Math.random() * 22)),
+      reputation: clamp(46 + Math.floor(Math.random() * 18)),
+      satisfaction: clamp(48 + Math.floor(Math.random() * 20)),
+      energy: clamp(62 + Math.floor(Math.random() * 16)),
+      people: [
+        buildWorkPerson('Boss', 'female'),
+        buildWorkPerson('Coworker'),
+        buildWorkPerson('Mentor'),
+        buildWorkPerson('Office Rival'),
+      ],
+      progression: getCareerPathForJob(currentJob.title || STATE.career.job),
+      category: currentJob.jobCategory || STATE.career.category || 'office',
+      companyName: currentJob.companyName || STATE.career.companyName || 'Company',
+      icon: currentJob.icon || 'mdi:briefcase-outline',
+    };
+  }
+  return STATE.career.work;
+}
+
+function getCareerStatTone(value, invert = false) {
+  const score = invert ? 100 - value : value;
+  if (score >= 70) return { fill:'#56a56f', track:'#e4f1e7' };
+  if (score >= 45) return { fill:'#d49a44', track:'#f5ead7' };
+  return { fill:'#d46d5c', track:'#f3dfdb' };
+}
+
+function buildCareerStatCard(label, value, opts = {}) {
+  const tone = getCareerStatTone(value, opts.invert);
   return `
-    <div style="display:flex;justify-content:space-between;align-items:flex-start">
-      <div style="display:flex;flex-direction:column;gap:8px;flex:1;min-width:0">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:22px;color:#ca8a04">🎒</span>
-          <span style="display:inline-block;background:rgba(0,0,0,0.08);border-radius:99px;padding:3px 10px;font-size:11px;font-weight:700;color:#1a1814;opacity:.7">${edu.current || stageLabel}</span>
-        </div>
-        <div style="font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1.2;color:#1a1814">${edu.current || '—'}</div>
+    <div class="career-stat-card">
+      <div class="career-stat-top">
+        <div class="career-stat-label">${label}</div>
+        <div class="career-stat-value">${value}</div>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;margin-left:12px">
-        <div style="width:52px;height:52px;border-radius:50%;background:${gradeBubbleBg};display:flex;align-items:center;justify-content:center">
-          <span style="font-family:var(--mono);font-size:22px;font-weight:800;color:#fff">${grade}</span>
+      <div class="career-stat-bar">
+        <div class="career-stat-fill" style="width:${clamp(value)}%;background:${tone.fill}"></div>
+      </div>
+    </div>`;
+}
+
+function buildCareerPeopleSection(work) {
+  return `
+    <div class="career-people-grid">
+      ${work.people.map(person => `
+        <div class="career-person-card">
+          <div class="career-person-avatar">${getCharacterHTML(person.appearance, 33, 42, { showBg:false })}</div>
+          <div class="career-person-copy">
+            <div class="career-person-role">${person.role}</div>
+            <div class="career-person-name">${person.firstName} ${person.surname}</div>
+          </div>
         </div>
-        <span style="font-size:10px;font-weight:600;color:#1a1814;opacity:.5">Your grade</span>
+      `).join('')}
+    </div>`;
+}
+
+function buildCareerActionsSection() {
+  const actions = [
+    ['work_hard', 'mdi:briefcase-check-outline', 'Work Hard', 'Push for stronger performance'],
+    ['slack_off', 'mdi:sofa-outline', 'Slack Off', 'Take it easier for a while'],
+    ['socialise', 'mdi:account-group-outline', 'Socialise', 'Build workplace relationships'],
+    ['ask_raise', 'mdi:cash-plus', 'Ask for Raise', 'Test your leverage'],
+    ['stay_late', 'mdi:weather-night', 'Stay Late', 'Trade energy for momentum'],
+    ['call_sick', 'mdi:thermometer', 'Call in Sick', 'Protect your health'],
+    ['search_jobs', 'mdi:magnify', 'Search for Jobs', 'Look for a better move'],
+    ['quit_job', 'mdi:exit-to-app', 'Quit Job', 'Walk away from the role'],
+  ];
+  return `
+    <div class="career-actions">
+      ${actions.map(([id, icon, title, sub]) => `
+        <button class="career-action-btn" onclick="runCareerAction('${id}')">
+          <div class="career-action-main">
+            <div class="career-action-icon"><iconify-icon icon="${icon}" style="font-size:18px"></iconify-icon></div>
+            <div class="career-action-text">
+              <div class="career-action-title">${title}</div>
+              <div class="career-action-sub">${sub}</div>
+            </div>
+          </div>
+          <span class="choice-arrow">›</span>
+        </button>
+      `).join('')}
+    </div>`;
+}
+
+function buildCareerProgressionSection(work) {
+  const path = work.progression || getCareerPathForJob(STATE.career.job);
+  const currentIndex = getCareerPathIndex(path, STATE.career.job);
+  return `
+    <div class="career-path-card">
+      ${path.map((role, index) => `
+        ${index ? '<div class="career-path-arrow">↓</div>' : ''}
+        <div class="career-path-node ${index === currentIndex ? 'current' : index > currentIndex ? 'future' : ''}">${role}</div>
+      `).join('')}
+    </div>`;
+}
+
+function buildEmployedCareerPage() {
+  const work = ensureCareerState();
+  return `
+    <div class="career-page">
+      <div class="career-hero">
+        <div class="career-kicker">Career</div>
+        <div class="career-title">${STATE.career.job}</div>
+        <div class="career-company">${work.companyName}</div>
+        <div class="career-yearline">Year ${Math.max(1, STATE.age - (STATE.career.startedAge ?? STATE.age) + 1)} • ${fmtMoney(STATE.finances.income)}</div>
+        <div class="career-illustration"><iconify-icon icon="${work.icon || 'mdi:briefcase-outline'}"></iconify-icon></div>
+      </div>
+      <div>
+        <div class="career-section-title">Work Stats</div>
+        <div class="career-stats-grid" style="margin-top:10px">
+          ${buildCareerStatCard('Performance', work.performance)}
+          ${buildCareerStatCard('Stress', work.stress, { invert:true })}
+          ${buildCareerStatCard('Reputation', work.reputation)}
+          ${buildCareerStatCard('Job Satisfaction', work.satisfaction)}
+        </div>
+      </div>
+      <div>
+        <div class="career-section-title">Important People</div>
+        <div style="margin-top:10px">${buildCareerPeopleSection(work)}</div>
+      </div>
+      <div>
+        <div class="career-section-title">Work Actions</div>
+        <div style="margin-top:10px">${buildCareerActionsSection()}</div>
+      </div>
+      <div>
+        <div class="career-section-title">Career Progression</div>
+        <div style="margin-top:10px">${buildCareerProgressionSection(work)}</div>
+      </div>
+    </div>`;
+}
+
+function maybePromoteCareer(work) {
+  const path = work.progression || [];
+  const currentIndex = getCareerPathIndex(path, STATE.career.job);
+  if (currentIndex >= path.length - 1) return false;
+  if (work.performance < 76 || work.reputation < 58) return false;
+  const nextRole = path[currentIndex + 1];
+  STATE.career.job = nextRole;
+  STATE.career.level = Math.max(STATE.career.level || 0, currentIndex + 2);
+  STATE.finances.income = Math.round(STATE.finances.income * 1.12);
+  STATE.finances.job = nextRole;
+  work.progression = getCareerPathForJob(nextRole);
+  work.performance = clamp(work.performance - 12);
+  work.stress = clamp(work.stress + 8);
+  work.satisfaction = clamp(work.satisfaction + 6);
+  logActivity(`You moved up to ${nextRole}.`, 10);
+  showToast(`Promoted to ${nextRole}.`);
+  return true;
+}
+
+function fireFromJob(reason) {
+  logActivity(`Lost your job as ${STATE.career.job}. ${reason}`, -12);
+  STATE.career.job = 'None';
+  STATE.career.salary = 0;
+  STATE.career.startedAge = null;
+  STATE.career.category = null;
+  STATE.career.work = null;
+  STATE.finances.income = 0;
+  STATE.finances.job = 'None';
+  showToast('You lost your job.');
+}
+
+function runCareerAction(actionId) {
+  const work = ensureCareerState();
+  if (actionId === 'search_jobs') {
+    openJobBoard('full-time');
+    return;
+  }
+  if (actionId === 'quit_job') {
+    fireFromJob('You decided to walk away.');
+    saveGame();
+    updateAllUI();
+    return;
+  }
+  const apply = effects => {
+    work.performance = clamp(work.performance + (effects.performance || 0));
+    work.stress = clamp(work.stress + (effects.stress || 0));
+    work.reputation = clamp(work.reputation + (effects.reputation || 0));
+    work.satisfaction = clamp(work.satisfaction + (effects.satisfaction || 0));
+    work.energy = clamp((work.energy || 60) + (effects.energy || 0));
+    if (effects.money) STATE.finances.balance += effects.money;
+    applyEffects({
+      happy: effects.happy || 0,
+      health: effects.health || 0,
+      rel_friends: effects.relationships || 0,
+      rep: effects.publicRep || 0,
+    });
+  };
+
+  if (actionId === 'work_hard') {
+    apply({ performance:+8, stress:+7, satisfaction:-2, energy:-8, happy:-1 });
+    adjustWorkRelationship(work, 'Boss', +4);
+    adjustWorkRelationship(work, 'Mentor', +3);
+    logActivity('Worked especially hard this week.', 5);
+    maybePromoteCareer(work);
+  } else if (actionId === 'slack_off') {
+    apply({ performance:-8, stress:-6, satisfaction:+3, energy:+4, reputation:-4, happy:+1 });
+    adjustWorkRelationship(work, 'Boss', -5);
+    adjustWorkRelationship(work, 'Office Rival', -2);
+    logActivity('Took your foot off the gas at work.', -4);
+  } else if (actionId === 'socialise') {
+    apply({ reputation:+6, satisfaction:+5, performance:-2, relationships:+4, happy:+3 });
+    adjustWorkRelationship(work, 'Coworker', +7);
+    adjustWorkRelationship(work, 'Mentor', +2);
+    logActivity('Spent time building relationships at work.', 6);
+  } else if (actionId === 'ask_raise') {
+    const success = work.performance >= 68 && work.reputation >= 58 && Math.random() < 0.45;
+    if (success) {
+      const raise = Math.max(900, Math.round(STATE.finances.income * 0.08));
+      STATE.finances.income += raise;
+      STATE.career.salary = STATE.finances.income;
+      apply({ satisfaction:+6, stress:+3 });
+      adjustWorkRelationship(work, 'Boss', +2);
+      logActivity(`Negotiated a raise worth ${fmtMoney(raise)} a year.`, 8);
+      showToast('Your raise was approved.');
+    } else {
+      apply({ stress:+5, satisfaction:-5, reputation:-2 });
+      adjustWorkRelationship(work, 'Boss', -4);
+      logActivity('Asked for a raise and got turned down.', -4);
+      showToast('The raise did not happen.');
+    }
+  } else if (actionId === 'stay_late') {
+    apply({ performance:+6, stress:+8, satisfaction:-1, energy:-10, health:-1 });
+    adjustWorkRelationship(work, 'Boss', +3);
+    adjustWorkRelationship(work, 'Office Rival', -2);
+    logActivity('Stayed late to get extra work done.', 4);
+    maybePromoteCareer(work);
+  } else if (actionId === 'call_sick') {
+    apply({ stress:-10, satisfaction:+2, energy:+10, health:+4, performance:-4, reputation:-3, happy:+1 });
+    adjustWorkRelationship(work, 'Coworker', +1);
+    adjustWorkRelationship(work, 'Boss', -2);
+    logActivity('Took a sick day to recover.', 1);
+  }
+
+  maybeTriggerWorkplaceEvent(work, actionId, apply);
+
+  if (work.stress >= 90) {
+    applyEffects({ health:-4, happy:-5 });
+    work.satisfaction = clamp(work.satisfaction - 6);
+    showToast('You feel close to burnout.');
+  }
+  if (work.performance <= 18 || work.reputation <= 16) {
+    fireFromJob('Things fell apart at work.');
+  }
+  saveGame();
+  updateAllUI();
+}
+
+function openJobDetail(index, category = 'full-time') {
+  const jobs = getJobListByCategory(category);
+  const job = jobs[index];
+  if (!job) return;
+  _jobFlowState = {
+    screen: 'detail',
+    category,
+    index,
+    job,
+    applicationScore: null,
+    questions: [],
+    questionIndex: 0,
+    metrics: { reliability:0, judgement:0, workEthic:0, calmness:0, teamwork:0, creativity:0, bravery:0, interviewScore:0 },
+    interviewEvent: null,
+    result: null,
+  };
+  renderJobFlow();
+  document.getElementById('job-overlay').classList.add('open');
+}
+
+function closeJobFlow() {
+  _jobFlowState = null;
+  document.getElementById('job-overlay').classList.remove('open');
+}
+
+function renderJobFlow() {
+  if (!_jobFlowState) return;
+  const { screen } = _jobFlowState;
+  if (screen === 'detail') renderJobDetailScreen();
+  if (screen === 'interview') renderJobInterviewScreen();
+  if (screen === 'result') renderJobResultScreen();
+}
+
+function renderJobDetailScreen() {
+  const { job } = _jobFlowState;
+  document.getElementById('job-inner').innerHTML = `
+    <div class="job-flow-topbar">
+      <button onclick="closeJobFlow()">Back</button>
+      <div class="job-flow-title">Job Details</div>
+      <div class="job-flow-spacer"></div>
+    </div>
+    <div class="job-flow-card">
+      <div class="job-flow-kicker">${job.type}</div>
+      <div class="job-flow-headline">${job.title}</div>
+      <div class="job-flow-meta">${job.companyName}</div>
+      <div class="job-flow-statline">
+        <span class="job-flow-stat">${job.payLabel}</span>
+        <span class="job-flow-stat">${job.jobCategory.replace(/^\w/, c => c.toUpperCase())}</span>
+      </div>
+      <div class="job-flow-copy">${job.description}</div>
+    </div>
+    <button class="continue-btn" onclick="applyToSelectedJob()">Apply</button>
+    <button class="birth-btn secondary" onclick="closeJobFlow()">Back</button>`;
+}
+
+function applyToSelectedJob() {
+  if (!_jobFlowState?.job) return;
+  const job = _jobFlowState.job;
+  const applicationScore = getPlayerApplicationScore(job);
+  _jobFlowState.applicationScore = applicationScore;
+
+  if (!job.requiresInterview) {
+    if (applicationScore >= 54) {
+      _jobFlowState.result = { kind:'immediate_hire' };
+      _jobFlowState.screen = 'result';
+      renderJobFlow();
+      return;
+    }
+    _jobFlowState.result = { kind: applicationScore >= 42 ? 'no_response' : 'rejected' };
+    _jobFlowState.screen = 'result';
+    renderJobFlow();
+    return;
+  }
+
+  if (applicationScore < 28) {
+    _jobFlowState.result = { kind:'rejected' };
+    _jobFlowState.screen = 'result';
+    renderJobFlow();
+    return;
+  }
+
+  _jobFlowState.questions = buildInterviewQuestions(job);
+  _jobFlowState.interviewEvent = buildInterviewEvent(job);
+  _jobFlowState.questionIndex = 0;
+  _jobFlowState.screen = 'interview';
+  renderJobFlow();
+}
+
+function renderJobInterviewScreen() {
+  const { job, questions, questionIndex } = _jobFlowState;
+  const current = questions[questionIndex];
+  if (!current) {
+    finishJobInterview();
+    return;
+  }
+  document.getElementById('job-inner').innerHTML = `
+    <div class="job-flow-topbar">
+      <button onclick="closeJobFlow()">Leave</button>
+      <div class="job-flow-title">Interview</div>
+      <div class="job-flow-sub">${questionIndex + 1} / ${questions.length}</div>
+    </div>
+    <div class="job-flow-card">
+      <div class="job-flow-kicker">Interview</div>
+      <div class="job-flow-sub">You’re interviewing for ${job.title} at ${job.companyName}.</div>
+      <div class="job-flow-question">${current.question}</div>
+    </div>
+    <div class="choices">
+      ${current.answers.map((answer, idx) => `
+        <button class="choice-btn" onclick="answerInterviewQuestion(${idx})">
+          <span>${answer.text}</span>
+          <span class="choice-arrow">›</span>
+        </button>
+      `).join('')}
+    </div>`;
+}
+
+function answerInterviewQuestion(answerIndex) {
+  const current = _jobFlowState?.questions?.[_jobFlowState.questionIndex];
+  const answer = current?.answers?.[answerIndex];
+  if (!answer) return;
+  Object.entries(answer.effects || {}).forEach(([key, value]) => {
+    _jobFlowState.metrics[key] = (_jobFlowState.metrics[key] || 0) + value;
+  });
+  _jobFlowState.questionIndex += 1;
+  renderJobFlow();
+}
+
+function finishJobInterview() {
+  const outcome = calculateInterviewOutcome(_jobFlowState.job, _jobFlowState.applicationScore, _jobFlowState.metrics, _jobFlowState.interviewEvent);
+  _jobFlowState.result = { kind: outcome };
+  _jobFlowState.screen = 'result';
+  renderJobFlow();
+}
+
+function getJobResultContent() {
+  const { job, result, interviewEvent } = _jobFlowState;
+  const eventText = interviewEvent ? `<div class="job-flow-event">${interviewEvent.text}</div>` : '';
+  if (result.kind === 'hired') {
+    return `
+      ${eventText}
+      <div class="milestone-emoji">🎉</div>
+      <div class="milestone-title">You Got the Job!</div>
+      <div class="milestone-body">${job.companyName} offered you the role of ${job.title}.</div>
+      <button class="continue-btn" onclick="acceptJobOffer()">Accept Job</button>
+      <button class="birth-btn secondary" onclick="declineJobOffer()">Decline</button>`;
+  }
+  if (result.kind === 'immediate_hire') {
+    return `
+      <div class="milestone-emoji">💼</div>
+      <div class="milestone-title">Hired on the Spot!</div>
+      <div class="milestone-body">${job.companyName} offered you the job after a quick chat.</div>
+      <button class="continue-btn" onclick="acceptJobOffer()">Accept Job</button>
+      <button class="birth-btn secondary" onclick="declineJobOffer()">Decline</button>`;
+  }
+  if (result.kind === 'waitlisted') {
+    return `
+      ${eventText}
+      <div class="milestone-emoji">⏳</div>
+      <div class="milestone-title">No Response</div>
+      <div class="milestone-body">They said they’ll get back to you, but nothing is certain yet.</div>
+      <button class="continue-btn" onclick="closeJobFlow()">Continue</button>`;
+  }
+  if (result.kind === 'no_response') {
+    return `
+      <div class="milestone-emoji">📭</div>
+      <div class="milestone-title">No Response</div>
+      <div class="milestone-body">You never heard back from ${job.companyName}.</div>
+      <button class="continue-btn" onclick="closeJobFlow()">Continue</button>`;
+  }
+  return `
+    ${eventText}
+    <div class="milestone-emoji">✉️</div>
+    <div class="milestone-title">Application Rejected</div>
+    <div class="milestone-body">${job.companyName} decided to go with another candidate.</div>
+    <button class="continue-btn" onclick="closeJobFlow()">Continue</button>`;
+}
+
+function renderJobResultScreen() {
+  document.getElementById('job-inner').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:16px;text-align:center">
+      ${getJobResultContent()}
+    </div>`;
+}
+
+function acceptJobOffer() {
+  if (!_jobFlowState?.job) return;
+  const job = _jobFlowState.job;
+  const currentYears = STATE.career.job && STATE.career.job !== 'None'
+    ? Math.max(0, STATE.age - (STATE.career.startedAge ?? STATE.age))
+    : 0;
+  STATE.career.experience = (STATE.career.experience || 0) + currentYears;
+  STATE.career.job = job.title;
+  STATE.career.salary = getJobAnnualIncome(job);
+  STATE.career.level = Math.max(STATE.career.level || 0, getCareerLevelForJob(job));
+  STATE.career.startedAge = STATE.age;
+  STATE.career.category = job.jobCategory;
+  STATE.career.companyName = job.companyName;
+  STATE.career.work = null;
+  STATE.finances.income = getJobAnnualIncome(job);
+  STATE.finances.job = job.title;
+  ensureCareerState(job);
+  logActivity(`Accepted a job as ${job.title} at ${job.companyName}.`, null);
+  saveGame();
+  updateAllUI();
+  closeJobFlow();
+  showToast(`Started work as ${job.title}.`);
+}
+
+function declineJobOffer() {
+  const job = _jobFlowState?.job;
+  if (job) logActivity(`Turned down an offer from ${job.companyName}.`, null);
+  saveGame();
+  closeJobFlow();
+}
+
+function previousUniApplicationStep() {
+  if (_learnScreen === 'uniApplyPreview') {
+    _learnScreen = 'uniApplyType';
+  } else if (_learnScreen === 'uniApplyType') {
+    _learnScreen = 'uniApplyBasics';
+  } else {
+    closeUniApplication();
+    return;
+  }
+  renderLearnTab();
+  const tab = document.getElementById('tab-learn');
+  if (tab) tab.scrollTop = 0;
+}
+
+function nextUniApplicationStep() {
+  if (!_uniApplyDraft) _uniApplyDraft = { course:null, uniType:null, funding:null, status:'draft' };
+  if (_learnScreen === 'uniApplyBasics') {
+    if (!_uniApplyDraft.course || !_uniApplyDraft.funding) {
+      showToast('Choose a course and funding.');
+      return;
+    }
+    _learnScreen = 'uniApplyType';
+  } else if (_learnScreen === 'uniApplyType') {
+    if (!_uniApplyDraft.uniType) {
+      showToast('Choose a university type.');
+      return;
+    }
+    _learnScreen = 'uniApplyPreview';
+  }
+  renderLearnTab();
+  const tab = document.getElementById('tab-learn');
+  if (tab) tab.scrollTop = 0;
+}
+
+function selectUniApplicationField(field, value) {
+  if (!_uniApplyDraft) _uniApplyDraft = { course:null, uniType:null, funding:null, status:'draft' };
+  _uniApplyDraft[field] = value;
+  renderLearnTab();
+}
+
+function universityAcceptanceChance(application) {
+  const grade = STATE.school.gradeScore || 50;
+  const minimumRequired = {
+    'Elite Universities': 90,
+    'Top Universities': 80,
+    'Standard Universities': 60,
+    'Local Universities': 45,
+  }[application.uniType] || 60;
+  if (grade < minimumRequired) return 0;
+  let chance = {
+    'Elite Universities': 68,
+    'Top Universities': 74,
+    'Standard Universities': 82,
+    'Local Universities': 90,
+  }[application.uniType] || 70;
+  chance += Math.floor((grade - minimumRequired) / 2);
+  if (STATE.traits.includes('intelligent')) chance += 6;
+  if (STATE.traits.includes('hardworking')) chance += 5;
+  if (STATE.traits.includes('lazy')) chance -= 5;
+  if (application.course === 'Medicine' || application.course === 'Law') chance -= 5;
+  if (application.course === 'Art' || application.course === 'Music') chance += STATE.traits.includes('creative') ? 8 : -2;
+  return clamp(chance, 0, 95);
+}
+
+function getUniRequirementLabel(uniType) {
+  return {
+    'Elite Universities': 'A+ only',
+    'Top Universities': 'A or above',
+    'Standard Universities': 'B-C or above',
+    'Local Universities': 'D or above',
+  }[uniType] || 'Varies';
+}
+
+function isEligibleForUniType(uniType, score) {
+  const minimumRequired = {
+    'Elite Universities': 90,
+    'Top Universities': 80,
+    'Standard Universities': 60,
+    'Local Universities': 45,
+  }[uniType] || 60;
+  return (score || 0) >= minimumRequired;
+}
+
+function submitUniApplication() {
+  if (!_uniApplyDraft?.course || !_uniApplyDraft?.uniType || !_uniApplyDraft?.funding) {
+    showToast('Choose a course, university type, and funding.');
+    return;
+  }
+  const postSchool = ensurePostSchoolState();
+  postSchool.uniApplication = {
+    ..._uniApplyDraft,
+    submittedAge: STATE.age,
+    status: 'pending',
+    result: null,
+  };
+  saveGame();
+  _learnScreen = 'main';
+  _uniApplyDraft = null;
+  renderLearnTab();
+  showToast('Application sent. Age up to get results.');
+}
+
+function resolveUniversityApplication() {
+  const application = STATE.school.postSchool?.uniApplication;
+  if (!application || application.status !== 'pending') return null;
+  if (application.submittedAge >= STATE.age) return null;
+  const accepted = Math.random() * 100 < universityAcceptanceChance(application);
+  if (accepted) {
+    application.status = 'accepted';
+    application.result = { outcome:'accepted', offeredType:application.uniType };
+    return application.result;
+  }
+  const fallbackAvailable = (application.uniType === 'Elite Universities' || application.uniType === 'Top Universities')
+    && isEligibleForUniType('Standard Universities', STATE.school.gradeScore);
+  const fallbackAccepted = fallbackAvailable && Math.random() < 0.55;
+  application.status = fallbackAccepted ? 'fallback_offer' : 'rejected';
+  application.result = fallbackAccepted
+    ? { outcome:'fallback_offer', offeredType:'Standard Universities' }
+    : { outcome:'rejected', offeredType:null };
+  return application.result;
+}
+
+function formatUniversityType(type) {
+  return String(type || 'University').replace(/ Universities$/, ' University');
+}
+
+function getUniCourseConfig(id) {
+  return UNI_COURSES.find(item => item.id === id) || UNI_COURSES[0];
+}
+
+function getUniTypeConfig(id) {
+  return UNI_TYPES.find(item => item.id === id) || UNI_TYPES[0];
+}
+
+function getUniFundingConfig(id) {
+  return UNI_FUNDING.find(item => item.id === id) || UNI_FUNDING[0];
+}
+
+function acceptUniversityOffer(type) {
+  const postSchool = ensurePostSchoolState();
+  if (!postSchool.uniApplication) return;
+  postSchool.uniApplication.status = 'accepted_offer';
+  postSchool.uniApplication.acceptedType = type;
+  postSchool.uniApplication.startedAge = STATE.age;
+  STATE.school.level = 'uni';
+  STATE.school.current = formatUniversityType(type);
+  logActivity(`Accepted a place to study ${postSchool.uniApplication.course} at ${formatUniversityType(type)}.`, null);
+  saveGame();
+  closeMilestone();
+  updateAllUI();
+}
+
+function rejectUniversityOffer() {
+  const postSchool = ensurePostSchoolState();
+  if (postSchool.uniApplication) postSchool.uniApplication.status = 'declined';
+  logActivity('Turned down the university offer.', null);
+  saveGame();
+  closeMilestone();
+  updateAllUI();
+}
+
+function buildUniSectionTitle(step, title, sideText='') {
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:28px;height:28px;border-radius:50%;background:#6d56c9;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;box-shadow:0 10px 22px rgba(109,86,201,.18)">${step}</div>
+        <div style="font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#473f38">${title}</div>
+      </div>
+      ${sideText ? `<div style="font-size:12px;font-weight:600;color:#978c80;display:flex;align-items:center;gap:4px">${sideText}<span style="font-size:18px;line-height:1">›</span></div>` : '<div></div>'}
+    </div>`;
+}
+
+function buildUniPageHeader(title, subtitle='') {
+  const backAction = _learnScreen === 'uniApplyBasics' ? 'closeUniApplication()' : 'previousUniApplicationStep()';
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <button onclick="${backAction}"
+        style="padding:0;background:none;border:none;font-size:13px;font-weight:700;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer">
+        <span style="font-size:18px;line-height:1">‹</span>
+        <span>Back</span>
+      </button>
+      <div style="font-size:16px;font-weight:800;color:var(--text)">${title}</div>
+      <button style="width:26px;height:26px;border-radius:50%;border:1px solid #d9d0c5;background:#fff;color:#7d7268;display:flex;align-items:center;justify-content:center;font-size:15px">
+        <iconify-icon icon="mdi:information-outline"></iconify-icon>
+      </button>
+    </div>
+    ${subtitle ? `<div style="font-size:13px;line-height:1.45;color:#7d7268;margin-bottom:10px">${subtitle}</div>` : ''}`;
+}
+
+function buildUniCourseCards() {
+  const selected = _uniApplyDraft?.course;
+  return `
+    <div style="display:flex;gap:12px;overflow-x:auto;padding:2px 2px 8px;margin:0 -2px 2px;scrollbar-width:none">
+      ${UNI_COURSES.map(item => {
+        const active = selected === item.id;
+        return `
+          <button onclick="selectUniApplicationField('course', '${item.id}')"
+            style="position:relative;min-width:170px;flex:0 0 170px;padding:18px 15px 16px;border-radius:22px;border:1.5px solid ${active ? '#6d56c9' : 'rgba(220,212,203,.9)'};background:${active ? 'linear-gradient(180deg, #fdfbff, #ffffff)' : '#fff'};box-shadow:${active ? '0 16px 34px rgba(109,86,201,.14)' : '0 10px 26px rgba(72,48,26,.06)'};text-align:left;cursor:pointer">
+            ${active ? `<div style="position:absolute;top:10px;right:10px;width:28px;height:28px;border-radius:50%;background:#6d56c9;color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 8px 18px rgba(109,86,201,.24)">✓</div>` : ''}
+            <div style="font-size:34px;color:${active ? '#6d56c9' : '#7e68cf'};line-height:1;margin-bottom:10px"><iconify-icon icon="${item.icon}"></iconify-icon></div>
+            <div style="font-size:17px;font-weight:800;color:#171510;line-height:1.1;margin-bottom:8px">${item.id}</div>
+            <div style="font-size:12px;line-height:1.45;color:#5f564e;min-height:52px">${item.blurb}</div>
+            <div style="display:flex;flex-direction:column;gap:7px;margin-top:12px">
+              ${item.perks.map(([label, color]) => `
+                <div style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#4f4741">
+                  <span style="width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;border:1px solid ${color};color:${color};font-size:11px;flex-shrink:0">${color === '#d45b55' ? '!' : '↑'}</span>
+                  <span>${label}</span>
+                </div>`).join('')}
+            </div>
+            <div style="margin-top:16px;padding:10px 14px;border-radius:999px;background:${active ? '#6d56c9' : '#fff'};border:1px solid ${active ? '#6d56c9' : '#d9d0c5'};font-size:12px;font-weight:800;color:${active ? '#fff' : '#5b42b1'};text-align:center">${active ? 'Selected' : 'Select'}</div>
+          </button>`;
+      }).join('')}
+    </div>`;
+}
+
+function buildUniTypeCards() {
+  const selected = _uniApplyDraft?.uniType;
+  return `
+    <div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:12px">
+      ${UNI_TYPES.map(item => {
+        const active = selected === item.id;
+        return `
+          <button onclick="selectUniApplicationField('uniType', '${item.id}')"
+            style="position:relative;padding:16px 15px 14px;border-radius:22px;border:1.5px solid ${active ? item.accent : 'rgba(220,212,203,.9)'};background:${active ? item.cardBg : '#fff'};box-shadow:${active ? '0 16px 36px rgba(48,48,72,.16)' : '0 10px 24px rgba(72,48,26,.06)'};text-align:left;cursor:pointer;color:${active ? item.cardText : '#1a1814'};min-height:220px">
+            <div style="position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:50%;border:1.5px solid ${active ? '#fff3d8' : '#b8b0a8'};background:${active ? item.accent : '#fff'};display:flex;align-items:center;justify-content:center;color:${active ? '#fff' : 'transparent'};font-size:16px;box-shadow:${active ? '0 8px 20px rgba(0,0,0,.18)' : 'none'}">✓</div>
+            <div style="font-size:34px;color:${active ? item.accent : item.accent};line-height:1;margin-bottom:8px"><iconify-icon icon="${item.icon}"></iconify-icon></div>
+            <div style="font-size:16px;font-weight:800;line-height:1.12;margin-bottom:8px">${item.id}</div>
+            <div style="display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:${item.tagBg};color:${item.tagColor};font-size:11px;font-weight:700;margin-bottom:12px">${item.tag}</div>
+            <div style="display:flex;flex-direction:column;gap:7px;font-size:11px;line-height:1.45;color:${active ? 'rgba(255,250,242,.92)' : '#423b35'}">
+              ${item.bullets.map(line => `<div>• ${line}</div>`).join('')}
+            </div>
+            <div style="margin-top:14px;padding-top:12px;border-top:1px solid ${active ? 'rgba(255,255,255,.18)' : '#ece4da'};display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <div style="font-size:10px;font-weight:700;color:${active ? 'rgba(255,250,242,.72)' : '#7f756b'};margin-bottom:6px">Stress</div>
+                <div style="display:flex;gap:4px">${Array.from({ length:4 }, (_, index) => `<span style="width:10px;height:10px;border-radius:50%;background:${index < item.stress ? (active ? '#a78cf7' : '#8f79d9') : (active ? 'rgba(255,255,255,.2)' : '#ded7cf')};display:block"></span>`).join('')}</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:700;color:${active ? 'rgba(255,250,242,.72)' : '#7f756b'};margin-bottom:6px">Cost</div>
+                <div style="font-size:22px;font-weight:800;color:${active ? '#cdb5ff' : item.accent}">${'£'.repeat(item.cost)}</div>
+              </div>
+            </div>
+          </button>`;
+      }).join('')}
+    </div>`;
+}
+
+function buildUniFundingCards() {
+  const selected = _uniApplyDraft?.funding;
+  return `
+    <div style="display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:10px">
+      ${UNI_FUNDING.map(item => {
+        const active = selected === item.id;
+        return `
+          <button onclick="selectUniApplicationField('funding', '${item.id}')"
+            style="position:relative;padding:14px 12px 12px;border-radius:20px;border:1.5px solid ${active ? item.accent : 'rgba(220,212,203,.9)'};background:${active ? '#fefcff' : '#fff'};box-shadow:${active ? '0 12px 28px rgba(109,86,201,.12)' : '0 8px 20px rgba(72,48,26,.05)'};text-align:left;cursor:pointer;min-height:164px">
+            <div style="position:absolute;top:10px;right:10px;width:24px;height:24px;border-radius:50%;border:1.5px solid ${active ? item.accent : '#b8b0a8'};background:${active ? item.accent : '#fff'};display:flex;align-items:center;justify-content:center;color:${active ? '#fff' : 'transparent'};font-size:15px">✓</div>
+            <div style="font-size:31px;color:${item.accent};line-height:1;margin-bottom:10px"><iconify-icon icon="${item.icon}"></iconify-icon></div>
+            <div style="font-size:14px;font-weight:800;line-height:1.12;color:#171510;margin-bottom:8px">${item.id}</div>
+            <div style="font-size:11px;line-height:1.45;color:#5f564e;min-height:50px">${item.blurb}</div>
+            <div style="margin-top:12px;display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:${item.tagBg};color:${item.tagColor};font-size:11px;font-weight:700">${item.tag}</div>
+          </button>`;
+      }).join('')}
+    </div>`;
+}
+
+function buildUniPreviewCard() {
+  const course = getUniCourseConfig(_uniApplyDraft?.course || 'Law');
+  const uniType = getUniTypeConfig(_uniApplyDraft?.uniType || 'Top Universities');
+  const funding = getUniFundingConfig(_uniApplyDraft?.funding || 'Student loan');
+  const preview = UNI_TYPE_PREVIEW[uniType.id] || UNI_TYPE_PREVIEW['Top Universities'];
+  const playerGrade = gradeFromScore(STATE.school.gradeScore || 0);
+  const eligible = isEligibleForUniType(uniType.id, STATE.school.gradeScore);
+  const requirement = getUniRequirementLabel(uniType.id);
+  const chance = universityAcceptanceChance({
+    course: _uniApplyDraft?.course || course.id,
+    uniType: _uniApplyDraft?.uniType || uniType.id,
+    funding: _uniApplyDraft?.funding || funding.id,
+  });
+  return `
+    <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin:2px 0 12px">
+      <div style="height:1px;flex:1;background:linear-gradient(90deg, transparent, #dccfc0)"></div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#7d7267">
+        <span style="color:#f0b43f">✦</span>
+        <span>Your Application Preview</span>
+        <span style="color:#f0b43f">✦</span>
+      </div>
+      <div style="height:1px;flex:1;background:linear-gradient(90deg, #dccfc0, transparent)"></div>
+    </div>
+    <div style="border-radius:26px;border:1px solid #e7ddd1;background:linear-gradient(180deg, rgba(255,255,255,.98), rgba(249,244,238,.98));box-shadow:0 18px 40px rgba(67,45,26,.08);padding:14px">
+      <div style="display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:12px">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#6d56c9;color:#fff;font-size:11px;font-weight:800;width:max-content">Your Application</div>
+          <div style="font-family:var(--mono);font-size:28px;font-weight:700;line-height:.98;color:#182038">${formatUniversityType(uniType.id)}</div>
+          <div style="display:flex;align-items:center;gap:9px;font-size:14px;font-weight:700;color:#5d4aa6">
+            <iconify-icon icon="${course.icon}" style="font-size:21px"></iconify-icon>
+            <span>${course.id} Applicant</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <div style="display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;background:#fff;border:1px solid #ece4da;font-size:11px;font-weight:700;color:#4f4741"><iconify-icon icon="mdi:currency-gbp" style="font-size:15px"></iconify-icon>${preview.fee}</div>
+            <div style="display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;background:${eligible ? '#eef7ea' : '#fff1ec'};border:1px solid ${eligible ? '#d7ebd5' : '#f1d3cb'};font-size:11px;font-weight:700;color:${eligible ? '#4d8450' : '#b15e53'}"><iconify-icon icon="mdi:school-outline" style="font-size:15px"></iconify-icon>Your grade: ${playerGrade}</div>
+            <div style="display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;background:#fff;border:1px solid #ece4da;font-size:11px;font-weight:700;color:#4f4741"><iconify-icon icon="mdi:star-outline" style="font-size:15px"></iconify-icon>Needs ${requirement}</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div style="padding:12px;border-radius:18px;background:#fff;border:1px solid #ede4d8">
+              <div style="font-size:11px;font-weight:700;color:#7b7268;margin-bottom:8px">Reputation</div>
+              <div style="display:flex;align-items:center;gap:2px;margin-bottom:6px">${Array.from({ length:5 }, (_, index) => `<span style="color:${index < Math.max(1, Math.round((uniType.stress + 1) / 1.25)) ? '#f4b239' : '#e6ddd2'};font-size:19px">★</span>`).join('')}</div>
+              <div style="font-size:11px;font-weight:700;color:#4f4741">${Math.max(1, Math.round((uniType.stress + 1) / 1.25))}/5</div>
+            </div>
+            <div style="padding:12px;border-radius:18px;background:#fff;border:1px solid #ede4d8">
+              <div style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#4f4741">
+                <iconify-icon icon="${funding.icon}" style="font-size:20px;color:${funding.accent}"></iconify-icon>
+                <span>Funding</span>
+              </div>
+              <div style="font-size:18px;font-weight:800;color:#191611;line-height:1.15;margin-top:8px">${funding.id}</div>
+            </div>
+          </div>
+        </div>
+        <div style="position:relative;min-height:290px;border-radius:22px;background:radial-gradient(circle at 22% 18%, rgba(250,232,181,.9), rgba(250,232,181,0) 32%), linear-gradient(180deg, #eef4ff 0%, #f6f0e9 100%);overflow:hidden;padding:16px">
+          <img src="${UNI_PREVIEW_IMAGE}" alt="University preview" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block" />
+          <div style="position:absolute;inset:0;background:linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.02))"></div>
+          <div style="position:absolute;inset:auto 14px 12px auto;width:108px;padding:12px 12px 10px;border-radius:18px;background:rgba(255,255,255,.95);border:1px solid rgba(201,222,200,.9);box-shadow:0 14px 30px rgba(62,114,66,.12)">
+            <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:${eligible ? '#4c8252' : '#be5a52'};margin-bottom:6px"><iconify-icon icon="${eligible ? 'mdi:check-circle-outline' : 'mdi:alert-circle-outline'}" style="font-size:15px"></iconify-icon>${eligible ? 'Acceptance Chance' : 'Not Eligible Yet'}</div>
+            <div style="font-size:40px;font-weight:900;line-height:1;color:${eligible ? '#4c9c4f' : '#cf6c5a'}">${eligible ? `${chance}%` : '0%'}</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4, minmax(0, 1fr));gap:10px;margin-top:12px">
+        ${preview.studentLife.map(([label, value, color, fill]) => `
+          <div style="padding:11px 10px;border-radius:18px;background:#fff;border:1px solid #ede4d8">
+            <div style="font-size:10px;font-weight:700;color:#7d7268;margin-bottom:6px">${label}</div>
+            <div style="font-size:13px;font-weight:800;color:${color};margin-bottom:8px">${value}</div>
+            <div style="height:8px;border-radius:999px;background:#f1e7db;overflow:hidden">
+              <div style="width:${fill}%;height:100%;border-radius:inherit;background:${color}"></div>
+            </div>
+          </div>`).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:minmax(0, 1fr) 152px;gap:12px;margin-top:12px">
+        <div style="padding:14px 16px;border-radius:18px;background:#f7f0ff;border:1px solid #eadfff;font-size:14px;line-height:1.5;color:#443c63">${preview.blurb}</div>
+        <div style="display:flex;align-items:center;justify-content:center;padding:14px 10px;border-radius:18px;background:#fffaf2;border:1px dashed #e5d5be;font-size:13px;font-weight:700;color:#8c7450">Figure things out later</div>
+      </div>
+    </div>`;
+}
+
+function buildUniApplicationScreen() {
+  if (!_uniApplyDraft) _uniApplyDraft = { course:null, uniType:null, funding:null, status:'draft' };
+  const basicsReady = _uniApplyDraft.course && _uniApplyDraft.funding;
+  const typeReady = !!_uniApplyDraft.uniType;
+  const previewReady = basicsReady && typeReady;
+  if (_learnScreen === 'uniApplyBasics') {
+    return `
+      <div style="display:flex;flex-direction:column;gap:16px;padding-bottom:10px">
+        ${buildUniPageHeader('Apply to University', 'Choose your course and how you plan to fund it first.')}
+        <div>
+          ${buildUniSectionTitle(1, 'Choose Your Course', 'Swipe to explore')}
+          ${buildUniCourseCards()}
+        </div>
+        <div>
+          ${buildUniSectionTitle(2, 'How Will You Fund Your Studies?')}
+          ${buildUniFundingCards()}
+        </div>
+        <button onclick="nextUniApplicationStep()"
+          style="width:100%;padding:18px 18px;border-radius:24px;border:1px solid ${basicsReady ? '#6d56c9' : '#d9d0c5'};background:${basicsReady ? 'linear-gradient(90deg, #6d56c9, #846be6)' : '#ebe5dd'};color:${basicsReady ? '#fff' : '#a0968c'};box-shadow:${basicsReady ? '0 18px 36px rgba(109,86,201,.22)' : 'none'};display:flex;align-items:center;justify-content:center;gap:12px;cursor:pointer">
+          <span style="font-size:15px;font-weight:800">Next: University Type</span>
+          <span style="font-size:20px;line-height:1">›</span>
+        </button>
+      </div>`;
+  }
+  if (_learnScreen === 'uniApplyType') {
+    return `
+      <div style="display:flex;flex-direction:column;gap:16px;padding-bottom:10px">
+        ${buildUniPageHeader('Choose University Type', 'Pick the level you want to apply for. Your grade requirement updates on the next page.')}
+        <div>
+          ${buildUniSectionTitle(3, 'Choose University Type')}
+          ${buildUniTypeCards()}
+        </div>
+        <button onclick="nextUniApplicationStep()"
+          style="width:100%;padding:18px 18px;border-radius:24px;border:1px solid ${typeReady ? '#6d56c9' : '#d9d0c5'};background:${typeReady ? 'linear-gradient(90deg, #6d56c9, #846be6)' : '#ebe5dd'};color:${typeReady ? '#fff' : '#a0968c'};box-shadow:${typeReady ? '0 18px 36px rgba(109,86,201,.22)' : 'none'};display:flex;align-items:center;justify-content:center;gap:12px;cursor:pointer">
+          <span style="font-size:15px;font-weight:800">Next: Application Preview</span>
+          <span style="font-size:20px;line-height:1">›</span>
+        </button>
+      </div>`;
+  }
+  return `
+    <div style="display:flex;flex-direction:column;gap:16px;padding-bottom:10px">
+      ${buildUniPageHeader('Application Preview', 'Review your choices before sending your UCAS application.')}
+      ${buildUniPreviewCard()}
+      <button onclick="submitUniApplication()"
+        style="width:100%;padding:18px 18px;border-radius:24px;border:1px solid ${previewReady ? '#6d56c9' : '#d9d0c5'};background:${previewReady ? 'linear-gradient(90deg, #6d56c9, #846be6)' : '#ebe5dd'};color:${previewReady ? '#fff' : '#a0968c'};box-shadow:${previewReady ? '0 18px 36px rgba(109,86,201,.22)' : 'none'};display:flex;align-items:center;justify-content:center;gap:12px;cursor:pointer">
+        <iconify-icon icon="mdi:email-outline" style="font-size:24px"></iconify-icon>
+        <div style="text-align:left">
+          <div style="font-size:15px;font-weight:800;line-height:1.05">Submit UCAS Application</div>
+          <div style="font-size:12px;font-weight:600;opacity:.86;margin-top:4px">${previewReady ? 'Results will arrive when you age up.' : 'Finish your application choices first.'}</div>
+        </div>
+      </button>
+    </div>`;
+}
+
+function ensureSchoolVipState() {
+  if (!STATE.school) return;
+  if (!Array.isArray(STATE.school.vipIds)) STATE.school.vipIds = [];
+  STATE.school.vipIds = STATE.school.vipIds.filter(id => STATE.school.classmates.some(c => c.id === id));
+}
+
+function isClassmateVip(classmateId) {
+  ensureSchoolVipState();
+  return STATE.school.vipIds.includes(classmateId);
+}
+
+function applyClassmateVipButtonState(classmateId) {
+  const button = document.querySelector(`[data-classmate-vip-button="${classmateId}"]`);
+  if (!button) return;
+  const active = isClassmateVip(classmateId);
+  button.textContent = active ? 'VIP added' : 'Add to VIP list';
+  button.style.borderColor = active ? '#efb7c9' : '#ddd2c6';
+  button.style.background = active ? '#fff1f6' : '#fffaf2';
+  button.style.boxShadow = active ? '0 8px 18px rgba(201,95,134,.14)' : 'none';
+  button.style.color = active ? '#c95f86' : '#7b6b5f';
+  button.style.transform = 'scale(0.98)';
+  setTimeout(() => {
+    if (button.isConnected) button.style.transform = '';
+  }, 120);
+}
+
+function toggleClassmateVip(classmateId) {
+  ensureSchoolVipState();
+  const next = STATE.school.vipIds.filter(id => STATE.school.classmates.some(c => c.id === id));
+  const index = next.indexOf(classmateId);
+  if (index >= 0) {
+    next.splice(index, 1);
+    STATE.school.vipIds = next;
+    saveGame();
+  } else {
+    if (next.length >= 3) next.shift();
+    next.push(classmateId);
+    STATE.school.vipIds = next;
+    saveGame();
+  }
+  if (_learnScreen === 'classmate' && _learnClassmateId === classmateId) {
+    applyClassmateVipButtonState(classmateId);
+    return;
+  }
+  renderLearnTab();
+}
+
+function openLearnClassmateDetail(classmateId) {
+  _learnScreen = 'classmate';
+  _learnClassmateId = classmateId;
+  renderLearnTab();
+  const tab = document.getElementById('tab-learn');
+  if (tab) tab.scrollTop = 0;
+}
+
+function closeLearnClassmateDetail() {
+  _learnScreen = 'classmates';
+  _learnClassmateId = null;
+  renderLearnTab();
+  const tab = document.getElementById('tab-learn');
+  if (tab) tab.scrollTop = 0;
+}
+
+function runLearnClassmateAction(actionId, classmateId) {
+  triggerAction(actionId, classmateId, 'classmate');
+  _learnScreen = 'classmate';
+  _learnClassmateId = classmateId;
+  renderLearnTab();
+}
+
+function buildLearnClassmateActions(c) {
+  const actions = getAvailableActions('classmate', STATE.age, c);
+  if (!actions.length) return '';
+  return `
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${actions.map(action => `
+        <button onclick="runLearnClassmateAction('${action.id}', '${c.id}')"
+          style="width:100%;padding:11px 14px;background:var(--surface-mid);border:1px solid var(--border);border-radius:11px;font-size:13px;font-weight:600;color:var(--text);text-align:left;cursor:pointer">
+          ${action.name}
+        </button>`).join('')}
+    </div>`;
+}
+
+function buildLearnHeroSchool(edu, grade, avgGrade, gradeAboveAvg) {
+  const primaryIllustration = 'data/primary_school_hero_card.png';
+  const schoolType = edu.type?.primary || 'State Primary';
+  const reputationByType = {
+    'State Primary': 3,
+    'Prep School': 4,
+    'Elite Prep School': 5,
+  };
+  const schoolReputation = reputationByType[schoolType] || 3;
+  const stageLabels = { pre:'Pre-School', primary:'Primary School', secondary:'Secondary School', college:'Sixth Form / College', uni:'University' };
+  const currentYear = Math.min(Math.max((STATE.age - 4), 1), 6);
+  const totalYears = 6;
+  const schoolName = edu.current || 'School';
+  const schoolStage = stageLabels[edu.level] || 'School';
+  const starIcons = Array.from({ length: 5 }, (_, i) =>
+    `<span style="color:${i < schoolReputation ? '#ffb703' : '#e6ded4'};font-size:20px;letter-spacing:.02em">★</span>`
+  ).join('');
+  return `
+    <div style="display:flex;flex-direction:column;min-height:206px">
+      <div style="position:relative;display:flex;justify-content:space-between;align-items:flex-start;gap:18px">
+        <div style="display:flex;flex-direction:column;flex:1;min-width:0;padding-top:2px;position:relative;z-index:2;max-width:52%">
+          <div style="display:inline-flex;align-items:center;width:fit-content;background:#ece8e3;border-radius:999px;padding:6px 14px;font-size:12px;font-weight:700;color:#5f5a54">
+            ${schoolStage}
+          </div>
+          <div style="font-size:26px;font-weight:800;letter-spacing:-.045em;line-height:1.03;color:#121212;margin-top:12px">${schoolName}</div>
+          <div style="font-size:13px;font-weight:700;color:#6a6661;margin-top:10px">Year ${currentYear} of ${totalYears}</div>
+          <div style="height:38px"></div>
+        </div>
+        <img src="${primaryIllustration}" alt="Primary school illustration" style="position:absolute;right:-18px;top:-44px;width:280px;height:330px;object-fit:contain;display:block;z-index:1;pointer-events:none" />
+      </div>
+      <div style="margin-top:auto;padding-top:10px;border-top:1px solid rgba(44,33,23,.12);display:flex;align-items:flex-start">
+        <div style="display:flex;align-items:flex-start;gap:10px;flex:1;padding-right:20px">
+          <iconify-icon icon="material-symbols:location-city-rounded" style="font-size:20px;color:#b8aea3;flex-shrink:0;margin-top:1px"></iconify-icon>
+          <div style="min-width:0">
+            <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9a9085">School Type</div>
+            <div style="font-size:14px;font-weight:800;color:#1a1814;margin-top:4px;line-height:1.1;white-space:nowrap">${schoolType}</div>
+          </div>
+        </div>
+        <div style="width:1px;align-self:stretch;background:rgba(44,33,23,.12)"></div>
+        <div style="display:flex;align-items:flex-start;gap:10px;flex:1;padding-left:20px">
+          <iconify-icon icon="material-symbols:kid-star-rounded" style="font-size:20px;color:#ffb703;flex-shrink:0;margin-top:1px"></iconify-icon>
+          <div style="min-width:0">
+            <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9a9085">School Reputation</div>
+            <div style="display:flex;align-items:center;gap:3px;margin-top:5px;line-height:1;white-space:nowrap">${starIcons}</div>
+          </div>
+        </div>
       </div>
     </div>
-    <div style="display:flex;gap:0;margin-top:14px;padding-top:12px;border-top:1px solid rgba(0,0,0,0.08)">
-      ${buildLearnHeroStat('Target School', isTarget ? '✅ Yes' : '❌ No')}
-      <div style="width:1px;background:rgba(0,0,0,0.08)"></div>
-      ${buildLearnHeroStat('Teacher Quality', qualityLabel)}
-      <div style="width:1px;background:rgba(0,0,0,0.08)"></div>
-      ${buildLearnHeroStat('Class Average', avgGrade)}
+  `;
+}
+
+function getUniversityCourseDuration(course) {
+  return {
+    Law: 3,
+    Medicine: 5,
+    Business: 3,
+    'Computer Science': 3,
+    Art: 3,
+    Psychology: 3,
+    Engineering: 4,
+    History: 3,
+    Music: 3,
+  }[course] || 3;
+}
+
+function getUniversityReputation(type) {
+  return {
+    'Elite University': 5,
+    'Top University': 4,
+    'Standard University': 2,
+    'Local University': 1,
+  }[type] || 3;
+}
+
+function ensureUniversityState() {
+  const postSchool = ensurePostSchoolState();
+  if (!STATE.school.uniProfile) {
+    STATE.school.uniProfile = {
+      people: [
+        { id:'uni-flatmate', label:'Flatmate', role:'Friend', firstName:'Maya', surname:'Collins', age:18, appearance: generateAppearance('female') },
+        { id:'uni-lecturer', label:'Lecturer', role:'Teacher', title:'Dr', firstName:'Harris', surname:'', age:42, appearance: generateAppearance('male') },
+        { id:'uni-rival', label:'Course Rival', role:'Friend', firstName:'Oliver', surname:'Reed', age:18, appearance: generateAppearance('male') },
+        { id:'uni-friend', label:'Friend', role:'Friend', firstName:'Zara', surname:'Ahmed', age:18, appearance: generateAppearance('female') },
+      ],
+    };
+  }
+  if (!postSchool.uniApplication?.startedAge) {
+    postSchool.uniApplication.startedAge = Math.max(18, STATE.age);
+  }
+  return STATE.school.uniProfile;
+}
+
+function getUniversityYearMeta() {
+  const application = STATE.school.postSchool?.uniApplication || {};
+  const course = application.course || 'Course';
+  const totalYears = getUniversityCourseDuration(course);
+  const startedAge = application.startedAge ?? 18;
+  const currentYear = clamp((STATE.age - startedAge) + 1, 1, totalYears);
+  return { course, totalYears, currentYear };
+}
+
+function buildUniversityHeroCard() {
+  const application = STATE.school.postSchool?.uniApplication || {};
+  const uniType = STATE.school.current || 'University';
+  const { course, totalYears, currentYear } = getUniversityYearMeta();
+  const stars = Array.from({ length: 5 }, (_, i) =>
+    `<span style="color:${i < getUniversityReputation(uniType) ? '#f4b239' : '#e6ddd2'};font-size:19px;letter-spacing:.02em">★</span>`
+  ).join('');
+  return `
+    <div style="display:flex;flex-direction:column;min-height:208px">
+      <div style="position:relative;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;min-height:150px">
+        <div style="display:flex;flex-direction:column;flex:1;min-width:0;max-width:55%;position:relative;z-index:2">
+          <div style="display:inline-flex;align-items:center;width:fit-content;background:#ece7f6;border-radius:999px;padding:6px 12px;font-size:11px;font-weight:800;color:#6558a8;text-transform:uppercase;letter-spacing:.07em">University</div>
+          <div style="font-size:30px;font-weight:800;letter-spacing:-.045em;line-height:1.02;color:#172039;margin-top:12px">${uniType}</div>
+          <div style="font-size:13px;font-weight:700;color:#6d6587;margin-top:10px">Year ${currentYear} of ${totalYears}</div>
+        </div>
+        <img src="${UNI_PREVIEW_IMAGE}" alt="University illustration" style="position:absolute;right:-8px;top:-30px;width:210px;height:210px;object-fit:contain;display:block;pointer-events:none;z-index:1" />
+      </div>
+      <div style="margin-top:auto;padding-top:12px;border-top:1px solid rgba(50,40,86,.12);display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <iconify-icon icon="mdi:school-outline" style="font-size:20px;color:#6d56c9;flex-shrink:0;margin-top:1px"></iconify-icon>
+          <div>
+            <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8e83aa">Course</div>
+            <div style="font-size:14px;font-weight:800;color:#1a1814;margin-top:4px;line-height:1.1">${course}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <iconify-icon icon="mdi:star-outline" style="font-size:20px;color:#f0b43f;flex-shrink:0;margin-top:1px"></iconify-icon>
+          <div>
+            <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8e83aa">University Reputation</div>
+            <div style="display:flex;align-items:center;gap:2px;margin-top:5px;line-height:1">${stars}</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function buildUniversityPerformanceSection() {
+  const application = STATE.school.postSchool?.uniApplication || {};
+  const grade = gradeFromScore(STATE.school.gradeScore || 0);
+  const stress = clamp(Math.round(((100 - (STATE.stats.happy || 0)) * 0.72) + ((100 - (STATE.stats.health || 0)) * 0.28)));
+  const social = clamp(Math.round(((STATE.stats.popularity || 0) * 0.7) + ((STATE.relationships.friends || 0) * 0.3)));
+  const networking = clamp(Math.round(((STATE.stats.smarts || 0) * 0.35) + ((STATE.stats.popularity || 0) * 0.35) + ((STATE.relationships.friends || 0) * 0.3)));
+  const cards = [
+    {
+      iconHTML: `<iconify-icon icon="material-symbols:assignment-rounded" style="font-size:24px;color:#8f73df"></iconify-icon>`,
+      value: grade,
+      label: 'Grade',
+      percent: clamp(STATE.school.gradeScore || scoreFromGrade(grade)),
+      barColor: '#8f73df',
+      track: '#efe7fb',
+      valueSize: '20px',
+    },
+    {
+      iconHTML: `<iconify-icon icon="material-symbols:neurology-rounded" style="font-size:24px;color:#d47a57"></iconify-icon>`,
+      value: stress,
+      label: 'Stress',
+      percent: stress,
+      barColor: '#d47a57',
+      track: '#f4e3d8',
+    },
+    {
+      iconHTML: `<iconify-icon icon="material-symbols:groups-rounded" style="font-size:24px;color:#5c8fd8"></iconify-icon>`,
+      value: social,
+      label: 'Social Life',
+      percent: social,
+      barColor: '#5c8fd8',
+      track: '#e7eefb',
+    },
+    {
+      iconHTML: `<iconify-icon icon="mdi:handshake-outline" style="font-size:24px;color:#56a56f"></iconify-icon>`,
+      value: networking,
+      label: 'Networking',
+      percent: networking,
+      barColor: '#56a56f',
+      track: '#e4f1e7',
+    },
+  ];
+  return `
+    <div style="margin-top:8px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#7c748d;margin-bottom:10px">Your Student Life</div>
+      <div style="display:flex;gap:10px">
+        ${cards.map(card => buildLearnPerformanceCard(card)).join('')}
+      </div>
+    </div>`;
+}
+
+function buildUniversityImportantPersonCard(person) {
+  const badgeColor = person.label === 'Lecturer' ? '#7f8fcf' : person.label === 'Course Rival' ? '#d77a72' : person.label === 'Flatmate' ? '#8a73d2' : '#72a985';
+  const displayName = `${person.title ? `${person.title} ` : ''}${person.firstName} ${person.surname}`.trim();
+  return `
+    <div style="flex:1;min-width:0;background:var(--surface);border:1px solid rgba(225,214,202,0.9);border-radius:18px;padding:12px 8px 10px;box-shadow:0 10px 22px rgba(64,42,22,0.06);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;min-height:126px">
+      <div style="position:relative;width:62px;height:62px;border-radius:50%;background:#fff9f0;border:1px solid rgba(226,212,196,0.9);display:flex;align-items:center;justify-content:center;overflow:hidden">
+        ${getCharacterHTML(person.appearance, person.age || 19, 58, { showBg: false })}
+        <div style="position:absolute;top:4px;right:4px;min-width:18px;height:18px;border-radius:999px;background:#fff;box-shadow:0 2px 8px rgba(34,26,18,0.12);display:flex;align-items:center;justify-content:center;color:${badgeColor};font-size:11px;font-weight:800;padding:0 4px">${person.label === 'Lecturer' ? 'A' : person.label === 'Course Rival' ? '!' : '•'}</div>
+      </div>
+      <div style="font-size:11px;font-weight:800;color:${badgeColor};line-height:1;text-transform:uppercase;letter-spacing:.06em;text-align:center">${person.label}</div>
+      <div style="font-size:13px;font-weight:700;color:#1b1815;line-height:1.15;text-align:center">${displayName}</div>
+    </div>`;
+}
+
+function buildUniversityImportantPeopleSection() {
+  const uni = ensureUniversityState();
+  return `
+    <div style="margin-top:18px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#7c748d;margin-bottom:10px">Important People</div>
+      <div style="display:flex;gap:10px">
+        ${uni.people.map(person => buildUniversityImportantPersonCard(person)).join('')}
+      </div>
+    </div>`;
+}
+
+function buildUniversityLifeActionRow(icon, title) {
+  return `
+    <button onclick="showToast('${title} is coming next.')"
+      style="width:100%;padding:13px 14px;background:transparent;border:none;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer">
+      <div style="display:flex;align-items:center;gap:12px;min-width:0">
+        <div style="width:32px;height:32px;border-radius:12px;background:#f5efff;border:1px solid #e5daf8;display:flex;align-items:center;justify-content:center;color:#6956c6;flex-shrink:0">
+          <iconify-icon icon="${icon}" style="font-size:18px"></iconify-icon>
+        </div>
+        <div style="font-size:14px;font-weight:700;color:#1a1814;text-align:left">${title}</div>
+      </div>
+      <span style="font-size:20px;line-height:1;color:#948a80">›</span>
+    </button>`;
+}
+
+function buildUniversityLifeSection() {
+  const rows = [
+    ['mdi:book-open-page-variant-outline', 'Attend Lecture'],
+    ['mdi:library-shelves', 'Study in Library'],
+    ['mdi:account-group-outline', 'Join Society'],
+    ['mdi:glass-cocktail', 'Go Clubbing'],
+    ['mdi:briefcase-outline', 'Apply for Internship'],
+    ['mdi:weather-night', 'Pull All-Nighter'],
+  ];
+  return `
+    <div class="actions-section" style="margin-top:18px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#7c748d;margin-bottom:10px">University Life</div>
+      <div style="background:var(--surface);border:1px solid rgba(225,214,202,0.9);border-radius:20px;box-shadow:0 12px 24px rgba(64,42,22,0.06);overflow:hidden">
+        ${rows.map((row, index) => `
+          <div style="${index ? 'border-top:1px solid rgba(226,216,205,0.9);' : ''}">
+            ${buildUniversityLifeActionRow(row[0], row[1])}
+          </div>`).join('')}
+      </div>
     </div>`;
 }
 
@@ -886,6 +3008,143 @@ function buildLearnHeroStat(label, value) {
     </div>`;
 }
 
+function buildLearnPerformanceCard({ iconHTML, value, label, percent, barColor, track = '#efe4d9', valueSize = '19px' }) {
+  return `
+    <div style="flex:1;min-width:0;background:var(--surface);border:1px solid rgba(225, 214, 202, 0.9);border-radius:18px;padding:14px 10px 12px;box-shadow:0 10px 22px rgba(64, 42, 22, 0.06);display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:8px">
+      <div style="height:30px;display:flex;align-items:center;justify-content:center">${iconHTML}</div>
+      <div style="font-size:${valueSize};font-weight:800;letter-spacing:-.03em;color:#191714;line-height:1">${value}</div>
+      <div style="font-size:11px;font-weight:700;color:#312a24;line-height:1.1;text-align:center">${label}</div>
+      <div style="width:100%;height:6px;border-radius:999px;background:${track};overflow:hidden;margin-top:2px">
+        <div style="width:${clamp(percent)}%;height:100%;border-radius:999px;background:${barColor}"></div>
+      </div>
+    </div>`;
+}
+
+function buildLearnPerformanceSection(edu, grade) {
+  const stressValue = clamp(Math.round(((100 - (STATE.stats.happy || 0)) * 0.7) + ((100 - (STATE.stats.health || 0)) * 0.3)));
+  const cards = [
+    {
+      iconHTML: `<iconify-icon icon="material-symbols:assignment-rounded" style="font-size:24px;color:#a874d8"></iconify-icon>`,
+      value: grade,
+      label: 'Grade',
+      fill: gradeColor(grade),
+      track: '#efe5d9',
+      valueSize: '20px',
+      percent: clamp(edu.gradeScore || scoreFromGrade(grade)),
+    },
+    {
+      iconHTML: `<div style="font-size:24px;font-weight:900;color:#111;line-height:1">?</div>`,
+      value: '—',
+      label: 'Creativity',
+      fill: '#f472b6',
+      track: '#f8e7ee',
+      percent: 45,
+      valueSize: '20px',
+    },
+    {
+      iconHTML: `<iconify-icon icon="material-symbols:groups-rounded" style="font-size:24px;color:#fb8c23"></iconify-icon>`,
+      value: STATE.stats.popularity ?? 0,
+      label: 'Popularity',
+      fill: '#fb8c23',
+      track: '#f5e6d7',
+      percent: clamp(STATE.stats.popularity || 0),
+    },
+    {
+      iconHTML: `<iconify-icon icon="material-symbols:neurology-rounded" style="font-size:24px;color:#a674d9"></iconify-icon>`,
+      value: stressValue,
+      label: 'Stress',
+      fill: '#b084dd',
+      track: '#ede2f7',
+      percent: stressValue,
+    },
+  ];
+
+  return `
+    <div style="margin-top:8px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8c8175;margin-bottom:10px">Your Performance</div>
+      <div style="display:flex;gap:10px">
+        ${cards.map(card => buildLearnPerformanceCard({
+          iconHTML: card.iconHTML,
+          value: card.value,
+          label: card.label,
+          percent: card.percent,
+          barColor: card.fill,
+          track: card.track,
+          valueSize: card.valueSize,
+        })).join('')}
+      </div>
+    </div>`;
+}
+
+function buildLearnImportantPeopleSlots(edu) {
+  ensureSchoolVipState();
+  const slots = [];
+  const usedIds = new Set();
+  const teachers = [...(edu.teachers || [])];
+
+  const addPersonSlot = (person, label, role) => {
+    if (!person || usedIds.has(person.id) || slots.length >= 4) return;
+    usedIds.add(person.id);
+    slots.push({ type:'person', person, label, role });
+  };
+  const addPlaceholderSlot = label => {
+    if (slots.length >= 4) return;
+    slots.push({ type:'placeholder', label });
+  };
+
+  const teacher = [...teachers].sort((a, b) => (b.npcStats?.warmth || 0) - (a.npcStats?.warmth || 0))[0];
+  addPersonSlot(teacher, 'Teacher', 'Teacher');
+  STATE.school.vipIds
+    .map(id => edu.classmates.find(c => c.id === id))
+    .filter(Boolean)
+    .forEach(person => {
+      const label = isClassmateCrush(person) ? 'Crush' : person.status === 'friend' ? 'Friend' : 'Classmate';
+      addPersonSlot(person, label, 'classmate');
+    });
+
+  while (slots.length < 4) {
+    addPlaceholderSlot('Add Here');
+  }
+  return slots;
+}
+
+function buildLearnImportantPersonCard(slot) {
+  if (slot.type === 'placeholder') {
+    return `
+      <div style="flex:1;min-width:0;background:rgba(255,255,255,0.62);border:1px dashed rgba(210,196,181,0.95);border-radius:18px;padding:14px 10px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:126px">
+        <div style="width:58px;height:58px;border-radius:50%;border:1px dashed rgba(182,167,151,0.85);display:flex;align-items:center;justify-content:center;color:#b2a698;background:rgba(246,240,234,0.7);font-size:20px;font-weight:700">+</div>
+        <div style="font-size:11px;font-weight:800;color:#8e8276;line-height:1.1;text-align:center;text-transform:uppercase;letter-spacing:.06em">${slot.label}</div>
+        <div style="font-size:12px;color:#b0a396;line-height:1;text-align:center">Add here</div>
+      </div>`;
+  }
+
+  const { person, role, label } = slot;
+  const displayName = role === 'classmate'
+    ? `${person.firstName || ''} ${person.surname || ''}`.trim()
+    : `${person.title ? `${person.title} ` : ''}${person.firstName || ''} ${person.surname || ''}`.trim();
+  const badgeColor = label === 'Crush' ? '#f07ba9' : label === 'Best Friend' ? '#f1ad38' : label === 'Teacher' ? '#8ea0d8' : '#72a985';
+  return `
+    <button onclick="openPersonSheet('${person.id}','${role}')" style="flex:1;min-width:0;background:var(--surface);border:1px solid rgba(225,214,202,0.9);border-radius:18px;padding:12px 8px 10px;box-shadow:0 10px 22px rgba(64,42,22,0.06);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;min-height:126px;cursor:pointer">
+      <div style="position:relative;width:62px;height:62px;border-radius:50%;background:#fff9f0;border:1px solid rgba(226,212,196,0.9);display:flex;align-items:center;justify-content:center;overflow:hidden">
+        ${getCharacterHTML(person.appearance, role === 'Teacher' ? 35 : STATE.age, 58, { showBg: false })}
+        <div style="position:absolute;top:4px;right:4px;min-width:18px;height:18px;border-radius:999px;background:#fff;box-shadow:0 2px 8px rgba(34,26,18,0.12);display:flex;align-items:center;justify-content:center;color:${badgeColor};font-size:11px;font-weight:800;padding:0 4px">${label === 'Crush' ? '♥' : label === 'Best Friend' ? '★' : label === 'Teacher' ? 'A' : '•'}</div>
+      </div>
+      <div style="font-size:11px;font-weight:800;color:${badgeColor};line-height:1;text-transform:uppercase;letter-spacing:.06em;text-align:center">${label}</div>
+      <div style="font-size:13px;font-weight:700;color:#1b1815;line-height:1.15;text-align:center">${displayName}</div>
+    </button>`;
+}
+
+function buildLearnImportantPeopleSection(edu) {
+  const slots = buildLearnImportantPeopleSlots(edu);
+  return `
+    <div style="margin-top:18px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8c8175;margin-bottom:10px">Important People</div>
+      <div style="display:flex;gap:10px">
+        ${slots.map(buildLearnImportantPersonCard).join('')}
+      </div>
+    </div>`;
+}
+
 function buildLearnHeroWork(edu) {
   return `
     <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;opacity:.45;color:#fff">Career</div>
@@ -893,12 +3152,131 @@ function buildLearnHeroWork(edu) {
     <div style="font-size:12px;opacity:.45;color:#fff;margin-top:2px">${fmtMoney(STATE.finances.income)} / year</div>`;
 }
 
+function buildWorkHeader() {
+  return `
+    <div class="jobs-header">
+      <button class="jobs-back" onclick="closeJobBoard()">‹</button>
+      <div class="jobs-header-main">
+        <div class="jobs-header-icon">
+          <iconify-icon icon="mdi:briefcase-outline" style="font-size:26px;color:#fff"></iconify-icon>
+        </div>
+        <div class="jobs-header-copy">
+          <div class="jobs-kicker">Work</div>
+          <div class="jobs-title">Apply for Jobs</div>
+          <div class="jobs-subtitle">Find work, earn money, and start your adult life.</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function buildWorkHomeHero() {
+  const degree = getDegreeCourse();
+  if (degree) {
+    return `
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;opacity:.45;color:#fff">Career</div>
+      <div style="font-family:var(--mono);font-size:32px;font-weight:500;letter-spacing:-.03em;line-height:1;color:#fff">${degree} Graduate</div>
+      <div style="font-size:12px;opacity:.65;color:#fff;margin-top:8px">Your degree opens some doors, but it does not decide your whole life.</div>`;
+  }
+  return buildLearnHeroPostSchool();
+}
+
+function buildWorkCategoryTabs() {
+  const tabs = [
+    { label:'Full-Time Jobs', icon:'mdi:office-building-outline', id:'full-time' },
+    { label:'Part-Time Jobs', icon:'mdi:coffee-outline', id:'part-time' },
+    { label:'Freelance', icon:'mdi:laptop', active:false },
+    { label:'Military', icon:'mdi:shield-outline', active:false },
+  ];
+  return `
+    <div class="job-tabs">
+      ${tabs.map(tab => `
+        <button class="job-tab ${tab.id === _jobBoardCategory ? 'active' : ''}" onclick="${tab.id ? `openJobBoard('${tab.id}')` : `showToast('${tab.label} coming soon.')`}">
+          <iconify-icon icon="${tab.icon}"></iconify-icon>
+          <span>${tab.label}</span>
+        </button>
+      `).join('')}
+    </div>`;
+}
+
+function buildPartTimeJobRow(job, index) {
+  return `
+    <button class="job-row" onclick="openJobDetail(${index}, 'part-time')">
+      <div class="job-row-art">
+        <iconify-icon icon="${job.icon}" style="color:${job.accent}"></iconify-icon>
+      </div>
+      <div class="job-row-copy">
+        <div class="job-row-title">${job.title}</div>
+        <div class="job-row-company">${job.companyName}</div>
+        <div class="job-row-pay">${job.payLabel}</div>
+      </div>
+      <div class="job-row-cta">›</div>
+    </button>`;
+}
+
+function buildFullTimeJobRow(job, index) {
+  return `
+    <button class="job-row" onclick="openJobDetail(${index}, 'full-time')">
+      <div class="job-row-art">
+        <iconify-icon icon="${job.icon}" style="color:${job.accent}"></iconify-icon>
+      </div>
+      <div class="job-row-copy">
+        <div class="job-row-title">${job.title}</div>
+        <div class="job-row-meta">${job.companyName} • ${job.payLabel}</div>
+      </div>
+      <div class="job-row-cta">›</div>
+    </button>`;
+}
+
+function buildWorkJobBoard() {
+  const isFullTime = _jobBoardCategory === 'full-time';
+  const jobs = isFullTime ? getFullTimeJobs() : getPartTimeJobs();
+  return `
+    <div class="jobs-board">
+      ${buildWorkHeader()}
+      ${buildWorkCategoryTabs()}
+      <div class="jobs-list">
+        ${(isFullTime ? jobs.map(buildFullTimeJobRow) : jobs.map(buildPartTimeJobRow)).join('')}
+      </div>
+      <div class="job-board-footer">${isFullTime ? (getDegreeCourse() ? `${getDegreeCourse()} gives you a slight edge here, but not a guaranteed path.` : 'No degree locks you out of some paths, but plenty of scalable routes are still open.') : 'Quick part-time picks for earning money fast.'}</div>
+    </div>`;
+}
+
+function buildLearnHeroPostSchool() {
+  const application = STATE.school.postSchool?.uniApplication;
+  const status = application?.status === 'pending'
+    ? `Waiting for ${formatUniversityType(application.uniType)} results`
+    : 'Choose your next step';
+  return `
+    <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;opacity:.45;color:#fff">School Finished</div>
+    <div style="font-family:var(--mono);font-size:34px;font-weight:500;letter-spacing:-.03em;line-height:1;color:#fff">What next?</div>
+    <div style="font-size:12px;opacity:.65;color:#fff;margin-top:8px">${status}</div>`;
+}
+
 function buildLearnHeroPreschool(edu) {
   const levelLabels = { pre:'Pre-School', primary:'Primary School', secondary:'Secondary School', college:'Sixth Form / College', uni:'University', finished_school:'School Complete' };
+  const notStarted = STATE.age < 5;
   return `
     <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;opacity:.45;color:#fff">Education</div>
-    <div style="font-family:var(--mono);font-size:44px;font-weight:500;letter-spacing:-.03em;line-height:1;color:#fff">${levelLabels[edu.level] || '—'}</div>
-    <div style="font-size:12px;opacity:.45;color:#fff;margin-top:2px">${edu.current || ''}</div>`;
+    <div style="font-family:var(--mono);font-size:${notStarted ? '28px' : '44px'};font-weight:500;letter-spacing:${notStarted ? '-.02em' : '-.03em'};line-height:1;color:#fff">${notStarted ? 'Not yet started' : (levelLabels[edu.level] || '—')}</div>
+    <div style="font-size:12px;opacity:.45;color:#fff;margin-top:2px">${notStarted ? 'School begins at age 5 in the UK.' : (edu.current || '')}</div>`;
+}
+
+function buildWorkHomeActions() {
+  const application = STATE.school.postSchool?.uniApplication;
+  const pending = application?.status === 'pending';
+  const graduated = isGraduate();
+  return `
+    <div class="actions-section">
+      ${graduated ? '' : `
+      <button onclick="${pending ? '' : 'openUniApplication()'}"
+        style="width:100%;padding:14px 16px;background:var(--surface);border:1px solid var(--border-light);border-radius:14px;font-size:13px;font-weight:800;color:var(--text);display:flex;justify-content:space-between;align-items:center;opacity:${pending ? '.6' : '1'};cursor:${pending ? 'default' : 'pointer'}">
+        <span>Apply to University</span><span>${pending ? 'Pending' : '›'}</span>
+      </button>`}
+      <button onclick="openJobBoard('full-time')"
+        style="width:100%;padding:14px 16px;background:var(--surface);border:1px solid var(--border-light);border-radius:14px;font-size:13px;font-weight:800;color:var(--text);display:flex;justify-content:space-between;align-items:center;margin-top:${graduated ? '0' : '10px'};cursor:pointer">
+        <span>Apply to Jobs</span><span>›</span>
+      </button>
+    </div>`;
 }
 
 function buildLearnClassmateRow(c) {
@@ -909,21 +3287,75 @@ function buildLearnClassmateRow(c) {
     return `<span class="trait-pill ${cls}" style="font-size:10px;padding:3px 8px">${t.label}</span>`;
   }).join('');
   return `
-    <div onclick="openPersonSheet('${c.id}','classmate')" style="background:var(--surface);border:1px solid var(--border-light);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px;cursor:pointer">
-      <div style="width:40px;height:40px;border-radius:50%;background:transparent;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden">
-        ${getCharacterHTML(c.appearance, STATE.age, 40, { showBg: false })}
-      </div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:14px;font-weight:700;${isClassmateCrush(c) ? 'color:#db2777' : ''}">${classmateDisplayName(c)}</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:1px">${c.status === 'friend' ? '🤝 Friend' : 'Classmate'}</div>
-        ${traits ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${traits}</div>` : ''}
-        <div style="display:flex;align-items:center;gap:8px;margin-top:7px">
-          <div style="flex:1;height:4px;background:var(--surface-mid);border-radius:99px;overflow:hidden">
-            <div style="width:${clamp(c.relationship)}%;height:100%;background:#22c55e;border-radius:99px"></div>
+    <div style="background:var(--surface);border:1px solid var(--border-light);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:0">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:40px;height:40px;border-radius:50%;background:transparent;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden">
+          ${getCharacterHTML(c.appearance, STATE.age, 40, { showBg: false })}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:700;${isClassmateCrush(c) ? 'color:#db2777' : ''}">${classmateDisplayName(c)}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:1px">${c.status === 'friend' ? 'Friend' : 'Classmate'}</div>
+          ${traits ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${traits}</div>` : ''}
+          <div style="display:flex;align-items:center;gap:8px;margin-top:7px">
+            <div style="flex:1;height:4px;background:var(--surface-mid);border-radius:99px;overflow:hidden">
+              <div style="width:${clamp(c.relationship)}%;height:100%;background:#22c55e;border-radius:99px"></div>
+            </div>
+            <span style="font-family:var(--mono);font-size:10px;color:var(--text-faint)">${c.relationship}%</span>
           </div>
-          <span style="font-family:var(--mono);font-size:10px;color:var(--text-faint)">${c.relationship}%</span>
+        </div>
+        <button onclick="event.stopPropagation();openLearnClassmateDetail('${c.id}')"
+          style="width:38px;height:38px;border-radius:99px;background:#fff8ea;border:1px solid #e7d7bf;box-shadow:0 3px 10px rgba(26,24,20,.08);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:22px;font-weight:800;color:#5f5145">›</button>
+      </div>
+    </div>`;
+}
+
+function buildClassmateVipButton(c) {
+  const active = isClassmateVip(c.id);
+  return `
+    <button type="button" data-classmate-vip-button="${c.id}" onclick="toggleClassmateVip('${c.id}')"
+      style="width:100%;padding:12px 14px;border-radius:14px;border:1px solid ${active ? '#efb7c9' : '#ddd2c6'};background:${active ? '#fff1f6' : '#fffaf2'};box-shadow:${active ? '0 8px 18px rgba(201,95,134,.14)' : 'none'};font-size:13px;font-weight:800;color:${active ? '#c95f86' : '#7b6b5f'};cursor:pointer;transition:background .2s,border-color .2s,color .2s,box-shadow .2s,transform .16s">
+      ${active ? 'VIP added' : 'Add to VIP list'}
+    </button>`;
+}
+
+function buildLearnClassmateDetailScreen(c) {
+  const traits = (c.traits || []).slice(0, 3).map(tid => {
+    const t = CLASSMATE_TRAITS_POOL.find(x => x.id === tid);
+    if (!t) return '';
+    const cls = t.positive === false ? 'negative' : t.positive === true ? 'positive' : '';
+    return `<span class="trait-pill ${cls}" style="font-size:10px;padding:3px 8px">${t.label}</span>`;
+  }).join('');
+  return `
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <button onclick="closeLearnClassmateDetail()"
+          style="padding:0;background:none;border:none;font-size:13px;font-weight:700;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer">
+          <span style="font-size:18px;line-height:1">‹</span>
+          <span>Back</span>
+        </button>
+        <div style="font-size:16px;font-weight:800;color:var(--text)">Classmate</div>
+        <button onclick="openPersonSheet('${c.id}','classmate')"
+          style="width:36px;height:36px;border-radius:99px;background:#fff8ea;border:1px solid #e7d7bf;box-shadow:0 3px 10px rgba(26,24,20,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">${buildDotsIcon()}</button>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border-light);border-radius:18px;padding:16px;display:flex;align-items:center;gap:14px;margin-bottom:12px">
+        <div style="width:64px;height:64px;border-radius:50%;background:transparent;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden">
+          ${getCharacterHTML(c.appearance, STATE.age, 64, { showBg: false })}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:18px;font-weight:800;color:var(--text);line-height:1.1;${isClassmateCrush(c) ? 'color:#db2777' : ''}">${classmateDisplayName(c)}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:3px">${c.status === 'friend' ? 'Friend' : 'Classmate'}</div>
+          ${traits ? `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">${traits}</div>` : ''}
+          <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+            <div style="flex:1;height:6px;background:var(--surface-mid);border-radius:99px;overflow:hidden">
+              <div style="width:${clamp(c.relationship)}%;height:100%;background:#22c55e;border-radius:99px"></div>
+            </div>
+            <span style="font-family:var(--mono);font-size:11px;color:var(--text-faint);font-weight:700">${c.relationship}%</span>
+          </div>
         </div>
       </div>
+      <div style="margin-bottom:16px">${buildClassmateVipButton(c)}</div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8c8175;margin-bottom:10px">Interactions</div>
+      ${buildLearnClassmateActions(c)}
     </div>`;
 }
 
@@ -953,8 +3385,37 @@ function buildLearnToggleSection(id, label, contentHTML) {
     </div>`;
 }
 
+let _learnScreen = 'main';
+
+function openLearnClassmatesScreen() {
+  _learnScreen = 'classmates';
+  _learnClassmateId = null;
+  renderLearnTab();
+  const tab = document.getElementById('tab-learn');
+  if (tab) tab.scrollTop = 0;
+}
+
+function closeLearnClassmatesScreen() {
+  _learnScreen = 'main';
+  _learnClassmateId = null;
+  renderLearnTab();
+  const tab = document.getElementById('tab-learn');
+  if (tab) tab.scrollTop = 0;
+}
+
 function renderLearnTab() {
-  const age = STATE.age, edu = STATE.school, isWork = age >= 18 && edu.level !== 'uni';
+  const age = STATE.age, edu = STATE.school;
+  const notStartedSchool = age < 5;
+  const isPostSchoolPlanning = age >= 18 && edu.level === 'finished_school';
+  const isGraduatePlanning = age >= 18 && edu.level === 'graduated';
+  const isEmployed = age >= 18 && STATE.career?.job && STATE.career.job !== 'None' && edu.level !== 'uni';
+  if (_learnScreen === 'classmates' && !(age >= 5 && age <= 18 && edu.classmates.length)) {
+    _learnScreen = 'main';
+  }
+  if (_learnScreen === 'classmate' && !edu.classmates.some(c => c.id === _learnClassmateId)) {
+    _learnScreen = age >= 5 && age <= 18 && edu.classmates.length ? 'classmates' : 'main';
+    _learnClassmateId = null;
+  }
   const grade       = (age >= 5 && age <= 18) ? gradeFromScore(edu.gradeScore) : null;
   const avgScore    = edu.classmates.length
     ? Math.round(edu.classmates.reduce((s, c) => s + c.gradeScore, 0) / edu.classmates.length)
@@ -963,51 +3424,176 @@ function renderLearnTab() {
   const gradeAboveAvg = grade && edu.gradeScore >= avgScore;
 
   // ── Hero card ─────────────────────────────────────────
+  const tab = document.getElementById('tab-learn');
   const hero = document.querySelector('#tab-learn .hub-hero');
-  if (!isWork && grade) {
-    hero.style.background = '#fef9c3';
-    hero.style.border     = '1px solid #fde047';
+  const gradeBlockWrap = document.getElementById('grade-block-wrap');
+  const rosterToggleWrap = document.getElementById('roster-toggle-wrap');
+  const sectionTitle = document.getElementById('learn-section-title');
+  const learnActions = document.getElementById('learn-actions');
+  const container = learnActions.parentElement;
+  const existingClassmatesScreen = document.getElementById('learn-classmates-screen');
+  if (existingClassmatesScreen) existingClassmatesScreen.remove();
+  const existingClassmateDetailScreen = document.getElementById('learn-classmate-detail-screen');
+  if (existingClassmateDetailScreen) existingClassmateDetailScreen.remove();
+  container.querySelectorAll('.uni-apply-screen').forEach(el => el.remove());
+
+  if (isPostSchoolPlanning) {
+    hero.style.background = 'linear-gradient(135deg, #485563, #29323c)';
+    hero.style.border = '1px solid rgba(255,255,255,.16)';
+    hero.innerHTML = buildLearnHeroPostSchool();
+  } else if (isGraduatePlanning) {
+    hero.style.background = 'linear-gradient(135deg, #485563, #29323c)';
+    hero.style.border = '1px solid rgba(255,255,255,.16)';
+    hero.innerHTML = buildWorkHomeHero();
+  } else if (edu.level === 'uni') {
+    ensureUniversityState();
+    hero.style.background = 'linear-gradient(180deg, rgba(255,255,255,0.99), rgba(247,243,252,0.99))';
+    hero.style.border = '1px solid rgba(221,212,232,0.95)';
+    hero.innerHTML = buildUniversityHeroCard();
+  } else if (grade) {
+    hero.style.background = edu.level === 'primary'
+      ? 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,243,238,0.98))'
+      : '#fef9c3';
+    hero.style.border     = edu.level === 'primary'
+      ? '1px solid rgba(218, 208, 197, 0.9)'
+      : '1px solid #fde047';
     hero.innerHTML = buildLearnHeroSchool(edu, grade, avgGrade, gradeAboveAvg);
   } else {
     hero.style.background = '';
     hero.style.border     = '';
-    hero.innerHTML = isWork ? buildLearnHeroWork(edu) : buildLearnHeroPreschool(edu);
+    hero.innerHTML = buildLearnHeroPreschool(edu);
   }
 
-  // ── Grade block (unused but kept for future) ──────────
-  document.getElementById('grade-block-wrap').innerHTML = '';
+  // ── Performance strip ─────────────────────────────────
+  gradeBlockWrap.innerHTML = edu.level === 'uni'
+    ? `${buildUniversityPerformanceSection()}${buildUniversityImportantPeopleSection()}`
+    : (!isPostSchoolPlanning && !isGraduatePlanning && grade ? `${buildLearnPerformanceSection(edu, grade)}${buildLearnImportantPeopleSection(edu)}` : '');
 
   // ── Roster toggle ─────────────────────────────────────
-  document.getElementById('roster-toggle-wrap').style.display =
-    (age >= 5 && age <= 18 && edu.classmates.length) ? 'block' : 'none';
+  rosterToggleWrap.style.display =
+    (edu.level !== 'uni' && age >= 5 && age <= 18 && edu.classmates.length) ? 'block' : 'none';
 
   // ── Dynamic sections: clear and rebuild ───────────────
-  const container = document.getElementById('learn-actions').parentElement;
   container.querySelectorAll('.actions-section, .cm-section, .tch-section').forEach(el => el.remove());
-  document.getElementById('learn-section-title').style.display = 'none';
-  document.getElementById('learn-actions').innerHTML = '';
+  sectionTitle.style.display = 'none';
+  learnActions.innerHTML = '';
+
+  if (isEmployed) {
+    hero.style.display = 'none';
+    gradeBlockWrap.style.display = 'none';
+    rosterToggleWrap.style.display = 'none';
+    learnActions.style.display = '';
+    learnActions.innerHTML = buildEmployedCareerPage();
+    return;
+  }
+
+  if (_learnScreen === 'jobsBoard') {
+    hero.style.display = 'none';
+    gradeBlockWrap.style.display = 'none';
+    rosterToggleWrap.style.display = 'none';
+    learnActions.style.display = '';
+    learnActions.innerHTML = buildWorkJobBoard();
+    return;
+  }
+
+  if (_learnScreen === 'classmates') {
+    hero.style.display = 'none';
+    gradeBlockWrap.style.display = 'none';
+    rosterToggleWrap.style.display = 'none';
+    learnActions.style.display = 'none';
+    const classmatesScreen = document.createElement('div');
+    classmatesScreen.id = 'learn-classmates-screen';
+    classmatesScreen.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <button onclick="closeLearnClassmatesScreen()"
+          style="padding:0;background:none;border:none;font-size:13px;font-weight:700;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer">
+          <span style="font-size:18px;line-height:1">‹</span>
+          <span>Back</span>
+        </button>
+        <div style="font-size:16px;font-weight:800;color:var(--text)">Classmates</div>
+        <div style="font-size:12px;font-weight:700;color:var(--text-faint)">${edu.classmates.length}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${edu.classmates.map(c => buildLearnClassmateRow(c)).join('')}
+      </div>`;
+    container.appendChild(classmatesScreen);
+    if (tab) tab.scrollTop = 0;
+    return;
+  }
+
+  if (_learnScreen === 'classmate') {
+    const classmate = edu.classmates.find(c => c.id === _learnClassmateId);
+    if (!classmate) return;
+    hero.style.display = 'none';
+    gradeBlockWrap.style.display = 'none';
+    rosterToggleWrap.style.display = 'none';
+    learnActions.style.display = 'none';
+    const classmateDetailScreen = document.createElement('div');
+    classmateDetailScreen.id = 'learn-classmate-detail-screen';
+    classmateDetailScreen.innerHTML = buildLearnClassmateDetailScreen(classmate);
+    container.appendChild(classmateDetailScreen);
+    if (tab) tab.scrollTop = 0;
+    return;
+  }
+
+  if (_learnScreen === 'uniApplyBasics' || _learnScreen === 'uniApplyType' || _learnScreen === 'uniApplyPreview') {
+    hero.style.display = 'none';
+    gradeBlockWrap.style.display = 'none';
+    rosterToggleWrap.style.display = 'none';
+    learnActions.style.display = 'none';
+    const uniApplyScreen = document.createElement('div');
+    uniApplyScreen.className = 'uni-apply-screen';
+    uniApplyScreen.innerHTML = buildUniApplicationScreen();
+    container.appendChild(uniApplyScreen);
+    if (tab) tab.scrollTop = 0;
+    return;
+  }
+
+  hero.style.display = '';
+  gradeBlockWrap.style.display = '';
+  rosterToggleWrap.style.display =
+    (edu.level !== 'uni' && age >= 5 && age <= 18 && edu.classmates.length) ? 'block' : 'none';
+  learnActions.style.display = '';
 
   // Actions
-  const acts = isWork ? CAREER_ACTIONS : EDUCATION_ACTIONS;
-  const actionsWrapper = document.createElement('div');
-  actionsWrapper.className = 'actions-section';
-  actionsWrapper.innerHTML = buildLearnToggleSection(
-    'actions',
-    '⚡ Actions',
-    `<div class="action-list" id="learn-actions-inner">${acts.map(a => buildActionHTML(a)).join('')}</div>`
-  );
-  container.appendChild(actionsWrapper);
-  wireActions(actionsWrapper.querySelector('#learn-actions-inner'), acts, () => { updateAllUI(); renderLearnTab(); });
+  if (isPostSchoolPlanning || isGraduatePlanning) {
+    const postSchoolWrapper = document.createElement('div');
+    postSchoolWrapper.className = 'actions-section';
+    postSchoolWrapper.innerHTML = buildWorkHomeActions();
+    container.appendChild(postSchoolWrapper);
+    return;
+  }
+
+  if (edu.level === 'uni') {
+    const uniWrapper = document.createElement('div');
+    uniWrapper.className = 'actions-section';
+    uniWrapper.innerHTML = buildUniversityLifeSection();
+    container.appendChild(uniWrapper);
+    return;
+  }
+
+  if (!notStartedSchool && edu.level !== 'uni') {
+    const acts = EDUCATION_ACTIONS;
+    const actionsWrapper = document.createElement('div');
+    actionsWrapper.className = 'actions-section';
+    actionsWrapper.innerHTML = buildLearnToggleSection(
+      'actions',
+      '⚡ Actions',
+      `<div class="action-list" id="learn-actions-inner">${acts.map(a => buildActionHTML(a)).join('')}</div>`
+    );
+    container.appendChild(actionsWrapper);
+    wireActions(actionsWrapper.querySelector('#learn-actions-inner'), acts, () => { updateAllUI(); renderLearnTab(); });
+  }
 
   // Classmates
   if (age >= 5 && age <= 18 && edu.classmates.length) {
     const cmWrapper = document.createElement('div');
     cmWrapper.className = 'cm-section';
-    cmWrapper.innerHTML = buildLearnToggleSection(
-      'cm',
-      `👥 Classmates (${edu.classmates.length})`,
-      edu.classmates.map(c => buildLearnClassmateRow(c)).join('')
-    );
+    cmWrapper.innerHTML = `
+      <button onclick="openLearnClassmatesScreen()"
+        style="width:100%;padding:13px 16px;background:var(--surface);border:1px solid var(--border-light);border-radius:14px;font-size:13px;font-weight:700;color:var(--text);display:flex;justify-content:space-between;align-items:center">
+        <span>👥 Classmates (${edu.classmates.length})</span><span>›</span>
+      </button>`;
     container.appendChild(cmWrapper);
   }
 
@@ -1123,6 +3709,42 @@ function showMilestone(m, onClose) {
     <div class="milestone-title">${m.title}</div>
     <div class="milestone-body">${m.body}</div>
     <button class="continue-btn" onclick="closeMilestone()">Continue →</button>`;
+  document.getElementById('milestone-overlay').classList.add('open');
+}
+function showSchoolFinishedTransition(onClose) {
+  const postSchool = ensurePostSchoolState();
+  postSchool.schoolFinishedShown = true;
+  _pendingAfterMilestone = onClose;
+  document.getElementById('milestone-inner').innerHTML = `
+    <div class="milestone-emoji">🎓</div>
+    <div class="milestone-title">School Finished</div>
+    <div class="milestone-body">Your final year of school has come to an end.<br><br>What do you want to do next? You can apply to university, apply for jobs or figure things out.</div>
+    <button class="continue-btn" onclick="closeMilestone()">Continue →</button>`;
+  document.getElementById('milestone-overlay').classList.add('open');
+}
+function showUniversityAdmissionResult(result, onClose) {
+  const application = STATE.school.postSchool?.uniApplication;
+  if (!application || !result) return;
+  _pendingAfterMilestone = onClose;
+  let body = '';
+  let actions = '';
+  if (result.outcome === 'accepted') {
+    body = `You've been offered a place to study ${application.course} at ${formatUniversityType(application.uniType)}.`;
+    actions = `<button class="continue-btn" onclick="acceptUniversityOffer('${application.uniType}')">Accept place →</button>`;
+  } else if (result.outcome === 'fallback_offer') {
+    body = `Unfortunately, your application to ${formatUniversityType(application.uniType)} was unsuccessful, but ${formatUniversityType(result.offeredType)} has offered you a place.`;
+    actions = `
+      <button class="continue-btn" onclick="acceptUniversityOffer('${result.offeredType}')">Accept place →</button>
+      <button class="birth-btn secondary" onclick="rejectUniversityOffer()">Reject offer</button>`;
+  } else {
+    body = `Unfortunately, your application to ${formatUniversityType(application.uniType)} was unsuccessful.`;
+    actions = `<button class="continue-btn" onclick="closeMilestone()">Continue →</button>`;
+  }
+  document.getElementById('milestone-inner').innerHTML = `
+    <div class="milestone-emoji">${result.outcome === 'accepted' ? '🎉' : '🎓'}</div>
+    <div class="milestone-title">${result.outcome === 'accepted' ? 'Accepted' : 'Rejected'}</div>
+    <div class="milestone-body">${body}</div>
+    ${actions}`;
   document.getElementById('milestone-overlay').classList.add('open');
 }
 function closeMilestone() {
@@ -1297,6 +3919,24 @@ document.getElementById('age-up-btn').addEventListener('click', () => {
   }
   updateAllUI();
   saveGame();
+  const postSchool = ensurePostSchoolState();
+  const admissionResult = resolveUniversityApplication();
+  if (admissionResult) {
+    showUniversityAdmissionResult(admissionResult, () => {
+      const ev = pickEvent();
+      if (ev) setTimeout(() => openEvent(ev), 200);
+    });
+    saveGame();
+    return;
+  }
+  if (STATE.age === 18 && STATE.school.level === 'finished_school' && !postSchool.schoolFinishedShown) {
+    showSchoolFinishedTransition(() => {
+      const ev = pickEvent();
+      if (ev) setTimeout(() => openEvent(ev), 200);
+    });
+    saveGame();
+    return;
+  }
   const milestone = checkMilestone();
   if (milestone) {
     showMilestone(milestone, () => {

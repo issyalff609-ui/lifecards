@@ -305,7 +305,7 @@
       }
       .badge-stage {
       background: #1e293b;
-      color: #e5e4e0; 
+      color: #ffffff; 
         padding: 5.5px 8.5px;
       }
       .badge-sign {
@@ -638,6 +638,566 @@ color: #64758b;
         color: #16a34a;
       }
 
+      .jobs-board {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .jobs-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+      }
+      .jobs-header-main {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+      }
+      .jobs-back {
+        width: 38px;
+        height: 38px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid #e8e0d6;
+        box-shadow: 0 8px 18px rgba(83, 56, 28, 0.05);
+        color: #5f5145;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        margin-top: 6px;
+      }
+      .jobs-header-icon {
+        width: 58px;
+        height: 58px;
+        border-radius: 18px;
+        background: linear-gradient(180deg, #9c86ff 0%, #7c63f2 100%);
+        box-shadow: 0 12px 22px rgba(124, 99, 242, 0.28);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .jobs-header-copy {
+        flex: 1;
+        min-width: 0;
+        padding-top: 2px;
+      }
+      .jobs-kicker {
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #8f8477;
+        margin-bottom: 7px;
+      }
+      .jobs-title {
+        font-size: 28px;
+        font-weight: 900;
+        line-height: 0.95;
+        letter-spacing: -0.05em;
+        color: #1f1a16;
+      }
+      .jobs-subtitle {
+        margin-top: 8px;
+        font-size: 13px;
+        line-height: 1.45;
+        font-weight: 600;
+        color: #766d64;
+        max-width: 280px;
+      }
+      .job-tabs {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 2px;
+        scrollbar-width: none;
+      }
+      .job-tabs::-webkit-scrollbar {
+        display: none;
+      }
+      .job-tab {
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 10px 12px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid #e8e0d6;
+        box-shadow: 0 8px 18px rgba(83, 56, 28, 0.05);
+        color: #473e37;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        line-height: 1.15;
+        white-space: nowrap;
+      }
+      .job-tab.active {
+        background: linear-gradient(180deg, #9279ff 0%, #775cea 100%);
+        border-color: transparent;
+        color: #fff;
+        box-shadow: 0 14px 26px rgba(119, 92, 234, 0.22);
+      }
+      .job-tab iconify-icon {
+        font-size: 16px;
+      }
+      .jobs-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding-bottom: 6px;
+      }
+      .job-row {
+        background: rgba(255, 255, 255, 0.96);
+        border: 1px solid rgba(233, 224, 214, 0.98);
+        border-radius: 22px;
+        box-shadow:
+          0 10px 24px rgba(75, 52, 27, 0.07),
+          inset 0 1px 0 rgba(255, 255, 255, 0.75);
+        padding: 12px 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .job-row-art {
+        width: 56px;
+        height: 56px;
+        border-radius: 18px;
+        background: linear-gradient(180deg, #fcf8f0 0%, #f4ede3 100%);
+        border: 1px solid #efe4d7;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .job-row-art iconify-icon {
+        font-size: 28px;
+      }
+      .job-row-copy {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .job-row-title {
+        font-size: 15px;
+        font-weight: 800;
+        color: #1f1a16;
+        line-height: 1.15;
+        letter-spacing: -0.03em;
+      }
+      .job-row-company {
+        font-size: 12px;
+        font-weight: 700;
+        color: #7e7368;
+        line-height: 1.2;
+      }
+      .job-row-meta {
+        font-size: 12px;
+        font-weight: 700;
+        color: #7e7368;
+        line-height: 1.25;
+      }
+      .job-row-pay {
+        font-size: 13px;
+        font-weight: 800;
+        color: #775cea;
+        letter-spacing: -0.02em;
+      }
+      .job-row-cta {
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        background: #fff7eb;
+        border: 1px solid #ecdcc6;
+        color: #5f5145;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        box-shadow: 0 4px 10px rgba(45, 28, 10, 0.06);
+      }
+      .job-board-footer {
+        margin-top: 2px;
+        padding: 0 2px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #9a9085;
+        text-align: center;
+      }
+      .job-flow-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding-top: 4px;
+      }
+      .job-flow-topbar button {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--text-muted);
+      }
+      .job-flow-spacer {
+        width: 40px;
+        flex-shrink: 0;
+      }
+      .job-flow-title {
+        font-size: 16px;
+        font-weight: 800;
+        color: var(--text);
+        letter-spacing: -0.02em;
+      }
+      .job-flow-card {
+        background: var(--surface);
+        border: 1px solid var(--border-light);
+        border-radius: 20px;
+        padding: 18px 18px 16px;
+        box-shadow:
+          0 12px 28px rgba(64, 42, 22, 0.06),
+          inset 0 1px 0 rgba(255,255,255,0.72);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .job-flow-kicker {
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #998d82;
+      }
+      .job-flow-headline {
+        font-size: 27px;
+        font-weight: 900;
+        letter-spacing: -0.05em;
+        line-height: 0.98;
+        color: #1f1a16;
+      }
+      .job-flow-meta {
+        font-size: 14px;
+        font-weight: 700;
+        color: #73695f;
+        line-height: 1.45;
+      }
+      .job-flow-copy {
+        font-size: 14px;
+        font-weight: 600;
+        color: #7c7168;
+        line-height: 1.55;
+      }
+      .job-flow-statline {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .job-flow-stat {
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: #faf4eb;
+        border: 1px solid #eee0cf;
+        color: #7f6f62;
+        font-size: 11px;
+        font-weight: 800;
+      }
+      .job-flow-question {
+        font-size: 23px;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        line-height: 1.15;
+        color: #1f1a16;
+      }
+      .job-flow-sub {
+        font-size: 13px;
+        font-weight: 700;
+        color: #8b7f73;
+        line-height: 1.4;
+      }
+      .job-flow-event {
+        padding: 12px 14px;
+        border-radius: 16px;
+        background: #fff8ed;
+        border: 1px solid #efe0cc;
+        font-size: 13px;
+        font-weight: 700;
+        color: #7f6a57;
+        line-height: 1.45;
+      }
+      #job-sheet {
+        background:
+          radial-gradient(circle at top left, rgba(255, 248, 239, 0.98), transparent 54%),
+          linear-gradient(180deg, rgba(255, 252, 247, 0.99), rgba(247, 240, 232, 0.99));
+      }
+      .career-page {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .career-hero {
+        position: relative;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,240,233,0.98));
+        border: 1px solid rgba(223,214,205,0.95);
+        border-radius: 22px;
+        padding: 18px 18px 16px;
+        box-shadow:
+          0 14px 28px rgba(53,39,28,0.08),
+          inset 0 1px 0 rgba(255,255,255,0.8);
+        overflow: hidden;
+      }
+      .career-hero::after {
+        content: "";
+        position: absolute;
+        right: -18px;
+        top: -12px;
+        width: 126px;
+        height: 126px;
+        border-radius: 28px;
+        background: radial-gradient(circle at 35% 35%, rgba(124, 138, 170, 0.18), transparent 60%);
+      }
+      .career-kicker {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #8c8075;
+      }
+      .career-title {
+        margin-top: 8px;
+        font-size: 28px;
+        font-weight: 900;
+        line-height: 0.98;
+        letter-spacing: -0.05em;
+        color: #202329;
+        max-width: 72%;
+      }
+      .career-company {
+        margin-top: 8px;
+        font-size: 14px;
+        font-weight: 700;
+        color: #616872;
+      }
+      .career-yearline {
+        margin-top: 10px;
+        font-size: 13px;
+        font-weight: 800;
+        color: #2d3642;
+      }
+      .career-illustration {
+        position: absolute;
+        right: 18px;
+        top: 18px;
+        width: 72px;
+        height: 72px;
+        border-radius: 20px;
+        background: linear-gradient(180deg, #243243 0%, #3a4b61 100%);
+        box-shadow: 0 14px 28px rgba(36, 50, 67, 0.22);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .career-illustration iconify-icon {
+        font-size: 32px;
+        color: #f5efe8;
+      }
+      .career-section-title {
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #8d8278;
+      }
+      .career-stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .career-stat-card {
+        background: var(--surface);
+        border: 1px solid rgba(225,214,202,0.95);
+        border-radius: 18px;
+        padding: 14px 14px 12px;
+        box-shadow:
+          0 10px 20px rgba(53,39,28,0.06),
+          inset 0 1px 0 rgba(255,255,255,0.78);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .career-stat-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .career-stat-label {
+        font-size: 11px;
+        font-weight: 800;
+        color: #5d544c;
+      }
+      .career-stat-value {
+        font-family: var(--mono);
+        font-size: 20px;
+        font-weight: 700;
+        color: #1c1f24;
+      }
+      .career-stat-bar {
+        width: 100%;
+        height: 6px;
+        background: #eee6dc;
+        border-radius: 999px;
+        overflow: hidden;
+      }
+      .career-stat-fill {
+        height: 100%;
+        border-radius: 999px;
+      }
+      .career-people-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .career-person-card {
+        background: var(--surface);
+        border: 1px solid rgba(225,214,202,0.95);
+        border-radius: 18px;
+        padding: 12px;
+        box-shadow:
+          0 10px 20px rgba(53,39,28,0.06),
+          inset 0 1px 0 rgba(255,255,255,0.78);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .career-person-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        border: 1px solid var(--border);
+        background: #fbf4ea;
+        overflow: hidden;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .career-person-copy {
+        min-width: 0;
+        flex: 1;
+      }
+      .career-person-role {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #8f8379;
+      }
+      .career-person-name {
+        margin-top: 3px;
+        font-size: 13px;
+        font-weight: 800;
+        color: #1d201f;
+        line-height: 1.15;
+      }
+      .career-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .career-action-btn {
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid rgba(225,214,202,0.95);
+        border-radius: 16px;
+        padding: 13px 15px;
+        box-shadow:
+          0 10px 20px rgba(53,39,28,0.06),
+          inset 0 1px 0 rgba(255,255,255,0.78);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        color: #1d201f;
+      }
+      .career-action-main {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+      .career-action-icon {
+        width: 34px;
+        height: 34px;
+        border-radius: 12px;
+        background: #f3ede5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #334155;
+        flex-shrink: 0;
+      }
+      .career-action-text {
+        text-align: left;
+      }
+      .career-action-title {
+        font-size: 14px;
+        font-weight: 800;
+      }
+      .career-action-sub {
+        margin-top: 2px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #877a6f;
+      }
+      .career-path-card {
+        background: var(--surface);
+        border: 1px solid rgba(225,214,202,0.95);
+        border-radius: 20px;
+        padding: 14px;
+        box-shadow:
+          0 10px 20px rgba(53,39,28,0.06),
+          inset 0 1px 0 rgba(255,255,255,0.78);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .career-path-card::-webkit-scrollbar {
+        display: none;
+      }
+      .career-path-node {
+        flex: 0 0 auto;
+        min-width: 112px;
+        padding: 10px 12px;
+        border-radius: 16px;
+        background: #f4eee6;
+        color: #81766c;
+        border: 1px solid #e8ddd1;
+        font-size: 12px;
+        font-weight: 800;
+        line-height: 1.2;
+        text-align: center;
+      }
+      .career-path-node.current {
+        background: linear-gradient(180deg, #253240 0%, #364759 100%);
+        color: #fff;
+        border-color: transparent;
+        box-shadow: 0 12px 24px rgba(37, 50, 64, 0.24);
+      }
+      .career-path-node.future {
+        opacity: 0.55;
+      }
+      .career-path-arrow {
+        flex: 0 0 auto;
+        color: #ac9f92;
+        font-size: 18px;
+        font-weight: 800;
+      }
+
       .detail-card {
         background: var(--surface);
         border: 1px solid var(--border-light);
@@ -681,17 +1241,36 @@ color: #64758b;
       .person-card {
         background: var(--surface);
         border: 1px solid var(--border-light);
-        border-radius: 14px;
+        border-radius: 22px;
         padding: 16px;
         display: flex;
         align-items: center;
         gap: 14px;
         cursor: pointer;
-        transition: background 0.13s;
-        box-shadow: 0 5px 12px rgba(26, 24, 20, 0.2);
+        transition:
+          background 0.18s,
+          transform 0.18s,
+          box-shadow 0.18s;
+        box-shadow:
+          0 10px 24px rgba(53, 39, 28, 0.08),
+          inset 0 1px 0 rgba(255, 255, 255, 0.55);
       }
       .person-card:hover {
         background: var(--surface-mid);
+      }
+      .person-card.is-dragging {
+        box-shadow:
+          0 18px 36px rgba(53, 39, 28, 0.18),
+          inset 0 1px 0 rgba(255, 255, 255, 0.7);
+        opacity: 0.96;
+      }
+      .relationship-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      body.is-reordering-people {
+        user-select: none;
       }
       .person-emoji {
         font-size: 28px;
@@ -1054,6 +1633,7 @@ color: #64758b;
         inset: 0;
         background: rgba(26, 24, 20, 0.45);
         backdrop-filter: blur(3px);
+        transition: opacity 0.25s ease;
       }
       .sheet {
         position: relative;
@@ -1079,6 +1659,31 @@ color: #64758b;
         border-radius: 99px;
         margin: 8px auto 2px;
         flex-shrink: 0;
+      }
+      #person-overlay .overlay-backdrop {
+        background: rgba(36, 27, 20, 0.34);
+        backdrop-filter: blur(10px) saturate(120%);
+      }
+      #person-sheet {
+        background:
+          radial-gradient(circle at top left, rgba(255, 245, 236, 0.96), transparent 52%),
+          linear-gradient(180deg, rgba(255, 252, 248, 0.98), rgba(247, 238, 228, 0.98));
+        border-radius: 30px 30px 0 0;
+        padding: 8px 18px calc(40px + env(safe-area-inset-bottom));
+        box-shadow: 0 -24px 56px rgba(34, 24, 17, 0.2);
+        width: min(100vw, 430px);
+        height: min(78dvh, 700px);
+        max-height: min(78dvh, 700px);
+        gap: 14px;
+        overflow: hidden;
+        align-self: center;
+      }
+      #person-sheet .sheet-handle {
+        width: 42px;
+        height: 5px;
+        background: rgba(143, 122, 103, 0.32);
+        margin: 6px auto 8px;
+        pointer-events: none;
       }
 
       .event-age-tag {
@@ -1335,6 +1940,251 @@ color: #64758b;
         flex-shrink: 0;
         border: 1px solid var(--border);
         overflow: hidden;
+      }
+      .person-sheet-shell {
+        display: flex;
+        flex-direction: column;
+        gap: 11px;
+        padding-bottom: 4px;
+      }
+      .person-sheet-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 12px;
+        min-height: 24px;
+      }
+      .person-sheet-close {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        border: none;
+        background: rgba(143, 117, 90, 0.12);
+        color: #755f4e;
+        font-size: 16px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+      .person-sheet-hero {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+      }
+      .person-sheet-avatar {
+        width: 74px;
+        height: 74px;
+        border: 2px solid rgba(240, 205, 187, 0.9);
+        box-shadow:
+          0 14px 28px rgba(111, 82, 59, 0.14),
+          inset 0 1px 0 rgba(255, 255, 255, 0.7);
+        background: linear-gradient(180deg, rgba(255, 251, 246, 0.94), rgba(248, 239, 229, 0.94));
+      }
+      .person-sheet-hero-copy {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .person-sheet-name {
+        font-size: 24px;
+        line-height: 1.02;
+        letter-spacing: -0.03em;
+        font-weight: 800;
+        color: #2f241c;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .person-sheet-role-inline {
+        display: inline-block;
+        color: #d24f7f;
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .person-sheet-progress {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .person-sheet-progress.compact {
+        width: 100%;
+      }
+      .person-sheet-progress-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 9px;
+        font-weight: 700;
+        color: #5c4a3d;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .person-sheet-progress-track {
+        height: 8px;
+        background: rgba(223, 206, 189, 0.48);
+        border-radius: 999px;
+        overflow: hidden;
+      }
+      .person-sheet-progress-fill {
+        height: 100%;
+        border-radius: 999px;
+        box-shadow: 0 8px 18px rgba(232, 93, 143, 0.22);
+      }
+      .person-sheet-metric-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .person-sheet-metric {
+        min-height: 74px;
+        padding: 10px 8px;
+        border-radius: 18px;
+        background: linear-gradient(180deg, rgba(255,255,255,0.88), rgba(248,239,229,0.82));
+        box-shadow:
+          0 8px 18px rgba(94, 70, 54, 0.07),
+          inset 0 1px 0 rgba(255,255,255,0.75);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        text-align: center;
+      }
+      .person-sheet-metric-icon {
+        font-size: 18px;
+        line-height: 1;
+      }
+      .person-sheet-metric-label {
+        font-size: 9px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #927e6e;
+        white-space: nowrap;
+      }
+      .person-sheet-metric-value {
+        font-size: 12px;
+        line-height: 1.1;
+        font-weight: 800;
+        color: #2f241c;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+      }
+      .sheet-section {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+      .sheet-section.flat {
+        gap: 8px;
+      }
+      .sheet-section-title {
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #9b8474;
+      }
+      .person-sheet-divider {
+        height: 1px;
+        background: rgba(187, 164, 143, 0.28);
+      }
+      .person-stat-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .person-stat-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .person-stat-label-wrap {
+        width: 92px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+      .person-stat-icon {
+        width: 18px;
+        height: 18px;
+        line-height: 1;
+        flex-shrink: 0;
+      }
+      .person-home-stat-icon {
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+      }
+      .person-inline-svg-icon {
+        width: 18px;
+        height: 18px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        color: #8f7362;
+      }
+      .person-stat-value {
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 700;
+        color: #8a7360;
+        width: 42px;
+        text-align: right;
+        flex-shrink: 0;
+      }
+      .person-stat-track {
+        flex: 1;
+        height: 8px;
+        background: rgba(224, 209, 192, 0.42);
+        border-radius: 999px;
+        overflow: hidden;
+      }
+      .person-stat-fill {
+        height: 100%;
+        border-radius: 999px;
+      }
+      .person-sheet-traits {
+        gap: 8px;
+      }
+      .person-reputation-inline {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .person-reputation-label {
+        font-size: 13px;
+        font-weight: 700;
+        color: #3f3025;
+        width: 78px;
+        flex-shrink: 0;
+      }
+      .person-reputation-score {
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+        width: 58px;
+        text-align: right;
+      }
+      .person-reputation-track {
+        flex: 1;
+        height: 10px;
+        background: rgba(222, 208, 191, 0.45);
+        border-radius: 999px;
+        overflow: hidden;
+      }
+      .person-reputation-fill {
+        height: 100%;
+        border-radius: 999px;
       }
 
       @keyframes fadeIn {
@@ -1821,7 +2671,7 @@ color: #64758b;
     <div id="person-overlay" class="overlay">
       <div class="overlay-backdrop" onclick="closePerson()"></div>
       <div class="sheet" id="person-sheet">
-        <div class="sheet-handle"></div>
+        <div class="sheet-handle" id="person-sheet-handle"></div>
         <div id="person-inner"></div>
       </div>
     </div>
@@ -1871,10 +2721,16 @@ color: #64758b;
         ></div>
       </div>
     </div>
+    <div id="job-overlay" class="overlay">
+      <div class="overlay-backdrop" onclick="closeJobFlow()"></div>
+      <div class="sheet" id="job-sheet">
+        <div class="sheet-handle"></div>
+        <div id="job-inner" style="display:flex;flex-direction:column;gap:16px"></div>
+      </div>
+    </div>
     <div id="toast"></div>
 
-    <script src="data/names/uk.js"></script>
-    <script src="data/places/uk.js"></script>
+    <script src="data/uk.js"></script>
     <script src="data/starsigns.js"></script>
     <script src="js/appearance.js"></script>
     <script src="js/engine.js"></script>

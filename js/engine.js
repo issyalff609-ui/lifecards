@@ -23,39 +23,6 @@ const SOCIAL_CLASSES = [
   { id:'elite',        label:'Elite',              startBalance:50000, parentIncome:250000, weight:5  },
 ];
 
-// ── SCHOOL TYPES ──────────────────────────────────────────
-const SCHOOL_TYPES = {
-  lower:        { primary:'State Primary',     secondary:'State Secondary', college:'State Sixth Form'   },
-  working:      { primary:'State Primary',     secondary:'State Secondary', college:'State Sixth Form'   },
-  middle:       { primary:'State Primary',     secondary:'Grammar School',  college:'Grammar Sixth Form' },
-  upper_middle: { primary:'Prep School',       secondary:'Private School',  college:'Private Sixth Form' },
-  elite:        { primary:'Elite Prep School', secondary:'Boarding School', college:'Elite Sixth Form'   },
-};
-
-const SCHOOL_NAMES = {
-  state_primary:   ['Meadowbrook Primary','St. Anne\'s C of E Primary','Riverside Primary','Oakfield Primary','Greenway Primary','St. Joseph\'s Catholic Primary','Hillside Primary','Elm Tree Primary'],
-  state_secondary: ['Northgate Academy','Riverside Community School','Hillcrest Secondary','St. George\'s Academy','Parkview School','Ashford Academy','Westfield School','Brookside Community College'],
-  grammar:         ['King Edward\'s Grammar School','The Grammar School at Leeds','Highgate Grammar','Westbourne Grammar','St. Catherine\'s Grammar','Thornton Grammar School'],
-  prep:            ['Kingsmead Prep','Ashdown House','St. Michael\'s Prep','Hillgrove Preparatory School','Fairfield Prep','Elmswood Prep'],
-  private:         ['Harlington College','St. Bartholomew\'s School','Westbrook Academy','Elmhurst School','Cavendish College','Ashbury Independent School'],
-  boarding:        ['Kingsford College','Ashfield House','Marlowe College','St. Edward\'s School','Thornton Hall','Eastbourne College'],
-  sixth_form:      ['Northgate Sixth Form','City College','Westfield Sixth Form Centre','Ashford College','Riverside Sixth Form'],
-  elite_prep:      ['Whitmore House','St. Crispin\'s Prep','Belmont Hill Prep','Kensington Prep'],
-  elite_sixth:     ['Westminster Sixth Form','Harlington Upper School','St. Paul\'s Sixth Form'],
-};
-
-function pickSchoolName(socialClass, level) {
-  const map = {
-    lower:        { primary:'state_primary', secondary:'state_secondary', college:'sixth_form' },
-    working:      { primary:'state_primary', secondary:'state_secondary', college:'sixth_form' },
-    middle:       { primary:'state_primary', secondary:'grammar',         college:'sixth_form' },
-    upper_middle: { primary:'prep',          secondary:'private',         college:'sixth_form' },
-    elite:        { primary:'elite_prep',    secondary:'boarding',        college:'elite_sixth' },
-  };
-  const pool = SCHOOL_NAMES[(map[socialClass]||map['working'])[level]];
-  return pickRandom(pool || ['School']);
-}
-
 // ── PARENT JOBS ───────────────────────────────────────────
 const PARENT_JOBS = {
   lower:        ['Assistant','Cleaner','Waiter','Babysitter'],
@@ -117,7 +84,6 @@ const MILESTONES = [
   { age:10, title:"Double digits.",                 body:"You've reached double digits! Things are starting to feel significant.", emoji:'🎂' },
   { age:13, title:"Secondary school.",              body:"New school, new people, new versions of yourself. Who you are here is yours to decide.", emoji:'🏫', unlocks:['secondary'] },
   { age:16, title:"GCSEs done.",                    body:"Whatever the results, that chapter is closed. Now you decide what comes next.", emoji:'📋', unlocks:['college_choice'] },
-  { age:18, title:"You're an adult.",               body:"Legally, at least. The world expects things of you now.", emoji:'🎓', unlocks:['full_finances','move_out'] },
   { age:21, title:"Your early twenties.",           body:"Have you figured out who you are? It feels like everyone else has. Keep going.", emoji:'🥂' },
   { age:30, title:"Thirty, Flirty, and Thriving.",  body:"The decade that changes everything. You can feel it already.", emoji:'3️⃣0️⃣' },
   { age:40, title:"Forty.",                         body:"You know yourself better now. Do you like who you've become?", emoji:'4️⃣0️⃣', unlocks:['aging_drift'] },
@@ -159,7 +125,7 @@ function createNewLife(opts) {
   const {gender,firstName,surname,birthday,city,socialClass,traits,situation,mumName,dadName,siblings} = opts;
   const sc         = SOCIAL_CLASSES.find(c => c.id === socialClass);
   const starSign   = getStarSign(birthday.day, birthday.month);
-  const schoolType = SCHOOL_TYPES[socialClass] || SCHOOL_TYPES['working'];
+  const schoolType = SCHOOL_TYPES_UK[socialClass] || SCHOOL_TYPES_UK['working'];
 
   const mumJob    = opts.mumJob || pickRandom(PARENT_JOBS[socialClass]);
   const dadJob    = opts.dadJob || pickRandom(PARENT_JOBS[socialClass]);
@@ -229,21 +195,23 @@ function createNewLife(opts) {
     },
 
     school: {
-      current:            pickSchoolName(socialClass, 'primary'),
+      current:            pickUKSchoolName(socialClass, 'primary'),
       type:               schoolType,
       level:              'pre',
       gradeScore:         traits.includes('intelligent') ? Math.floor(Math.random()*15)+75 : Math.floor(Math.random()*20)+45,
       classmates:         [],
+      vipIds:             [],
       rosterSnapshot:     [],
       teachers:           [],
       scholarshipOffered: false,
       scholarshipSchool:  null,
+      postSchool:         { schoolFinishedShown:false, uniApplication:null },
     },
 
     career: { job:'None', salary:0, level:0 },
     sexuality: opts.sexuality || 'heterosexual',
     sexualityConfirmed: false,
-    social: { bullyCount:0, isBully:false },
+    social: { bullyCount:0, isBully:false, friends:[] },
 
     usedEvents:       [],
     shownMilestones:  [],
@@ -405,6 +373,29 @@ function buildTeacherNpcStats(teacher) {
     warmth: clamp(warmth),
     strictness: clamp(strictness),
   };
+}
+
+function ensurePersistentFriendState() {
+  if (!STATE.social) STATE.social = { bullyCount:0, isBully:false, friends:[] };
+  if (!Array.isArray(STATE.social.friends)) STATE.social.friends = [];
+}
+
+function upsertPersistentFriend(friend) {
+  if (!friend) return;
+  ensurePersistentFriendState();
+  const snapshot = {
+    ...friend,
+    status: 'friend',
+    relationship: friend.relationship ?? 60,
+  };
+  const index = STATE.social.friends.findIndex(existing => existing.id === snapshot.id);
+  if (index >= 0) STATE.social.friends[index] = { ...STATE.social.friends[index], ...snapshot };
+  else STATE.social.friends.push(snapshot);
+}
+
+function getPersistentFriendById(personId) {
+  ensurePersistentFriendState();
+  return STATE.social.friends.find(friend => friend.id === personId) || null;
 }
 
 function playerLikesGender(gender) {
@@ -768,7 +759,9 @@ function triggerAction(actionId, personId, role) {
     ? getParentById(personId)
     : (role === 'Brother' || role === 'Sister')
       ? getSiblingById(personId)
-      : (role === 'Friend' || role === 'classmate')
+      : (role === 'Friend')
+        ? STATE.school.classmates.find(c => c.id === personId) || getPersistentFriendById(personId)
+      : (role === 'classmate')
         ? STATE.school.classmates.find(c => c.id === personId) || null
         : null;
   const action = getAvailableActions(role, STATE.age, person).find(a => a.id === actionId);
@@ -907,14 +900,63 @@ function transitionSchool(newLevel) {
   const newCount = Math.max(0, 9 - kept.length);
   STATE.school.classmates     = [...kept, ...generateClassmates(newCount)];
   STATE.school.level          = newLevel;
-  STATE.school.current        = pickSchoolName(STATE.socialClass, newLevel === 'college' ? 'college' : 'secondary');
+  STATE.school.current        = pickUKSchoolName(STATE.socialClass, newLevel === 'college' ? 'college' : 'secondary');
   STATE.school.rosterSnapshot = buildRosterSnapshot();
   STATE.school.teachers       = generateTeachers();
 }
 
+function finishSchool() {
+  ensurePersistentFriendState();
+  STATE.school.classmates
+    .filter(classmate => classmate.status === 'friend')
+    .forEach(upsertPersistentFriend);
+  STATE.school.level = 'finished_school';
+  STATE.school.current = 'School finished';
+  STATE.school.classmates = [];
+  STATE.school.vipIds = [];
+  STATE.school.rosterSnapshot = [];
+  STATE.school.teachers = [];
+  STATE.school.postSchool = STATE.school.postSchool || { schoolFinishedShown:false, uniApplication:null };
+  STATE.finances.income = 0;
+  STATE.career = { job:'None', salary:0, level:0 };
+}
+
+function getUniversityCourseYears(course) {
+  return {
+    Law: 3,
+    Medicine: 5,
+    Business: 3,
+    'Computer Science': 3,
+    Art: 3,
+    Education: 3,
+    Engineering: 4,
+    History: 3,
+    Music: 3,
+  }[course] || 3;
+}
+
+function maybeGraduateUniversity() {
+  if (STATE.school.level !== 'uni') return false;
+  const application = STATE.school.postSchool?.uniApplication;
+  if (!application?.startedAge || !application?.course) return false;
+  const graduationAge = application.startedAge + getUniversityCourseYears(application.course);
+  if (STATE.age < graduationAge) return false;
+  application.status = 'graduated';
+  application.graduatedAge = STATE.age;
+  application.degreeAwarded = application.course;
+  STATE.school.level = 'graduated';
+  STATE.school.current = `${application.course} graduate`;
+  STATE.school.classmates = [];
+  STATE.school.vipIds = [];
+  STATE.school.rosterSnapshot = [];
+  STATE.school.teachers = [];
+  logActivity(`Graduated with a degree in ${application.course}.`, null);
+  return true;
+}
+
 function startPrimarySchool() {
   STATE.school.level          = 'primary';
-  STATE.school.current        = pickSchoolName(STATE.socialClass, 'primary');
+  STATE.school.current        = pickUKSchoolName(STATE.socialClass, 'primary');
   STATE.school.classmates     = generateClassmates(9);
   STATE.school.rosterSnapshot = buildRosterSnapshot();
   STATE.school.teachers       = generateTeachers();
@@ -982,38 +1024,34 @@ function friendshipThreshold(classmate) {
 }
 
 function tryMakeFriend(classmate) {
-  const threshold = friendshipThreshold(classmate);
-  if (classmate.relationship < threshold) {
-    applyEffects({ rep:-1 });
-    logActivity(`Tried to befriend ${classmate.firstName}, but it was too soon.`, -1);
-    return { ok:true, success:false, toast:`Not close enough yet. (${classmate.relationship}/${threshold})` };
-  }
-
-  let base          = 50;
-  const relBonus    = Math.floor((classmate.relationship - threshold) / 2);
-  const compatBonus = Math.floor(classmate.compatibility / 5);
-  const repBonus    = Math.floor((STATE.stats.rep || 0) / 8);
-  let chance        = base + relBonus + compatBonus + repBonus;
+  const threshold   = friendshipThreshold(classmate);
+  const relDelta    = classmate.relationship - threshold;
+  let chance        = 80;
+  const relBonus    = Math.floor(relDelta / 8);
+  const compatBonus = Math.floor((classmate.compatibility - 50) / 10);
+  const repBonus    = Math.floor((STATE.stats.rep || 0) / 20);
+  chance += relBonus + compatBonus + repBonus;
 
   if (STATE.age < 11) chance += 12;
   if (STATE.age > 13) {
     const popularityDiff = (STATE.stats.popularity || 0) - (classmate.npcStats?.popularity || 50);
-    chance += Math.floor(popularityDiff / 6);
+    chance += Math.floor(popularityDiff / 12);
   }
-  if (STATE.social?.isBully) chance -= 18;
-  if (STATE.traits.includes('charismatic')) chance += 8;
-  if (STATE.traits.includes('empathetic')) chance += 5;
-  if (STATE.traits.includes('anxious')) chance -= 8;
+  if (STATE.social?.isBully) chance -= 12;
+  if (STATE.traits.includes('charismatic')) chance += 5;
+  if (STATE.traits.includes('empathetic')) chance += 4;
+  if (STATE.traits.includes('anxious')) chance -= 6;
 
   classmate.traits.forEach(t => {
     const tr = CLASSMATE_TRAITS_POOL.find(x=>x.id===t);
-    if (tr && !tr.positive) chance -= 10;
-    if (tr && tr.positive) chance += 5;
+    if (tr && !tr.positive) chance -= 4;
+    if (tr && tr.positive) chance += 2;
   });
-  chance = clamp(chance, 10, 95);
+  chance = clamp(chance, 45, 95);
 
   if (Math.random()*100 < chance) {
     classmate.status = 'friend';
+    upsertPersistentFriend(classmate);
     STATE.relationships.friends = clamp(STATE.relationships.friends + 10);
     logActivity(`Became friends with ${classmate.firstName}`, 10);
     return { ok:true, success:true, toast:`${classmate.firstName} said yes ✓` };
@@ -1030,6 +1068,7 @@ function maybeReceiveClassmateFriendRequest() {
   if (Math.random() > 0.25) return;
   const classmate = pickRandom(candidates);
   classmate.status = 'friend';
+  upsertPersistentFriend(classmate);
   STATE.relationships.friends = clamp(STATE.relationships.friends + 10);
   logActivity(`${classmate.firstName} asked to be your friend. You said yes.`, 10);
 }
@@ -1044,6 +1083,33 @@ function annualTick() {
   if (STATE.age === 5  && STATE.school.level==='pre')       startPrimarySchool();
   if (STATE.age === 12 && STATE.school.level==='primary')   transitionSchool('secondary');
   if (STATE.age === 17 && STATE.school.level==='secondary') transitionSchool('college');
+  if (STATE.age === 18 && STATE.school.level==='college')   finishSchool();
+  if (STATE.age >= 18 && !STATE.school.postSchool) STATE.school.postSchool = { schoolFinishedShown:false, uniApplication:null };
+  maybeGraduateUniversity();
+
+  if (STATE.career?.job && STATE.career.job !== 'None' && STATE.career.work) {
+    const work = STATE.career.work;
+    work.performance = clamp(work.performance + Math.floor(Math.random() * 5) - 2);
+    work.stress = clamp(work.stress + Math.floor(Math.random() * 7) - 3);
+    work.reputation = clamp(work.reputation + Math.floor(Math.random() * 5) - 2);
+    work.satisfaction = clamp(work.satisfaction + Math.floor(Math.random() * 7) - 3);
+    work.energy = clamp((work.energy || 60) - 8 + Math.floor(Math.random() * 7));
+
+    if (work.stress >= 82) {
+      STATE.stats.health = clamp(STATE.stats.health - 2);
+      STATE.stats.happy = clamp(STATE.stats.happy - 3);
+    }
+    if (work.satisfaction <= 28) {
+      STATE.stats.happy = clamp(STATE.stats.happy - 2);
+    }
+    if (work.performance >= 78) {
+      STATE.stats.rep = clampRep((STATE.stats.rep || 0) + 2);
+    }
+    if (work.energy <= 20) {
+      STATE.stats.health = clamp(STATE.stats.health - 1);
+      STATE.stats.happy = clamp(STATE.stats.happy - 2);
+    }
+  }
 
   STATE.annualGradeGain  = 0;
   STATE.annualStudyCount = 0;

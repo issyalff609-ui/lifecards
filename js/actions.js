@@ -356,20 +356,10 @@ const PET_ACTIONS = [
 const EDUCATION_ACTIONS = [
   { id:'extra_study',  isStudy:true, icon:'📚', name:'Study harder',          desc:'Push your grades up.',      cost:0,    effects:{ smarts:+3, gradeScore:+5 }, cooldown:0, minAge:5,  maxAge:18 },
   { id:'school_club',               icon:'🎭', name:'Join a school club',     desc:'Extracurriculars look good.',cost:0,    effects:{ rep:+3, rel_friends:+5 },   cooldown:1, minAge:8,  maxAge:18 },
-  { id:'tutoring_edu', isStudy:true, icon:'👩‍🏫', name:'Get a tutor',           desc:'Targeted help.',            cost:-200, effects:{ smarts:+8, gradeScore:+8 }, cooldown:1, minAge:8,  maxAge:21 },
-  { id:'pt_job_sch',                icon:'☕', name:'Part-time job',           desc:'Your own money.',            cost:0,    effects:{ income:+4000, happy:+3 },   cooldown:0, minAge:16, maxAge:18 },
-  { id:'dropout',                   icon:'🚪', name:'Drop out — work full-time',desc:'Not for everyone. But valid.',cost:0,  effects:{ income:+16000, smarts:-5 }, cooldown:0, minAge:16, maxAge:17 },
-  { id:'apply_uni',                 icon:'🎓', name:'Apply to university',     desc:'The next step.',             cost:0,    effects:{ smarts:+3 },               cooldown:0, minAge:17, maxAge:19 },
+  { id:'tutoring_edu', isStudy:true, icon:'👩‍🏫', name:'Get a tutor',           desc:'Targeted help.',            cost:-200, effects:{ smarts:+8, gradeScore:+8 }, cooldown:1, minAge:8,  maxAge:18 },
 ];
 
-const CAREER_ACTIONS = [
-  { id:'apply_jobs',    icon:'📄', name:'Apply for jobs',             desc:'Put yourself out there.',                        cost:0,     effects:{ rep:+2 },                  cooldown:1, minAge:16 },
-  { id:'upskill',       icon:'💻', name:'Learn a new skill',          desc:'Stay competitive.',                              cost:-100,  effects:{ smarts:+5, rep:+3 },        cooldown:1, minAge:18 },
-  { id:'side_hustle',   icon:'💡', name:'Start a side hustle',        desc:'Build something on the side.',                   cost:-200,  effects:{ income:+3000, smarts:+3 },  cooldown:1, minAge:18 },
-  { id:'negotiate_pay', icon:'💬', name:'Negotiate a pay rise',       desc:'The worst they can say is no.',                  cost:0,     effects:{ income:+3000, rep:+3 },     cooldown:2, minAge:20 },
-  { id:'networking',    icon:'🤝', name:'Go networking',              desc:'It\'s about who you know.',                      cost:-30,   effects:{ rep:+5, rel_friends:+3 },   cooldown:1, minAge:18 },
-  { id:'start_biz',     icon:'🏢', name:'Start a business',           desc:'High risk, high reward.',                        cost:-5000, effects:{ income:+8000, rep:+10 },   cooldown:0, minAge:21 },
-];
+const CAREER_ACTIONS = [];
 
 function isActionAvailable(action) {
   if (action.minAge && STATE.age < action.minAge) return { ok:false, reason:`Available at ${action.minAge}` };
