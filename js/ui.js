@@ -691,11 +691,12 @@ function closeEventOverlay() {
 // ── FAMILY TAB ────────────────────────────────────────────
 function renderFamilyTab() {
   const currentSubTab = window._familySubTab || 'family';
-  document.getElementById('family-tab-bar').innerHTML = ['Family','Partner','Friends','Quick Contact']
+  document.getElementById('family-tab-bar').innerHTML = ['Children','Family','Partner','Friends','Quick Contact']
     .map((label, i) => {
-      const key = ['family','partner','friends','quick'][i];
+      const key = ['children','family','partner','friends','quick'][i];
       return `<button class="family-subtab ${currentSubTab === key ? 'active' : ''}" onclick="switchFamilyTab('${key}')">${label}</button>`;
     }).join('');
+  if (currentSubTab === 'children') renderFamilyChildren();
   if (currentSubTab === 'family')  renderFamilyPeople();
   if (currentSubTab === 'partner') renderFamilyPartner();
   if (currentSubTab === 'friends') renderFamilyFriends();
@@ -707,6 +708,7 @@ function switchFamilyTab(key) {
 }
 function ensureRelationshipOrderState() {
   if (!STATE.relationshipOrder) STATE.relationshipOrder = {};
+  if (!Array.isArray(STATE.relationshipOrder.children)) STATE.relationshipOrder.children = [];
   if (!Array.isArray(STATE.relationshipOrder.family)) STATE.relationshipOrder.family = [];
   if (!Array.isArray(STATE.relationshipOrder.friends)) STATE.relationshipOrder.friends = [];
 }
@@ -721,6 +723,14 @@ function getFamilyPeopleEntries() {
   STATE.family.pets.filter(p => !p.dead).forEach(p =>
     people.push({ person:{...p, firstName:p.name, traits:[]}, role:'Pet', rel:p.happiness, traitPool:[] }));
   return people;
+}
+function getChildrenEntries() {
+  return (STATE.romance?.children || []).map(child => ({
+    person:child,
+    role:child.gender === 'male' ? 'Son' : 'Daughter',
+    rel:child.relationship || 70,
+    traitPool:CLASSMATE_TRAITS_POOL,
+  }));
 }
 function getFriendEntries() {
   ensurePersistentFriendState();
@@ -782,11 +792,201 @@ function renderRelationshipList(listKey, heading, entries) {
 function renderFamilyPeople() {
   renderRelationshipList('family', 'Immediate Family', getFamilyPeopleEntries());
 }
+function renderFamilyChildren() {
+  const children = getChildrenEntries();
+  if (!children.length) {
+    document.getElementById('family-tab-content').innerHTML = buildEmptyState('🧸', 'No children yet.', 'Children will appear here later.');
+    return;
+  }
+  renderRelationshipList('children', 'Children', children);
+}
+
+function openDatingInPlay(view = 'hub') {
+  window._playSubTab = 'dating';
+  window._datingView = view;
+  renderActivitiesTab();
+}
+
+function askOutKnownPersonUi(personId) {
+  const result = attemptDatePerson(personId);
+  if (result?.message) showToast(result.message);
+  if (result?.ok !== false) {
+    saveGame();
+    updateAllUI();
+    renderFamilyTab();
+    renderActivitiesTab();
+  }
+}
+
+function runRomanceUiAction(action, arg = null) {
+  let result = null;
+  if (action === 'spend_time') {
+    const partner = getCurrentPartner();
+    if (!partner) return;
+    partner.relationship = clamp((partner.relationship || 60) + 5);
+    partner.friendshipCloseness = partner.relationship;
+    partner.happiness = clamp((partner.happiness || 50) + 4);
+    markNpcInteraction(partner, `Spent time together with ${partner.firstName}.`);
+    logActivity(`Spent quality time with ${partner.firstName}.`, 6);
+    syncRomanceLegacyFields();
+    result = { ok:true, message:`You spent time with ${partner.firstName}.` };
+  } else if (action === 'date') {
+    const partner = getCurrentPartner();
+    if (!partner) return;
+    const delta = Math.random() < ((partner.compatibility || 50) / 100) ? 8 : 3;
+    partner.relationship = clamp((partner.relationship || 60) + delta);
+    partner.friendshipCloseness = partner.relationship;
+    applyEffects({ happy:+6 });
+    markNpcInteraction(partner, `Went on a date with ${partner.firstName}.`);
+    logActivity(`Went on a date with ${partner.firstName}.`, delta);
+    syncRomanceLegacyFields();
+    result = { ok:true, message:`You went on a date with ${partner.firstName}.` };
+  } else if (action === 'serious_talk') {
+    const partner = getCurrentPartner();
+    if (!partner) return;
+    const success = Math.random() < 0.68;
+    const delta = success ? 5 : -4;
+    partner.relationship = clamp((partner.relationship || 60) + delta);
+    partner.friendshipCloseness = partner.relationship;
+    applyEffects({ happy: success ? 3 : -3 });
+    logActivity(`${success ? 'Had a good serious conversation with' : 'A serious conversation with'} ${partner.firstName}${success ? '.' : ' went badly.'}`, delta);
+    syncRomanceLegacyFields();
+    result = { ok:true, message: success ? 'That brought you closer.' : 'That was difficult.' };
+  } else if (action === 'gift') {
+    const partner = getCurrentPartner();
+    if (!partner) return;
+    if (STATE.finances.balance < 40) result = { ok:false, message:'You cannot afford a gift right now.' };
+    else {
+      STATE.finances.balance -= 40;
+      partner.relationship = clamp((partner.relationship || 60) + 6);
+      partner.friendshipCloseness = partner.relationship;
+      applyEffects({ happy:+3 });
+      logActivity(`Gave ${partner.firstName} a gift.`, 6);
+      syncRomanceLegacyFields();
+      result = { ok:true, message:`You gave ${partner.firstName} a gift.` };
+    }
+  } else if (action === 'move_in') {
+    result = moveInWithPartner();
+  } else if (action === 'propose') {
+    result = proposeToPartner();
+  } else if (action === 'marry') {
+    result = marryPartner(arg || 'registry');
+  } else if (action === 'baby') {
+    result = tryForBaby();
+  } else if (action === 'breakup') {
+    result = breakupWithPartner();
+  } else if (action === 'divorce') {
+    if (!confirm('Are you sure you want to divorce?')) return;
+    result = divorcePartner();
+  }
+  if (result?.message) showToast(result.message);
+  if (result?.ok !== false) {
+    saveGame();
+    updateAllUI();
+    renderFamilyTab();
+    renderActivitiesTab();
+  }
+}
+
+function buildPartnerTraits(partner) {
+  return (partner.traits || []).slice(0, 3).map(tid => {
+    const t = CLASSMATE_TRAITS_POOL.find(x => x.id === tid);
+    if (!t) return '';
+    const cls = t.positive === false ? 'negative' : t.positive === true ? 'positive' : '';
+    return `<span class="trait-pill ${cls}">${t.label}</span>`;
+  }).join('');
+}
+
+function buildPartnerActionButton(label, action, arg = null) {
+  const argText = arg !== null ? `,'${arg}'` : '';
+  return `<button onclick="runRomanceUiAction('${action}'${argText})" style="width:100%;padding:12px 14px;background:var(--surface-mid);border:1px solid var(--border);border-radius:12px;font-size:13px;font-weight:700;color:var(--text);text-align:left;cursor:pointer">${label}</button>`;
+}
+
+function buildPartnerStatusPanel(partner) {
+  const romance = STATE.romance || {};
+  const loyaltyBar = clamp(Math.round(((partner.loyalty || 50) * 0.65) + ((partner.kindness || 50) * 0.35)));
+  const actions = [
+    buildPartnerActionButton('Spend Time Together', 'spend_time'),
+    buildPartnerActionButton('Go On Date', 'date'),
+    buildPartnerActionButton('Have Serious Conversation', 'serious_talk'),
+    buildPartnerActionButton('Give Gift', 'gift'),
+  ];
+  if (!partner.livingTogether && (partner.relationship || 0) >= 60) actions.push(buildPartnerActionButton('Move In Together', 'move_in'));
+  if (romance.status === 'dating' && STATE.age >= 18 && (partner.relationship || 0) >= 75 && (romance.relationshipYears || 0) >= 1) actions.push(buildPartnerActionButton('Propose', 'propose'));
+  if (romance.status === 'engaged' && STATE.age >= 18) {
+    actions.push(buildPartnerActionButton('Get Married • Registry Office', 'marry', 'registry'));
+    actions.push(buildPartnerActionButton('Get Married • Small Wedding', 'marry', 'small'));
+    actions.push(buildPartnerActionButton('Get Married • Big Wedding', 'marry', 'big'));
+  }
+  if (STATE.age >= 18 && ['dating', 'engaged', 'married'].includes(romance.status)) actions.push(buildPartnerActionButton('Try For Baby', 'baby'));
+  if (['dating', 'engaged'].includes(romance.status)) actions.push(buildPartnerActionButton('Break Up', 'breakup'));
+  if (romance.status === 'married') actions.push(buildPartnerActionButton('Divorce', 'divorce'));
+
+  return `
+    <div class="person-card" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:14px">
+        ${buildPersonCardAvatar({ ...partner, _roleCard:'Partner' })}
+        <div style="flex:1;min-width:0">
+          <div style="font-size:22px;font-weight:800;letter-spacing:-.03em;color:var(--text)">${partner.firstName} ${partner.surname || ''}</div>
+          <div style="font-size:13px;color:var(--text-muted);margin-top:2px">Age ${partner.age} • ${partner.job || 'Student'}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:3px">${romanceStatusLabel(STATE.romance.status)} • ${partner.compatibility}% compatible</div>
+          ${buildPartnerTraits(partner) ? `<div class="trait-pills" style="margin-top:8px">${buildPartnerTraits(partner)}</div>` : ''}
+        </div>
+        <button onclick="openPersonSheet('${partner.id}','Partner')" style="width:38px;height:38px;border-radius:99px;background:#fff8ea;border:1px solid #e7d7bf;box-shadow:0 3px 10px rgba(26,24,20,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">${buildDotsIcon()}</button>
+      </div>
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:12px;font-weight:700;color:var(--text-muted)">Relationship</span><span style="font-family:var(--mono);font-size:12px;font-weight:700;color:#d46f8f">${partner.relationship}%</span></div>
+        <div style="height:8px;background:#e8e2d8;border-radius:99px;overflow:hidden"><div style="width:${partner.relationship}%;height:100%;background:#e86e95;border-radius:99px"></div></div>
+      </div>
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:12px;font-weight:700;color:var(--text-muted)">Loyalty & Stability</span><span style="font-family:var(--mono);font-size:12px;font-weight:700;color:#74b551">${loyaltyBar}%</span></div>
+        <div style="height:8px;background:#e8e2d8;border-radius:99px;overflow:hidden"><div style="width:${loyaltyBar}%;height:100%;background:#74b551;border-radius:99px"></div></div>
+      </div>
+      ${STATE.romance.pregnancy ? `<div style="font-size:12px;color:var(--text-muted);line-height:1.5">Pregnancy: ongoing • due around age ${STATE.romance.pregnancy.dueAge}</div>` : ''}
+      <div style="display:flex;flex-direction:column;gap:8px">${actions.join('')}</div>
+    </div>`;
+}
+
+function buildExesPanel() {
+  const exes = (STATE.romance?.exes || []);
+  if (!exes.length) return '';
+  return `
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint)">Exes</div>
+      ${exes.map(ex => `
+        <div class="person-card" style="display:flex;align-items:center;gap:14px">
+          ${buildPersonCardAvatar({ ...ex, _roleCard:'Partner' })}
+          <div style="flex:1;min-width:0">
+            <div style="font-size:17px;font-weight:800;color:var(--text)">${ex.firstName} ${ex.surname || ''}</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${ex.age ? `Age ${ex.age} • ` : ''}${ex.relationshipStatus || ex.maritalStatus || 'Ex'}</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${compatibilityFor(ex)}% compatible</div>
+          </div>
+          <button onclick="openPersonSheet('${ex.id}','Partner')" style="width:38px;height:38px;border-radius:99px;background:#fff8ea;border:1px solid #e7d7bf;box-shadow:0 3px 10px rgba(26,24,20,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">${buildDotsIcon()}</button>
+        </div>
+      `).join('')}
+    </div>`;
+}
+
 function renderFamilyPartner() {
-  const r = STATE.relationships;
-  document.getElementById('family-tab-content').innerHTML = r.partner > 0 && STATE._partnerName
-    ? `<div style="display:flex;flex-direction:column;gap:8px">${buildPersonCard({ firstName:STATE._partnerName, emoji:'💑', id:'__partner__', traits:[] }, 'Partner', r.partner, [])}</div>`
-    : buildEmptyState('💑', 'No partner yet.', 'Download a dating app. You never know.');
+  ensureRomanceState();
+  const partner = getCurrentPartner();
+  if (!partner) {
+    const canDate = STATE.age >= 16;
+    document.getElementById('family-tab-content').innerHTML = canDate
+      ? `
+        <div style="display:flex;flex-direction:column;gap:12px">
+          ${buildEmptyState('💑', 'No partner right now.', 'A relationship can start when you are ready.')}
+          <div class="person-card" style="display:flex;flex-direction:column;gap:12px">
+            <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint)">Partner</div>
+            <div onclick="openDatingInPlay('app')" style="font-size:16px;font-weight:800;color:var(--text);cursor:pointer">Download Dating App</div>
+            <div onclick="openDatingInPlay('known')" style="font-size:16px;font-weight:800;color:var(--text);cursor:pointer">Ask Out Someone You Know</div>
+          </div>
+          ${buildExesPanel()}
+        </div>`
+      : `${buildEmptyState('💑', 'No partner yet.', 'Dating opens later.')}${buildExesPanel()}`;
+    return;
+  }
+  document.getElementById('family-tab-content').innerHTML = `<div style="display:flex;flex-direction:column;gap:10px">${buildPartnerStatusPanel(partner)}${buildExesPanel()}</div>`;
 }
 function renderFamilyFriends() {
   const friends = getFriendEntries();
@@ -1034,6 +1234,7 @@ function buildEmptyState(emoji, title, subtitle) {
 // ── PLAY / HOME TAB ──────────────────────────────────────
 function switchPlayTab(key) {
   window._playSubTab = key;
+  if (key !== 'dating') window._datingView = null;
   renderActivitiesTab();
 }
 
@@ -1060,6 +1261,7 @@ function runHomeAction(actionName, ...args) {
 function clearPlaySelection() {
   window._playSubTab = null;
   window._homeView = null;
+  window._datingView = null;
   renderActivitiesTab();
 }
 
@@ -1069,6 +1271,7 @@ function buildPlayHub() {
     { id:'shopping', label:'Shopping', icon:'🛍️', subtitle:'Clothes, treats, essentials' },
     { id:'lifestyle', label:'Lifestyle', icon:'🌿', subtitle:'Habits, hobbies, routines' },
     { id:'home', label:'Home', icon:'🏠', subtitle:'Where you live and who you live with' },
+    { id:'dating', label:'Dating', icon:'💘', subtitle:'Apps, dates, and relationships' },
     { id:'travel', label:'Travel', icon:'✈️', subtitle:'Trips, holidays, escapes' },
     { id:'social', label:'Social', icon:'🥂', subtitle:'Plans, nights out, connection' },
     { id:'beauty', label:'Beauty', icon:'✨', subtitle:'Hair, style, self-expression' },
@@ -1081,7 +1284,7 @@ function buildPlayHub() {
       <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#938678">Play</div>
       <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
         ${options.map(option => `
-          <button onclick="${option.id === 'home' ? `switchPlayTab('home')` : `showToast('${option.label} coming soon.')`}"
+          <button onclick="${option.id === 'home' ? `switchPlayTab('home')` : option.id === 'dating' ? `switchPlayTab('dating')` : `showToast('${option.label} coming soon.')`}"
             style="background:var(--surface);border:1px solid var(--border-light);border-radius:18px;padding:16px 14px;text-align:left;display:flex;flex-direction:column;gap:8px;cursor:pointer;box-shadow:0 8px 20px rgba(64,42,22,.05)">
             <div style="font-size:28px;line-height:1">${option.icon}</div>
             <div style="font-size:15px;font-weight:800;color:var(--text)">${option.label}</div>
@@ -1097,6 +1300,92 @@ function buildHomeMetricChip(label, value, accent = '#7b6b5f') {
     <div style="background:#fffaf1;border:1px solid rgba(224,210,193,.95);border-radius:14px;padding:10px 11px;display:flex;flex-direction:column;gap:3px;min-width:0">
       <div style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9d8f82">${label}</div>
       <div style="font-size:15px;font-weight:800;color:${accent};line-height:1.1">${value}</div>
+    </div>`;
+}
+
+function passDatingMatchUi(personId) {
+  passDatingMatch(personId);
+  saveGame();
+  updateAllUI();
+  renderActivitiesTab();
+}
+
+function buildDatingCandidateCard(person, includePass = true) {
+  const traits = (person.traits || []).slice(0, 2).map(tid => {
+    const t = CLASSMATE_TRAITS_POOL.find(x => x.id === tid);
+    if (!t) return '';
+    const cls = t.positive === false ? 'negative' : t.positive === true ? 'positive' : '';
+    return `<span class="trait-pill ${cls}">${t.label}</span>`;
+  }).join('');
+  return `
+    <div class="person-card" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:14px">
+        ${buildPersonCardAvatar({ ...person, _roleCard:'Partner' })}
+        <div style="flex:1;min-width:0">
+          <div style="font-size:18px;font-weight:800;color:var(--text)">${person.firstName} ${person.surname || ''}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Age ${person.age} • ${person.job || 'Student'}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${person.compatibility}% compatible</div>
+          ${traits ? `<div class="trait-pills" style="margin-top:8px">${traits}</div>` : ''}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:${includePass ? 'repeat(2,minmax(0,1fr))' : 'minmax(0,1fr)'};gap:8px">
+        <button onclick="askOutKnownPersonUi('${person.id}')" style="padding:12px 14px;border:1px solid #d9c5a2;border-radius:12px;background:#fff4dc;font-size:13px;font-weight:800;color:#6f5335;cursor:pointer">Date</button>
+        ${includePass ? `<button onclick="passDatingMatchUi('${person.id}')" style="padding:12px 14px;border:1px solid var(--border-light);border-radius:12px;background:var(--surface);font-size:13px;font-weight:800;color:var(--text);cursor:pointer">Pass</button>` : ''}
+      </div>
+    </div>`;
+}
+
+function buildDatingTab() {
+  ensureRomanceState();
+  const currentView = window._datingView || 'hub';
+  if (STATE.age < 16) {
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <button onclick="clearPlaySelection()" style="padding:0;background:none;border:none;font-size:13px;font-weight:700;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer"><span style="font-size:18px;line-height:1">‹</span><span>Play</span></button>
+        <div style="font-size:16px;font-weight:800;color:var(--text)">Dating</div>
+        <div style="width:36px"></div>
+      </div>
+      ${buildEmptyState('💘', 'Dating unlocks later.', 'You need to be older first.')}`;
+  }
+  if (getCurrentPartner()) {
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <button onclick="clearPlaySelection()" style="padding:0;background:none;border:none;font-size:13px;font-weight:700;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer"><span style="font-size:18px;line-height:1">‹</span><span>Play</span></button>
+        <div style="font-size:16px;font-weight:800;color:var(--text)">Dating</div>
+        <div style="width:36px"></div>
+      </div>
+      ${buildPartnerStatusPanel(getCurrentPartner())}`;
+  }
+  if (currentView === 'app') {
+    const matches = getDatingPool();
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <button onclick="openDatingInPlay('hub')" style="padding:0;background:none;border:none;font-size:13px;font-weight:700;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer"><span style="font-size:18px;line-height:1">‹</span><span>Dating</span></button>
+        <div style="font-size:16px;font-weight:800;color:var(--text)">Dating App</div>
+        <div style="width:36px"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">${matches.map(match => buildDatingCandidateCard(match, true)).join('')}</div>`;
+  }
+  if (currentView === 'known') {
+    const people = getEligibleKnownDatingPeople();
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <button onclick="openDatingInPlay('hub')" style="padding:0;background:none;border:none;font-size:13px;font-weight:700;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer"><span style="font-size:18px;line-height:1">‹</span><span>Dating</span></button>
+        <div style="font-size:16px;font-weight:800;color:var(--text)">Someone You Know</div>
+        <div style="width:36px"></div>
+      </div>
+      ${people.length ? `<div style="display:flex;flex-direction:column;gap:10px">${people.map(person => buildDatingCandidateCard(person, false)).join('')}</div>` : buildEmptyState('💬', 'Nobody obvious right now.', 'Build more connections first.')}`;
+  }
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <button onclick="clearPlaySelection()" style="padding:0;background:none;border:none;font-size:13px;font-weight:700;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer"><span style="font-size:18px;line-height:1">‹</span><span>Play</span></button>
+      <div style="font-size:16px;font-weight:800;color:var(--text)">Dating</div>
+      <div style="width:36px"></div>
+    </div>
+    <div class="person-card" style="display:flex;flex-direction:column;gap:12px">
+      <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint)">How do you want to meet someone?</div>
+      <button onclick="openDatingInPlay('app')" style="padding:14px;border:1px solid var(--border-light);border-radius:14px;background:var(--surface);font-size:15px;font-weight:800;color:var(--text);text-align:left;cursor:pointer">Download Dating App</button>
+      <button onclick="openDatingInPlay('known')" style="padding:14px;border:1px solid var(--border-light);border-radius:14px;background:var(--surface);font-size:15px;font-weight:800;color:var(--text);text-align:left;cursor:pointer">Ask Out Someone You Know</button>
     </div>`;
 }
 
@@ -1200,7 +1489,7 @@ function buildHomeHouseholdRoute() {
             ? 'Roommate'
             : 'Friend',
         rel: resident.relationship || 50,
-        traitPool: resident.refType === 'partner' ? HOUSEMATE_TRAITS_POOL : HOUSEMATE_TRAITS_POOL,
+        traitPool: resident.refType === 'partner' ? CLASSMATE_TRAITS_POOL : HOUSEMATE_TRAITS_POOL,
       }));
   return `
     <div>
@@ -1468,6 +1757,8 @@ function renderActivitiesTab() {
   let body = '';
   if (current === 'home') {
     body = buildHomeTab();
+  } else if (current === 'dating') {
+    body = buildDatingTab();
   } else {
     body = buildPlayHub();
   }
@@ -1523,6 +1814,8 @@ function buildHomeStatIcon(type) {
 }
 function relationshipBarColor(role) {
   if (role === 'Teacher') return '#ef9f47';
+  if (role === 'Son' || role === 'Daughter') return '#9f7de2';
+  if (role === 'Partner') return '#e86e95';
   if (role === 'Friend' || role === 'classmate') return '#ff6f91';
   return '#e85d8f';
 }
@@ -1557,11 +1850,22 @@ function openPersonSheet(personId, role) {
     person = { ...STATE.family.mum, _role:'Mother', _rel:STATE.family.mum.relationship ?? STATE.relationships.family };
   else if (personId === STATE.family.dad.id)
     person = { ...STATE.family.dad, _role:'Father', _rel:STATE.family.dad.relationship ?? STATE.relationships.family };
+  else if (role === 'Partner' && STATE.romance?.partner)
+    person = { ...STATE.romance.partner, _role:'Partner', _rel:STATE.romance.partner.relationship ?? STATE.relationships.partner };
   else {
     const sib = STATE.family.siblings.find(s => s.id === personId);
     if (sib) person = { ...sib, _role:role, _rel:sib.relationship||60 };
+    const child = (STATE.romance?.children || []).find(c => c.id === personId);
+    if (!person && child) person = { ...child, _role:child.gender === 'male' ? 'Son' : 'Daughter', _rel:child.relationship || 70 };
     const cm  = STATE.school.classmates.find(c => c.id === personId);
-    if (cm)  person = { ...cm,  _role:role, _rel:(typeof getStableFriendRelationship === 'function' ? getStableFriendRelationship(cm, 60) : (cm.relationship ?? 60)) };
+    if (cm) {
+      const resolvedRole = (role === 'Friend' || cm.status === 'friend') ? 'Friend' : role;
+      person = {
+        ...cm,
+        _role: resolvedRole,
+        _rel:(typeof getStableFriendRelationship === 'function' ? getStableFriendRelationship(cm, 60) : (cm.relationship ?? 60)),
+      };
+    }
     if (!person && role === 'Friend') {
       const savedFriend = getPersistentFriendById(personId);
       if (savedFriend) person = { ...savedFriend, _role:'Friend', _rel:(typeof getStableFriendRelationship === 'function' ? getStableFriendRelationship(savedFriend, 60) : (savedFriend.relationship ?? 60)) };
@@ -1578,15 +1882,16 @@ function openPersonSheet(personId, role) {
   if (!person) return;
   const sheet = document.getElementById('person-sheet');
   const backdrop = document.querySelector('#person-overlay .overlay-backdrop');
-  const traitsHTML = buildPersonSheetTraits(person, role);
+  const resolvedRole = person._role || role;
+  const traitsHTML = buildPersonSheetTraits(person, resolvedRole);
   const avatarHTML = buildPersonSheetAvatar(person);
-  const detailsHTML = buildPersonSheetDetails(person, role);
-  const statsHTML = buildPersonSheetStats(person, role);
-  const lifeDetailsHTML = buildPersonSheetLifeDetails(person, role);
+  const detailsHTML = buildPersonSheetDetails(person, resolvedRole);
+  const statsHTML = buildPersonSheetStats(person, resolvedRole);
+  const lifeDetailsHTML = buildPersonSheetLifeDetails(person, resolvedRole);
   const lifeUpdatesHTML = buildPersonSheetLifeUpdates(person);
-  const reputationHTML = buildPersonSheetReputation(person, role);
-  const relLabel = role === 'Teacher' ? 'Warmth' : 'Relationship';
-  const displayName = (role === 'Friend' || role === 'classmate') ? classmateDisplayName(person) : `${person.firstName}${person.surname ? ' '+person.surname : ''}`;
+  const reputationHTML = buildPersonSheetReputation(person, resolvedRole);
+  const relLabel = resolvedRole === 'Teacher' ? 'Warmth' : 'Relationship';
+  const displayName = (resolvedRole === 'Friend' || resolvedRole === 'classmate') ? classmateDisplayName(person) : `${person.firstName}${person.surname ? ' '+person.surname : ''}`;
   const relColor = relationshipBarColor(person._role);
   document.getElementById('person-inner').innerHTML = `
     <div class="person-sheet-shell">
@@ -1668,6 +1973,22 @@ function npcStatConfigFor(role, person) {
       ['Reputation', 'reputation', person.reputation ?? person.npcStats?.reputation, '#4ecb71'],
     ];
   }
+  if (role === 'Partner') {
+    return [
+      ['Happiness', 'warmth', person.happiness, '#9d87ff'],
+      ['Looks', 'looks', person.npcStats?.looks, '#ff89db'],
+      ['Smarts', 'smarts', person.npcStats?.smarts, '#8fbffa'],
+      ['Reputation', 'reputation', person.reputation ?? person.npcStats?.reputation ?? person.loyalty, '#4ecb71'],
+    ];
+  }
+  if (role === 'Son' || role === 'Daughter') {
+    return [
+      ['Happiness', 'warmth', person.happiness, '#9d87ff'],
+      ['Looks', 'looks', person.npcStats?.looks, '#ff89db'],
+      ['Smarts', 'smarts', person.npcStats?.smarts, '#8fbffa'],
+      ['Reputation', 'reputation', person.reputation ?? person.npcStats?.reputation ?? person.relationship, '#4ecb71'],
+    ];
+  }
   if (role === 'Teacher') {
     return [
       ['Looks', 'looks', person.npcStats?.looks, '#ff89db'],
@@ -1722,11 +2043,22 @@ function buildPersonSheetDetails(person, role) {
     rows.push(['Education', buildSheetSymbolIcon('job', '#bc8f68'), person.educationLevel || 'Unknown']);
     rows.push(['Status', buildSheetSymbolIcon('single', '#ef98a5'), person.relationshipStatus || 'Single']);
   }
+  if (role === 'Partner') {
+    rows.push(['Job', buildSheetSymbolIcon('job', '#bc8f68'), person.jobTitle && person.jobTitle !== 'None' ? person.jobTitle : (person.job || 'Student')]);
+    rows.push(['Status', buildSheetSymbolIcon('single', '#ef98a5'), romanceStatusLabel(STATE.romance?.status || 'dating')]);
+    rows.push(['Compatible', buildSheetSymbolIcon('compatibility', '#f0b14f'), `${compatibilityFor(person)}%`]);
+    rows.push(['Loyalty', buildSheetSymbolIcon('reputation', '#4ecb71'), `${person.loyalty || 50}%`]);
+  }
+  if (role === 'Son' || role === 'Daughter') {
+    rows.push(['Job', buildSheetSymbolIcon('job', '#bc8f68'), person.jobTitle && person.jobTitle !== 'None' ? person.jobTitle : 'Child']);
+    rows.push(['Education', buildSheetSymbolIcon('job', '#bc8f68'), person.educationLevel || educationLevelForAge(person.age)]);
+    rows.push(['Status', buildSheetSymbolIcon('single', '#ef98a5'), person.age <= 3 ? 'Little one' : 'Child']);
+  }
   if (role === 'Teacher') {
     rows.push(['Subject', buildSheetSymbolIcon('job', '#bc8f68'), person.subject || 'Unknown']);
     rows.push(['Title', buildSheetSymbolIcon('job', '#bc8f68'), person.title || 'Teacher']);
   }
-  if (!person.isPet && role !== 'Teacher') rows.push(['Compatible', buildSheetSymbolIcon('compatibility', '#f0b14f'), `${compatibilityFor(person)}%`]);
+  if (!person.isPet && role !== 'Teacher' && role !== 'Partner' && role !== 'Son' && role !== 'Daughter') rows.push(['Compatible', buildSheetSymbolIcon('compatibility', '#f0b14f'), `${compatibilityFor(person)}%`]);
   const compactRows = rows.slice(0, 4);
   while (compactRows.length < 4) compactRows.push(['', '', '']);
   if (!rows.length) return '';
@@ -1749,7 +2081,12 @@ function buildPersonSheetLifeDetails(person, role) {
   if (person.relationshipStatus) rows.push(['Relationship', person.relationshipStatus]);
   if (person.housingStatus) rows.push(['Housing', person.housingStatus]);
   if (person.socialGroup && (role === 'Friend' || role === 'classmate')) rows.push(['Social Group', person.socialGroup]);
-  if (person.salary && person.salary > 0 && (role === 'Mother' || role === 'Father' || role === 'Friend' || role === 'Brother' || role === 'Sister')) rows.push(['Income', fmtMoney(person.salary)]);
+  if (person.salary && person.salary > 0 && (role === 'Mother' || role === 'Father' || role === 'Friend' || role === 'Brother' || role === 'Sister' || role === 'Partner')) rows.push(['Income', fmtMoney(person.salary)]);
+  if (role === 'Partner') {
+    rows.push(['Relationship', romanceStatusLabel(STATE.romance?.status || 'dating')]);
+    rows.push(['Living Together', person.livingTogether ? 'Yes' : 'Not yet']);
+  }
+  if (role === 'Son' || role === 'Daughter') rows.push(['Family Role', role]);
   if (person.careerPath && person.jobTitle && person.jobTitle !== 'None') rows.push(['Career Path', person.careerPath]);
   if (!rows.length) return '';
   return `
@@ -2227,8 +2564,10 @@ function normalizeJob(job, type = 'full-time') {
   const payLabel = type === 'full-time'
     ? (legalProfile ? formatSalaryRange(legalProfile.salaryMin, legalProfile.salaryMax) : job.salary)
     : `£${job.rate} / hr`;
-  const difficultyBase = type === 'full-time' ? 44 + Math.max(0, parseSalaryValue(job.salary) - 20000) / 1200 : 22 + Math.max(0, (job.rate || 10) - 10) * 3.5;
-  const categoryDifficulty = { retail:0, office:6, creative:8, emergency:14, sales:9, corporate:18 }[category] || 0;
+  const difficultyBase = type === 'full-time'
+    ? 33 + Math.max(0, parseSalaryValue(job.salary) - 20000) / 1800
+    : 22 + Math.max(0, (job.rate || 10) - 10) * 3.5;
+  const categoryDifficulty = { retail:0, office:3, creative:5, emergency:10, sales:6, corporate:12 }[category] || 0;
   const difficulty = Math.round(difficultyBase + categoryDifficulty + (legalProfile?.pathway === 'barrister' ? 8 : 0));
   const immediateHire = type === 'part-time' || (/warehouse|fast food|retail assistant|delivery|cashier|cafe/i.test(job.title) && difficulty < 38);
   return {
@@ -2241,7 +2580,7 @@ function normalizeJob(job, type = 'full-time') {
     description: buildJobDescription({ ...job, companyName }, type, category),
     requiresInterview: locked ? false : (immediateHire ? false : (job.requiresInterview ?? difficulty >= 34)),
     applicationDifficulty: difficulty,
-    hiringChance: Math.round(66 - difficulty * 0.45 + (type === 'part-time' ? 10 : 0)),
+    hiringChance: Math.round(74 - difficulty * 0.38 + (type === 'part-time' ? 10 : 0)),
     interviewQuestionPool: JOB_INTERVIEW_QUESTION_POOLS[category] || JOB_INTERVIEW_QUESTION_POOLS.office,
     legalProfile,
     locked,
@@ -2275,9 +2614,10 @@ function getYearsSinceGraduation() {
 }
 
 function getJobPoolType(job) {
-  if (FULL_TIME_GENERAL_JOBS.includes(job)) return 'general';
-  if (FULL_TIME_ANY_DEGREE_JOBS.includes(job)) return 'any-degree';
-  if (FULL_TIME_NO_DEGREE_GROWTH_JOBS.includes(job)) return 'no-degree-growth';
+  const matchesPool = pool => pool.some(item => getJobKey(item) === getJobKey(job));
+  if (matchesPool(FULL_TIME_GENERAL_JOBS)) return 'general';
+  if (matchesPool(FULL_TIME_ANY_DEGREE_JOBS)) return 'any-degree';
+  if (matchesPool(FULL_TIME_NO_DEGREE_GROWTH_JOBS)) return 'no-degree-growth';
   return 'degree-linked';
 }
 
@@ -2396,10 +2736,11 @@ function getPlayerApplicationScore(job) {
   const experience = getCurrentCareerExperience();
   const work = STATE.career?.work;
   const legalState = ensureLegalCareerState();
-  let score = 46;
+  let score = 53;
+  const poolType = getJobPoolType(job);
 
   if (STATE.school.level === 'graduated') score += 10;
-  else if (STATE.school.level === 'finished_school') score += 3;
+  else if (STATE.school.level === 'finished_school') score += 8;
   score += (smarts - 50) * 0.16;
   score += (gradeScore - 50) * 0.1;
   score += reputation * 0.06;
@@ -2414,7 +2755,12 @@ function getPlayerApplicationScore(job) {
 
   if (job.type === 'Full-Time' && degree) score += 6;
   if (job.type === 'Full-Time' && degree && (FULL_TIME_DEGREE_JOB_POOLS[degree] || []).some(item => item.title === job.title)) score += 12;
-  if (job.type === 'Full-Time' && job.jobCategory === 'corporate' && !degree) score -= 10;
+  if (job.type === 'Full-Time' && !degree) {
+    if (poolType === 'general') score += 8;
+    if (poolType === 'no-degree-growth') score += 10;
+    if (poolType === 'any-degree') score -= 2;
+  }
+  if (job.type === 'Full-Time' && job.jobCategory === 'corporate' && !degree) score -= 6;
 
   if (STATE.traits.includes('hardworking')) score += 8;
   if (STATE.traits.includes('lazy')) score -= 10;
@@ -2448,8 +2794,8 @@ function getPlayerApplicationScore(job) {
     if (job.title === 'Judge') score -= 20;
   }
 
-  score += Math.floor(Math.random() * 19) - 9;
-  score -= job.applicationDifficulty * 0.55;
+  score += Math.floor(Math.random() * 15) - 7;
+  score -= job.applicationDifficulty * 0.42;
   return Math.round(score);
 }
 
@@ -4442,6 +4788,8 @@ function buildClassmateVipButton(c) {
 }
 
 function buildLearnClassmateDetailScreen(c) {
+  const resolvedRole = c.status === 'friend' ? 'Friend' : 'classmate';
+  const sectionLabel = c.status === 'friend' ? 'Friend' : 'Classmate';
   const traits = (c.traits || []).slice(0, 3).map(tid => {
     const t = CLASSMATE_TRAITS_POOL.find(x => x.id === tid);
     if (!t) return '';
@@ -4456,8 +4804,8 @@ function buildLearnClassmateDetailScreen(c) {
           <span style="font-size:18px;line-height:1">‹</span>
           <span>Back</span>
         </button>
-        <div style="font-size:16px;font-weight:800;color:var(--text)">Classmate</div>
-        <button onclick="openPersonSheet('${c.id}','classmate')"
+        <div style="font-size:16px;font-weight:800;color:var(--text)">${sectionLabel}</div>
+        <button onclick="openPersonSheet('${c.id}','${resolvedRole}')"
           style="width:36px;height:36px;border-radius:99px;background:#fff8ea;border:1px solid #e7d7bf;box-shadow:0 3px 10px rgba(26,24,20,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">${buildDotsIcon()}</button>
       </div>
       <div style="background:var(--surface);border:1px solid var(--border-light);border-radius:18px;padding:16px;display:flex;align-items:center;gap:14px;margin-bottom:12px">
@@ -4965,6 +5313,33 @@ function confirmPetName() {
   _pendingPetData = null;
 }
 
+function openChildNaming(childId, onNamed) {
+  const child = getChildById(childId);
+  if (!child) return;
+  const suggestedName = child.firstName || pickRandom(NAMES_UK[child.gender || 'female']);
+  document.getElementById('pet-inner').innerHTML = `
+    <div class="milestone-emoji">🍼</div>
+    <div class="milestone-title">What will you name your baby?</div>
+    <input class="pet-name-input" id="pet-name-input" type="text" placeholder="${suggestedName}" value="${suggestedName}" maxlength="20"/>
+    <button class="birth-btn secondary" onclick="document.getElementById('pet-name-input').value='${pickRandom(NAMES_UK[child.gender || 'female'])}'">↺ Suggest another name</button>
+    <button class="birth-btn" onclick="confirmChildName('${childId}')">That's their name →</button>`;
+  document.getElementById('pet-overlay').classList.add('open');
+  _pendingPetData = { childId, onNamed };
+}
+
+function confirmChildName(childId) {
+  const child = getChildById(childId);
+  const name = document.getElementById('pet-name-input').value.trim() || child?.firstName || pickRandom(NAMES_UK[child?.gender || 'female']);
+  document.getElementById('pet-overlay').classList.remove('open');
+  if (child) {
+    child.firstName = name;
+    logActivity(`${name} was born.`, 14);
+  }
+  if (STATE.romance) STATE.romance.pendingChildNamingId = null;
+  if (_pendingPetData?.onNamed) _pendingPetData.onNamed(name);
+  _pendingPetData = null;
+}
+
 // ── EVENT OVERLAY ─────────────────────────────────────────
 function openEvent(ev) {
   document.getElementById('event-inner').innerHTML = `
@@ -5006,7 +5381,13 @@ function handleChoice(ev, choice) {
         .filter(c => c.status === 'classmate')
         .sort((a,b) => b.compatibility - a.compatibility)[0];
       if (best && STATE.traits.includes('charismatic') && best.compatibility >= 70) {
+        ensureNpcCoreFields(best, {
+          role: 'friend',
+          socialGroup: STATE.school?.level === 'uni' ? 'university friend' : 'school friend',
+        });
         best.status = 'friend';
+        markNpcInteraction(best, `Became friends with ${STATE.firstName}.`);
+        upsertPersistentFriend(best);
         STATE.relationships.friends = clamp(STATE.relationships.friends + 15);
         logActivity(`${best.firstName} became your first friend 🎉`, 10);
       }
@@ -5047,19 +5428,7 @@ function showOutcome(choice, totalDelta) {
   updateAllUI();
 }
 
-// ── GAME LOOP ─────────────────────────────────────────────
-document.getElementById('age-up-btn').addEventListener('click', () => {
-  STATE.age += 1;
-  const alive = annualTick();
-  if (!alive) {
-    showToast(`${STATE.firstName} lived to ${STATE.age}. ✦`);
-    document.getElementById('age-up-btn').disabled   = true;
-    document.getElementById('age-up-btn').textContent = '✦ Life Complete';
-    updateAllUI();
-    return;
-  }
-  updateAllUI();
-  saveGame();
+function runPostAgeUpFlow() {
   const postSchool = ensurePostSchoolState();
   const admissionResult = resolveUniversityApplication();
   if (admissionResult) {
@@ -5102,6 +5471,31 @@ document.getElementById('age-up-btn').addEventListener('click', () => {
     const ev = pickEvent();
     if (ev) setTimeout(() => openEvent(ev), 100);
   }
+}
+
+// ── GAME LOOP ─────────────────────────────────────────────
+document.getElementById('age-up-btn').addEventListener('click', () => {
+  STATE.age += 1;
+  const alive = annualTick();
+  if (!alive) {
+    showToast(`${STATE.firstName} lived to ${STATE.age}. ✦`);
+    document.getElementById('age-up-btn').disabled   = true;
+    document.getElementById('age-up-btn').textContent = '✦ Life Complete';
+    updateAllUI();
+    return;
+  }
+  updateAllUI();
+  saveGame();
+  if (STATE.romance?.pendingChildNamingId) {
+    const childId = STATE.romance.pendingChildNamingId;
+    openChildNaming(childId, () => {
+      saveGame();
+      updateAllUI();
+      runPostAgeUpFlow();
+    });
+    return;
+  }
+  runPostAgeUpFlow();
 });
 
 // ── TOAST ─────────────────────────────────────────────────

@@ -189,15 +189,17 @@ function buildResidentFromSibling(sibling) {
 }
 
 function buildPartnerResident() {
+  const partner = typeof getCurrentPartner === 'function' ? getCurrentPartner() : null;
   return {
     id: uid(),
     refType: 'partner',
-    refId: '__partner__',
-    name: STATE._partnerName || 'Partner',
+    refId: partner?.id || '__partner__',
+    name: partner ? `${partner.firstName} ${partner.surname || ''}`.trim() : (STATE._partnerName || 'Partner'),
     role: 'Partner',
-    relationship: STATE.relationships.partner || 60,
+    relationship: partner?.relationship ?? STATE.relationships.partner ?? 60,
     contributionMonthly: Math.round(320 + Math.random() * 260),
-    traits: sampleN(HOUSEMATE_TRAITS_POOL, 2).map(trait => trait.id),
+    traits: (partner?.traits || sampleN(HOUSEMATE_TRAITS_POOL, 2).map(trait => trait.id)).slice(0, 2),
+    friendProfile: partner ? { ...partner } : null,
   };
 }
 
@@ -747,25 +749,40 @@ function takeTemporaryAccommodation() {
 }
 
 function moveInWithPartner() {
-  if (!STATE._partnerName || (STATE.relationships.partner || 0) < 60) {
+  const partner = typeof getCurrentPartner === 'function' ? getCurrentPartner() : null;
+  if (!partner || (STATE.relationships.partner || 0) < 60) {
     return { ok:false, message:'You need a stronger relationship first.' };
   }
   const current = getCurrentHome();
   if (current?.ownershipStatus === 'partner') return { ok:false, message:'You already live with your partner.' };
-  if (current?.source === 'owner') return { ok:false, message:'Sell your owned home before moving elsewhere.' };
+  if (current?.source === 'owner') {
+    const household = current.household || [];
+    const alreadyThere = household.some(resident => resident.refType === 'partner');
+    if (alreadyThere) return { ok:false, message:'Your partner already lives here.' };
+    const capacity = current.maxOccupants || 2;
+    if ((household.length + 2) > capacity) return { ok:false, message:'There is not enough room at home right now.' };
+    household.push(buildPartnerResident());
+    current.household = household;
+    partner.livingTogether = true;
+    partner.livesWithPlayer = true;
+    applyEffects({ happy:+8, rep:+2 });
+    return { ok:true, message:`${partner.firstName} moved in with you.` };
+  }
   const template = getHomeTemplate('rental_apartment');
   const home = addHomeToHistory(buildHomeRecord(template, {
     source: 'guest',
     ownershipStatus: 'partner',
-    name: `${STATE._partnerName}'s Apartment`,
+    name: `${partner.firstName}'s Apartment`,
     household: [buildPartnerResident()],
     baseMonthlyCost: 920,
     utilitiesMonthly: 120,
     futureHooks: { relationshipBreakdown:true, surpriseGuests:true, familyGrowth:true },
   }));
-  setCurrentHome(home, `Moved in with ${STATE._partnerName}.`, 'relationship');
+  partner.livingTogether = true;
+  partner.livesWithPlayer = true;
+  setCurrentHome(home, `Moved in with ${partner.firstName}.`, 'relationship');
   applyEffects({ happy:+8, rep:+2 });
-  return { ok:true, message:`You moved in with ${STATE._partnerName}.` };
+  return { ok:true, message:`You moved in with ${partner.firstName}.` };
 }
 
 function cleanCurrentHome() {
@@ -897,6 +914,22 @@ function runAnnualHomeTick() {
   if (!home) return;
 
   home.yearsLived = (home.yearsLived || 0) + 1;
+  if (Array.isArray(home.household)) {
+    home.household.forEach(resident => {
+      if (resident.friendProfile && typeof ageNpcOneYear === 'function') {
+        ageNpcOneYear(resident.friendProfile, { role: 'roommate', socialGroup: 'roommate' });
+        resident.relationship = resident.friendProfile.relationship ?? resident.relationship;
+      }
+      if (resident.refType === 'friend' && resident.refId && typeof getPersistentFriendById === 'function') {
+        const friend = getPersistentFriendById(resident.refId) || (STATE.school?.classmates || []).find(person => person.id === resident.refId);
+        if (friend) resident.relationship = friend.relationship ?? resident.relationship;
+      }
+      if (resident.refType === 'sibling' && resident.refId) {
+        const sibling = (STATE.family?.siblings || []).find(person => person.id === resident.refId);
+        if (sibling) resident.relationship = sibling.relationship ?? resident.relationship;
+      }
+    });
+  }
   if (home.source !== 'family') {
     home.cleanliness = clamp((home.cleanliness || 0) - randomStat(2, 8));
     home.maintenance = clamp((home.maintenance || 0) - randomStat(1, 6));

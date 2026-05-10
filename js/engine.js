@@ -293,6 +293,18 @@ function createNewLife(opts) {
     sexuality: opts.sexuality || 'heterosexual',
     sexualityConfirmed: false,
     social: { bullyCount:0, isBully:false, friends:[] },
+    romance: {
+      status: 'single',
+      partner: null,
+      exes: [],
+      children: [],
+      pregnancy: null,
+      pendingChildNamingId: null,
+      marriageYears: 0,
+      relationshipYears: 0,
+      datingPool: [],
+    },
+    _partnerName: null,
 
     usedEvents:       [],
     shownMilestones:  [],
@@ -735,6 +747,16 @@ function markNpcInteraction(npc, memoryText = null) {
   if (memoryText) buildNpcMemory(npc, memoryText);
 }
 
+function ageNpcOneYear(npc, context = {}) {
+  if (!npc) return npc;
+  const previousAge = Number.isFinite(Number(npc.age))
+    ? Number(npc.age)
+    : Math.max(0, (STATE.age || 0) - 1);
+  npc.age = previousAge + 1;
+  ensureNpcCoreFields(npc, context);
+  return npc;
+}
+
 function recordNpcLifeUpdate(npc, text, bucket, priority = 1) {
   ensureNpcCoreFields(npc);
   const entry = { text, age: STATE.age, priority };
@@ -748,6 +770,7 @@ function ensureNpcSystemState() {
   if (!Array.isArray(STATE.npc.annualUpdates)) STATE.npc.annualUpdates = [];
   if (!Array.isArray(STATE.npc.archive)) STATE.npc.archive = [];
   ensurePersistentFriendState();
+  ensureRomanceState();
   ensureNpcCoreFields(STATE.family?.mum, { role: 'parent' });
   ensureNpcCoreFields(STATE.family?.dad, { role: 'parent' });
   sanitizeParentNpcState(STATE.family?.mum);
@@ -761,6 +784,30 @@ function ensureNpcSystemState() {
   }));
   (STATE.social?.friends || []).forEach(friend => ensureNpcCoreFields(friend, { role: 'friend', socialGroup: friend.socialGroup || 'school friend' }));
   return STATE.npc;
+}
+
+function ageRelationshipNetworkOneYear() {
+  ensurePersistentFriendState();
+  const liveFriendIds = new Set();
+  (STATE.school?.classmates || []).forEach(classmate => {
+    ageNpcOneYear(classmate, {
+      role: classmate.status === 'friend' ? 'friend' : 'classmate',
+      socialGroup: classmate.status === 'friend'
+        ? (STATE.school?.level === 'uni' ? 'university friend' : 'school friend')
+        : 'classmate',
+    });
+    if (classmate.status === 'friend') {
+      liveFriendIds.add(classmate.id);
+      syncFriendSnapshot(classmate);
+    }
+  });
+  (STATE.social?.friends || []).forEach(friend => {
+    if (liveFriendIds.has(friend.id)) return;
+    ageNpcOneYear(friend, {
+      role: 'friend',
+      socialGroup: friend.socialGroup || 'school friend',
+    });
+  });
 }
 
 function getImportantNpcEntries() {
@@ -939,7 +986,10 @@ function maybeUpdateNpcCareer(entry, updates) {
     + (hasNpcTrait(npc, 'flaky') ? 0.06 : 0)
     + (hasNpcTrait(npc, 'toxic') ? 0.04 : 0)
     - Math.max(0, rep - 55) * 0.0013;
-  const careerChangeChance = 0.05 + (ambitious > 72 && npc.yearsInRole >= 3 ? 0.08 : 0) + (npc.happiness < 42 ? 0.04 : 0);
+  let careerChangeChance = 0.05 + (ambitious > 72 && npc.yearsInRole >= 3 ? 0.08 : 0) + (npc.happiness < 42 ? 0.04 : 0);
+  if (entry.role === 'parent') {
+    careerChangeChance *= 0.22;
+  }
 
   if (Math.random() < jobLossChance) {
     npc.employmentStatus = 'Unemployed';
@@ -961,7 +1011,7 @@ function maybeUpdateNpcCareer(entry, updates) {
     recordNpcLifeUpdate(npc, `${prefix} got promoted to ${npc.jobTitle}.`, updates, 5);
     return;
   }
-  if (Math.random() < careerChangeChance && (npc.age ?? 0) <= 58) {
+  if (Math.random() < careerChangeChance && (npc.age ?? 0) <= 58 && (entry.role !== 'parent' || npc.yearsInRole >= 5)) {
     const oldPath = npc.careerPath;
     const possible = ['Business', 'Education', 'Creative', 'Public Service', 'General', 'Technology', 'Engineering']
       .filter(path => path !== oldPath);
@@ -1051,12 +1101,20 @@ function applyNpcRelationshipDrift(entry) {
 }
 
 function getStableFriendRelationship(friend, fallback = 60) {
-  const values = [
-    friend?.friendshipCloseness,
-    friend?.relationship,
-    fallback,
-  ].filter(value => value !== undefined && value !== null && !Number.isNaN(Number(value)));
-  return clamp(Math.max(...values.map(value => Number(value))));
+  const relationship = friend?.relationship;
+  const closeness = friend?.friendshipCloseness;
+  const numericRelationship = relationship !== undefined && relationship !== null && !Number.isNaN(Number(relationship))
+    ? Number(relationship)
+    : null;
+  const numericCloseness = closeness !== undefined && closeness !== null && !Number.isNaN(Number(closeness))
+    ? Number(closeness)
+    : null;
+  if (numericRelationship !== null && numericCloseness !== null && numericRelationship === 0 && numericCloseness === 0) {
+    return clamp(fallback);
+  }
+  if (numericRelationship !== null) return clamp(numericRelationship);
+  if (numericCloseness !== null) return clamp(numericCloseness);
+  return clamp(fallback);
 }
 
 function normalizeFriendRelationshipState(friend, fallback = null) {
@@ -1105,6 +1163,481 @@ function ensurePersistentFriendState() {
   if (!STATE.social) STATE.social = { bullyCount:0, isBully:false, friends:[] };
   if (!Array.isArray(STATE.social.friends)) STATE.social.friends = [];
 }
+
+function ensureRomanceState() {
+  if (!STATE.romance) {
+    STATE.romance = {
+      status: 'single',
+      partner: null,
+      exes: [],
+      children: [],
+      pregnancy: null,
+      pendingChildNamingId: null,
+      marriageYears: 0,
+      relationshipYears: 0,
+      datingPool: [],
+    };
+  }
+  STATE.romance.status = STATE.romance.status || 'single';
+  if (!Array.isArray(STATE.romance.exes)) STATE.romance.exes = [];
+  if (!Array.isArray(STATE.romance.children)) STATE.romance.children = [];
+  if (!Array.isArray(STATE.romance.datingPool)) STATE.romance.datingPool = [];
+  STATE.romance.pendingChildNamingId = STATE.romance.pendingChildNamingId || null;
+  if (!STATE.romance.partner && STATE._partnerName && (STATE.relationships?.partner || 0) > 0) {
+    const parts = String(STATE._partnerName).trim().split(/\s+/);
+    const firstName = parts.shift() || STATE._partnerName;
+    const surname = parts.join(' ') || STATE.surname;
+    STATE.romance.partner = buildRomanceNpc({
+      firstName,
+      surname,
+      age: Math.max(16, STATE.age),
+      relationship: STATE.relationships.partner,
+      startedDatingAge: Math.max(16, STATE.age - 1),
+      metAge: Math.max(16, STATE.age - 1),
+    });
+    STATE.romance.status = STATE.relationships.partner >= 80 ? 'engaged' : 'dating';
+  }
+  STATE.romance.partner = STATE.romance.partner || null;
+  STATE.romance.pregnancy = STATE.romance.pregnancy || null;
+  STATE.romance.marriageYears = STATE.romance.marriageYears || 0;
+  STATE.romance.relationshipYears = STATE.romance.relationshipYears || 0;
+  if (STATE.romance.partner) ensureNpcCoreFields(STATE.romance.partner, { role: 'partner', socialGroup: 'partner' });
+  STATE.romance.children.forEach(child => ensureNpcCoreFields(child, { role: 'child', socialGroup: 'family' }));
+  syncRomanceLegacyFields();
+  return STATE.romance;
+}
+
+function syncRomanceLegacyFields() {
+  const romance = STATE.romance || {};
+  const partner = romance.partner || null;
+  STATE._partnerName = partner ? `${partner.firstName}${partner.surname ? ` ${partner.surname}` : ''}` : null;
+  STATE.relationships.partner = partner ? clamp(partner.relationship ?? STATE.relationships.partner ?? 0) : 0;
+}
+
+function getCurrentPartner() {
+  ensureRomanceState();
+  return STATE.romance.partner || null;
+}
+
+function getChildById(personId) {
+  ensureRomanceState();
+  return STATE.romance.children.find(child => child.id === personId) || null;
+}
+
+function getRomancePersonById(personId) {
+  const partner = getCurrentPartner();
+  if (partner?.id === personId) return partner;
+  return (STATE.romance?.exes || []).find(ex => ex.id === personId) || null;
+}
+
+function partnerTraitPool() {
+  return CLASSMATE_TRAITS_POOL;
+}
+
+function buildRomanceNpc(base = {}) {
+  const gender = base.gender || (Math.random() > 0.5 ? 'male' : 'female');
+  const partner = {
+    id: base.id || uid(),
+    firstName: base.firstName || pickRandom(NAMES_UK[gender]),
+    surname: base.surname || pickRandom(NAMES_UK.surnames),
+    gender,
+    age: base.age ?? Math.max(16, STATE.age),
+    appearance: base.appearance || generateAppearance(gender),
+    traits: (base.traits || sampleN(CLASSMATE_TRAITS_POOL, 2).map(trait => trait.id)).slice(0, 3),
+    compatibility: clamp(base.compatibility ?? randomStat(35, 92)),
+    relationship: clamp(base.relationship ?? base.friendshipCloseness ?? 58),
+    attraction: clamp(base.attraction ?? randomStat(35, 90)),
+    loyalty: clamp(base.loyalty ?? randomStat(35, 92)),
+    ambition: clamp(base.ambition ?? randomStat(30, 88)),
+    kindness: clamp(base.kindness ?? randomStat(30, 88)),
+    conflict: clamp(base.conflict ?? randomStat(10, 70)),
+    job: base.job || base.jobTitle || (((base.age ?? STATE.age) >= 18) ? pickRandom(['Admin Assistant', 'Retail Assistant', 'Customer Service Advisor', 'Barista', 'Teaching Assistant']) : 'Student'),
+    salary: base.salary ?? (((base.age ?? STATE.age) >= 18 && base.job !== 'Student') ? randomStat(16000, 32000) : 0),
+    educationLevel: base.educationLevel || (((base.age ?? STATE.age) >= 18) ? pickRandom(['No higher education', 'In college', 'At university', 'Graduated']) : 'In school'),
+    relationshipStatus: base.relationshipStatus || 'Single',
+    maritalStatus: base.maritalStatus || 'Single',
+    livingTogether: base.livingTogether ?? false,
+    metAge: base.metAge ?? STATE.age,
+    startedDatingAge: base.startedDatingAge ?? null,
+    engagedAge: base.engagedAge ?? null,
+    marriedAge: base.marriedAge ?? null,
+  };
+  ensureNpcCoreFields(partner, { role: 'partner', socialGroup: 'partner' });
+  partner.relationship = clamp(base.relationship ?? partner.relationship);
+  partner.friendshipCloseness = partner.relationship;
+  partner.jobTitle = partner.job;
+  partner.relationshipStatus = romanceStatusLabel(STATE.romance?.status || 'single');
+  partner.maritalStatus = ['married', 'widowed'].includes(STATE.romance?.status) ? 'Married' : (STATE.romance?.status === 'divorced' ? 'Divorced' : 'Single');
+  return partner;
+}
+
+function romanceStatusLabel(status) {
+  return {
+    single: 'Single',
+    dating: 'Dating',
+    engaged: 'Engaged',
+    married: 'Married',
+    separated: 'Separated',
+    divorced: 'Divorced',
+    widowed: 'Widowed',
+  }[status] || 'Single';
+}
+
+function getEligibleKnownDatingPeople() {
+  ensureNpcSystemState();
+  const sources = [
+    ...(STATE.school?.classmates || []),
+    ...(STATE.social?.friends || []),
+  ];
+  const seen = new Set();
+  return sources.filter(person => {
+    if (!person || seen.has(person.id)) return false;
+    seen.add(person.id);
+    ensureNpcCoreFields(person, {
+      role: person.status === 'friend' ? 'friend' : 'classmate',
+      socialGroup: person.status === 'friend' ? (person.socialGroup || 'friend') : 'classmate',
+    });
+    return (person.age ?? STATE.age) >= 16
+      && person.canBecomePartner !== false
+      && playerLikesGender(person.gender)
+      && person.id !== getCurrentPartner()?.id;
+  });
+}
+
+function getPreferredDatingGenders() {
+  if (STATE.sexuality === 'bisexual') return ['male', 'female'];
+  if (STATE.sexuality === 'heterosexual') return [STATE.gender === 'male' ? 'female' : 'male'];
+  if (STATE.sexuality === 'homosexual') return [STATE.gender];
+  return ['male', 'female'];
+}
+
+function generateDatingCandidate(knownPerson = null) {
+  const known = knownPerson ? ensureNpcCoreFields({ ...knownPerson }, { role: 'friend', socialGroup: knownPerson.socialGroup || 'friend' }) : null;
+  const baseAge = Math.max(16, STATE.age + npcSeedBetween({ id: uid() }, 'dating-age', -2, 3));
+  const preferredGenders = getPreferredDatingGenders();
+  const gender = known?.gender || pickRandom(preferredGenders);
+  const partner = buildRomanceNpc(known || {
+    gender,
+    age: baseAge,
+    relationship: randomStat(42, 72),
+    compatibility: known ? clamp((known.compatibility ?? 60) + randomStat(-8, 12)) : randomStat(40, 92),
+    attraction: randomStat(35, 92),
+  });
+  partner.relationshipStatus = 'Single';
+  partner.maritalStatus = 'Single';
+  return partner;
+}
+
+function generateDatingPool(count = 10) {
+  ensureRomanceState();
+  const known = getEligibleKnownDatingPeople().sort((a, b) => (b.compatibility ?? 0) - (a.compatibility ?? 0)).slice(0, 3);
+  const pool = [];
+  known.forEach(person => pool.push(generateDatingCandidate(person)));
+  while (pool.length < count) pool.push(generateDatingCandidate());
+  STATE.romance.datingPool = pool.slice(0, count);
+  return STATE.romance.datingPool;
+}
+
+function getDatingPool() {
+  ensureRomanceState();
+  if (!STATE.romance.datingPool.length) generateDatingPool(10);
+  return STATE.romance.datingPool;
+}
+
+function beginRelationshipWithPartner(partner, sourceLabel = 'Started dating') {
+  ensureRomanceState();
+  const romance = STATE.romance;
+  romance.partner = buildRomanceNpc({
+    ...partner,
+    relationship: clamp(partner.relationship ?? STATE.relationships.partner ?? 62),
+    startedDatingAge: STATE.age,
+    metAge: partner.metAge ?? STATE.age,
+  });
+  romance.partner.relationshipStatus = 'Dating';
+  romance.partner.maritalStatus = 'Single';
+  romance.status = 'dating';
+  romance.relationshipYears = 0;
+  romance.marriageYears = 0;
+  romance.pregnancy = null;
+  STATE.relationships.partner = clamp(romance.partner.relationship ?? 60);
+  syncRomanceLegacyFields();
+  logActivity(`${sourceLabel} ${romance.partner.firstName} ${romance.partner.surname}.`, 10);
+  return romance.partner;
+}
+
+function attemptDatePerson(personId) {
+  ensureRomanceState();
+  if (STATE.age < 16) return { ok:false, message:'You are too young to date right now.' };
+  if (STATE.romance.partner) return { ok:false, message:'You are already with someone.' };
+  const candidate = getDatingPool().find(person => person.id === personId) || getEligibleKnownDatingPeople().find(person => person.id === personId);
+  if (!candidate) return { ok:false, message:'That person is no longer available.' };
+  const compatibility = candidate.compatibility ?? 50;
+  let chance = 28
+    + (STATE.stats.looks || 0) * 0.18
+    + (STATE.stats.happy || 0) * 0.08
+    + clampRep(STATE.stats.rep || 0) * 0.05
+    + compatibility * 0.24
+    + (candidate.attraction || 50) * 0.16;
+  if ((candidate.traits || []).includes('kind')) chance += 6;
+  if ((candidate.traits || []).includes('supportive')) chance += 5;
+  if ((candidate.traits || []).includes('loyal')) chance += 4;
+  if ((candidate.traits || []).includes('flaky')) chance -= 6;
+  if ((candidate.traits || []).includes('toxic')) chance -= 10;
+  if ((candidate.relationshipStatus || 'Single') !== 'Single') chance -= 12;
+  chance = Math.max(8, Math.min(94, chance));
+  if (Math.random() * 100 <= chance) {
+    const partner = beginRelationshipWithPartner(candidate, 'Started dating');
+    STATE.romance.datingPool = STATE.romance.datingPool.filter(person => person.id !== personId);
+    return { ok:true, success:true, message:`You started dating ${partner.firstName}.` };
+  }
+  applyEffects({ happy:-2 });
+  logActivity(`Things did not go anywhere with ${candidate.firstName}.`, -2);
+  return { ok:true, success:false, message:`The date with ${candidate.firstName} did not lead anywhere.` };
+}
+
+function passDatingMatch(personId) {
+  ensureRomanceState();
+  STATE.romance.datingPool = getDatingPool().filter(person => person.id !== personId);
+  while (STATE.romance.datingPool.length < 10) STATE.romance.datingPool.push(generateDatingCandidate());
+}
+
+function movePartnerToExes(reason = 'Relationship ended') {
+  const partner = getCurrentPartner();
+  if (!partner) return;
+  ensureRomanceState();
+  partner.livingTogether = false;
+  partner.livesWithPlayer = false;
+  const snapshot = { ...partner, relationshipStatus: reason, maritalStatus: reason === 'Divorced' ? 'Divorced' : partner.maritalStatus };
+  STATE.romance.exes.unshift(snapshot);
+  if (STATE.romance.exes.length > 12) STATE.romance.exes.length = 12;
+}
+
+function clearCurrentPartner(status = 'single') {
+  ensureRomanceState();
+  STATE.romance.partner = null;
+  STATE.romance.status = status;
+  STATE.romance.relationshipYears = 0;
+  STATE.romance.marriageYears = 0;
+  syncRomanceLegacyFields();
+}
+
+function breakupWithPartner() {
+  const partner = getCurrentPartner();
+  if (!partner) return { ok:false, message:'You are not with anyone right now.' };
+  const pain = Math.max(4, Math.round((partner.relationship || 55) / 10));
+  movePartnerToExes('Ex');
+  clearCurrentPartner('single');
+  applyEffects({ happy:-pain });
+  logActivity(`You broke up with ${partner.firstName}.`, -pain);
+  return { ok:true, message:`You broke up with ${partner.firstName}.` };
+}
+
+function divorcePartner() {
+  const partner = getCurrentPartner();
+  if (!partner || STATE.romance.status !== 'married') return { ok:false, message:'You are not married right now.' };
+  const hasChildren = (STATE.romance.children || []).length > 0;
+  const wealthPenalty = STATE.finances.balance > 100000 ? Math.round(STATE.finances.balance * 0.05) : 0;
+  const cost = 1500 + (hasChildren ? 1000 : 0) + wealthPenalty;
+  STATE.finances.balance -= cost;
+  movePartnerToExes('Divorced');
+  clearCurrentPartner('divorced');
+  applyEffects({ happy:-12, rep:-3 });
+  logActivity(`You divorced ${partner.firstName}.`, -12);
+  return { ok:true, message:`You finalised the divorce. It cost ${fmtMoney(cost)}.` };
+}
+
+function proposeToPartner() {
+  const partner = getCurrentPartner();
+  ensureRomanceState();
+  if (!partner || STATE.romance.status !== 'dating') return { ok:false, message:'You need to be dating first.' };
+  if (STATE.age < 18) return { ok:false, message:'You are too young to propose.' };
+  if ((partner.relationship || 0) < 75 || (STATE.romance.relationshipYears || 0) < 1) return { ok:false, message:'The relationship is not ready for that yet.' };
+  let chance = 34 + (partner.relationship || 0) * 0.38 + (partner.compatibility || 0) * 0.22 + (partner.loyalty || 0) * 0.16 - (partner.conflict || 0) * 0.18;
+  chance = Math.max(10, Math.min(96, chance));
+  if (Math.random() * 100 <= chance) {
+    STATE.romance.status = 'engaged';
+    partner.engagedAge = STATE.age;
+    partner.relationshipStatus = 'Engaged';
+    logActivity(`You got engaged to ${partner.firstName}.`, 12);
+    applyEffects({ happy:+8, rep:+3 });
+    syncRomanceLegacyFields();
+    return { ok:true, success:true, message:`${partner.firstName} said yes.` };
+  }
+  partner.relationship = clamp((partner.relationship || 70) - 12);
+  STATE.relationships.partner = partner.relationship;
+  applyEffects({ happy:-6 });
+  logActivity(`${partner.firstName} was not ready to get engaged.`, -6);
+  syncRomanceLegacyFields();
+  return { ok:true, success:false, message:`${partner.firstName} said no.` };
+}
+
+function marryPartner(style = 'registry') {
+  const partner = getCurrentPartner();
+  ensureRomanceState();
+  if (!partner || STATE.romance.status !== 'engaged') return { ok:false, message:'You need to be engaged first.' };
+  if (STATE.age < 18) return { ok:false, message:'You are too young to get married.' };
+  const costMap = { registry:500, small:5000, big:20000 };
+  const repMap = { registry:2, small:4, big:7 };
+  const happyMap = { registry:8, small:12, big:16 };
+  const cost = costMap[style] ?? 500;
+  if (STATE.finances.balance < cost) return { ok:false, message:'You cannot afford that wedding yet.' };
+  STATE.finances.balance -= cost;
+  STATE.romance.status = 'married';
+  partner.marriedAge = STATE.age;
+  partner.relationshipStatus = 'Married';
+  partner.maritalStatus = 'Married';
+  applyEffects({ happy:happyMap[style] ?? 8, rep:repMap[style] ?? 2 });
+  logActivity(`You married ${partner.firstName}.`, happyMap[style] ?? 8);
+  syncRomanceLegacyFields();
+  return { ok:true, message:`You got married. Wedding cost ${fmtMoney(cost)}.` };
+}
+
+function getPregnancyChanceForAge(age = STATE.age) {
+  if (age < 18 || age > 45) return 0;
+  if (age <= 30) return 0.34;
+  if (age <= 38) return 0.2;
+  return 0.08;
+}
+
+function tryForBaby() {
+  const partner = getCurrentPartner();
+  ensureRomanceState();
+  if (!partner) return { ok:false, message:'You need a partner first.' };
+  if (STATE.age < 18) return { ok:false, message:'You are too young for that right now.' };
+  if (STATE.romance.pregnancy) return { ok:false, message:'A pregnancy is already ongoing.' };
+  const baseChance = getPregnancyChanceForAge(STATE.age);
+  if (!baseChance) return { ok:false, message:'Pregnancy is very unlikely at this age.' };
+  let chance = baseChance;
+  if (['engaged', 'married'].includes(STATE.romance.status)) chance += 0.08;
+  if (STATE.romance.status === 'dating') chance -= 0.03;
+  if ((partner.relationship || 0) >= 78) chance += 0.03;
+  chance = Math.max(0.02, Math.min(0.72, chance));
+  if (Math.random() < chance) {
+    STATE.romance.pregnancy = {
+      id: uid(),
+      partnerId: partner.id,
+      conceivedAge: STATE.age,
+      dueAge: STATE.age + 1,
+      planned: true,
+      outcome: 'ongoing',
+    };
+    logActivity(`You and ${partner.firstName} are expecting a baby.`, 12);
+    applyEffects({ happy:+6 });
+    return { ok:true, success:true, message:'You are expecting a baby.' };
+  }
+  logActivity('You tried for a baby, but nothing happened yet.', null);
+  return { ok:true, success:false, message:'Nothing happened yet.' };
+}
+
+function createRomanceChild(parentPartner = null) {
+  const partner = parentPartner || getCurrentPartner();
+  if (!partner) return null;
+  const gender = Math.random() > 0.5 ? 'male' : 'female';
+  const child = {
+    id: uid(),
+    firstName: pickRandom(NAMES_UK[gender]),
+    surname: STATE.surname,
+    gender,
+    age: 0,
+    appearance: generateFamilyAppearance(gender, [STATE.appearance, partner.appearance]),
+    traits: sampleN(CLASSMATE_TRAITS_POOL, 2).map(trait => trait.id),
+    relationship: 72,
+    otherParentId: partner.id,
+    bornAge: STATE.age,
+  };
+  ensureNpcCoreFields(child, { role: 'child', socialGroup: 'family' });
+  child.educationLevel = 'Pre-school';
+  child.currentEducation = null;
+  child.jobTitle = 'None';
+  child.salary = 0;
+  return child;
+}
+
+function resolvePregnancyBirth() {
+  ensureRomanceState();
+  const pregnancy = STATE.romance.pregnancy;
+  if (!pregnancy || pregnancy.dueAge > STATE.age) return null;
+  const child = createRomanceChild(getRomancePersonById(pregnancy.partnerId));
+  if (!child) return null;
+  STATE.romance.children.push(child);
+  STATE.romance.pregnancy = null;
+  STATE.romance.pendingChildNamingId = child.id;
+  applyEffects({ happy:+10, rep:+2 });
+  logActivity('Your baby was born.', 14);
+  return child;
+}
+
+function runAnnualRomanceProgression() {
+  ensureRomanceState();
+  const romance = STATE.romance;
+  romance.children.forEach(child => ageNpcOneYear(child, { role: 'child', socialGroup: 'family' }));
+  const partner = romance.partner;
+  if (!partner) {
+    resolvePregnancyBirth();
+    return;
+  }
+  ageNpcOneYear(partner, { role: 'partner', socialGroup: 'partner' });
+  romance.relationshipYears += 1;
+  if (romance.status === 'married') romance.marriageYears += 1;
+  resolvePregnancyBirth();
+  let drift = 0;
+  drift += ((partner.compatibility || 50) - 50) * 0.08;
+  drift += ((partner.kindness || 50) - 50) * 0.05;
+  drift += ((partner.loyalty || 50) - 50) * 0.05;
+  drift -= ((partner.conflict || 50) - 40) * 0.07;
+  const traits = partner.traits || [];
+  if (traits.includes('kind')) drift += 2;
+  if (traits.includes('supportive')) drift += 2;
+  if (traits.includes('loyal')) drift += 2;
+  if (traits.includes('toxic')) drift -= 4;
+  if (traits.includes('flaky')) drift -= 2;
+  if (traits.includes('jealous')) drift -= 2;
+  if (traits.includes('manipulative')) drift -= 3;
+  if (partner.livingTogether) drift += (partner.conflict || 50) > 62 ? -2 : 1;
+  if ((STATE.finances.balance || 0) < 0) drift -= 2;
+  if (romance.children.length) {
+    drift -= 1;
+    applyEffects({ happy:+1 });
+  }
+  partner.relationship = clamp(Math.round((partner.relationship || 60) + drift + (Math.random() * 5 - 2)));
+  partner.friendshipCloseness = partner.relationship;
+  STATE.relationships.partner = partner.relationship;
+  partner.relationshipStatus = romanceStatusLabel(romance.status);
+  partner.maritalStatus = ['married', 'widowed'].includes(romance.status) ? 'Married' : (romance.status === 'divorced' ? 'Divorced' : 'Single');
+  syncRomanceLegacyFields();
+}
+
+function runChildRelationshipAction(action, child) {
+  if (!child) return { ok:false };
+  const effects = action.effects || {};
+  let delta = 0;
+  Object.entries(effects).forEach(([key, value]) => {
+    if (key === 'rel_child') {
+      child.relationship = clamp((child.relationship || 60) + value);
+      delta += value;
+    } else {
+      applyEffects({ [key]: value });
+      delta += value;
+    }
+  });
+  markNpcInteraction(child, `${action.name} with ${child.firstName}.`);
+  logActivity(`${action.name} with ${child.firstName}`, delta);
+  return { ok:true, toast:`${action.name} with ${child.firstName} ✓` };
+}
+
+// TODO: cheating suspicion
+// TODO: partner loses job
+// TODO: fertility struggles
+// TODO: surprise pregnancy
+// TODO: miscarriage / pregnancy complications
+// TODO: wedding planning drama
+// TODO: in-law tension
+// TODO: custody dispute
+// TODO: child illness
+// TODO: child school milestones
+// TODO: partner career promotion
+// TODO: partner wants to move city
+// TODO: blended families / stepchildren
 
 function upsertPersistentFriend(friend) {
   if (!friend) return;
@@ -1184,7 +1717,14 @@ function applyEffects(effects) {
       syncSharedFamilyRelationshipFromParents();
     }
     else if (k==='rel_friends') STATE.relationships.friends = clamp(STATE.relationships.friends+v);
-    else if (k==='rel_partner') STATE.relationships.partner = clamp(STATE.relationships.partner+v);
+    else if (k==='rel_partner') {
+      STATE.relationships.partner = clamp(STATE.relationships.partner+v);
+      if (STATE.romance?.partner) {
+        STATE.romance.partner.relationship = clamp((STATE.romance.partner.relationship || STATE.relationships.partner) + v);
+        STATE.romance.partner.friendshipCloseness = STATE.romance.partner.relationship;
+        syncRomanceLegacyFields();
+      }
+    }
     else if (STATE.stats[k]!==undefined) STATE.stats[k]    = clamp(STATE.stats[k]+v);
   });
 }
@@ -1425,6 +1965,7 @@ function applyTargetedClassmateEffects(effects, person) {
   Object.entries(effects).forEach(([k, v]) => {
     if (k === 'rel_classmate') {
       person.relationship = clamp((person.relationship ?? 0) + v);
+      if (person.status === 'friend') person.friendshipCloseness = person.relationship;
       delta += v;
     } else {
       passthrough[k] = v;
@@ -1497,6 +2038,8 @@ function getAvailableActions(role, age = STATE.age, person = null) {
     ? PARENT_RELATIONSHIP_ACTIONS
     : (role === 'Brother' || role === 'Sister')
       ? SIBLING_RELATIONSHIP_ACTIONS
+      : (role === 'Son' || role === 'Daughter')
+        ? CHILD_RELATIONSHIP_ACTIONS
       : (role === 'Friend' || role === 'classmate')
         ? CLASSMATE_RELATIONSHIP_ACTIONS
         : [];
@@ -1522,6 +2065,8 @@ function triggerAction(actionId, personId, role) {
     ? getParentById(personId)
     : (role === 'Brother' || role === 'Sister')
       ? getSiblingById(personId)
+      : (role === 'Son' || role === 'Daughter')
+        ? getChildById(personId)
       : (role === 'Friend')
         ? STATE.school.classmates.find(c => c.id === personId) || getPersistentFriendById(personId)
       : (role === 'classmate')
@@ -1532,7 +2077,10 @@ function triggerAction(actionId, personId, role) {
 
   const minAge = action.minAge ?? 0;
   const maxAge = action.maxAge ?? Infinity;
-  if (STATE.age < minAge || STATE.age > maxAge) {
+  const isAdultFriendCarryOver = role === 'Friend'
+    && STATE.age >= 18
+    && action.id.endsWith('_older');
+  if (STATE.age < minAge || (!isAdultFriendCarryOver && STATE.age > maxAge)) {
     console.warn(`Action ${actionId} not available at age ${STATE.age}`);
     return;
   }
@@ -1541,6 +2089,8 @@ function triggerAction(actionId, personId, role) {
     ? runParentRelationshipAction(action, person, role)
     : (role === 'Brother' || role === 'Sister')
       ? runSiblingRelationshipAction(action, person, role)
+      : (role === 'Son' || role === 'Daughter')
+        ? runChildRelationshipAction(action, person, role)
       : runClassmateRelationshipAction(action, person, role);
   if (!result.ok) return;
   if (person) markNpcInteraction(person);
@@ -1900,9 +2450,10 @@ function annualTick() {
     }
   });
 
-  STATE.family.siblings.forEach(s => s.age++);
-  STATE.family.mum.age++;
-  STATE.family.dad.age++;
+  STATE.family.siblings.forEach(sibling => ageNpcOneYear(sibling, { role: 'sibling' }));
+  ageNpcOneYear(STATE.family.mum, { role: 'parent' });
+  ageNpcOneYear(STATE.family.dad, { role: 'parent' });
+  ageRelationshipNetworkOneYear();
   ensureNpcSystemState();
 
   const bornNow = [];
@@ -1942,6 +2493,7 @@ function annualTick() {
   }
 
   runAnnualNpcLifeProgression();
+  runAnnualRomanceProgression();
 
   if (STATE.stats.health<=0 || STATE.age>=STATE.deathAge) return false;
   return true;

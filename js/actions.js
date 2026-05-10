@@ -319,6 +319,17 @@ const SIBLING_RELATIONSHIP_ACTIONS = [
   { id:'sib_argue_adult',              icon:'😠', name:'Argue',                 desc:'Adult arguments cut deeper.',              cost:0, effects:{ happy:-3, rel_sibling:-5 }, cooldown:0, minAge:22,             customType:'generic_sibling_action' },
 ];
 
+const CHILD_RELATIONSHIP_ACTIONS = [
+  { id:'child_cuddle', icon:'🤱', name:'Cuddle', desc:'Comfort and warmth matter most right now.', cost:0, effects:{ happy:+4, rel_child:+6 }, cooldown:0, minAge:0, maxAge:3 },
+  { id:'child_play_small', icon:'🧸', name:'Play Together', desc:'Little moments build a strong bond.', cost:0, effects:{ happy:+5, rel_child:+5 }, cooldown:0, minAge:0, maxAge:3 },
+  { id:'child_spend_time', icon:'🏡', name:'Spend Time Together', desc:'Be present and involved.', cost:0, effects:{ happy:+3, rel_child:+4 }, cooldown:0, minAge:4 },
+  { id:'child_homework', icon:'📚', name:'Help With Homework', desc:'Support them as they learn.', cost:0, effects:{ smarts:+1, rel_child:+3 }, cooldown:0, minAge:5 },
+  { id:'child_discipline', icon:'🧭', name:'Discipline', desc:'Set boundaries, even if it is hard.', cost:0, effects:{ rel_child:-2, rep:+1 }, cooldown:0, minAge:4 },
+  { id:'child_gift', icon:'🎁', name:'Give Gift', desc:'A small gesture can mean a lot.', cost:-30, effects:{ happy:+4, rel_child:+4 }, cooldown:0, minAge:0 },
+  { id:'child_heart_to_heart', icon:'💬', name:'Have A Heart-to-Heart', desc:'Listen properly and talk honestly.', cost:0, effects:{ happy:+3, rel_child:+5 }, cooldown:0, minAge:8 },
+  { id:'child_hobby', icon:'🎨', name:'Support Their Hobby', desc:'Encourage what lights them up.', cost:-40, effects:{ happy:+4, smarts:+1, rel_child:+4 }, cooldown:0, minAge:6 },
+];
+
 const CLASSMATE_RELATIONSHIP_ACTIONS = [
   { id:'cm_play_together_child',   icon:'🧸', name:'Play together',          desc:'Shared play makes school easier.',       cost:0,  effects:{ happy:+4, rel_classmate:+4, popularity:+1 }, cooldown:0, minAge:5,  maxAge:10, customType:'generic_classmate_action' },
   { id:'cm_share_snacks_child',    icon:'🍎', name:'Share snacks',           desc:'Small gestures matter.',                 cost:-2, effects:{ happy:+2, rel_classmate:+3, popularity:+1 }, cooldown:0, minAge:5,  maxAge:10, customType:'generic_classmate_action' },
