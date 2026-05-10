@@ -1086,6 +1086,7 @@ function annualTick() {
   if (STATE.age === 18 && STATE.school.level==='college')   finishSchool();
   if (STATE.age >= 18 && !STATE.school.postSchool) STATE.school.postSchool = { schoolFinishedShown:false, uniApplication:null };
   maybeGraduateUniversity();
+  if (typeof maybeCompleteFurtherEducationYear === 'function') maybeCompleteFurtherEducationYear();
 
   if (STATE.career?.job && STATE.career.job !== 'None' && STATE.career.work) {
     const work = STATE.career.work;
@@ -1110,6 +1111,7 @@ function annualTick() {
       STATE.stats.happy = clamp(STATE.stats.happy - 2);
     }
   }
+  if (typeof applyAnnualLegalCareerProgression === 'function') applyAnnualLegalCareerProgression();
 
   STATE.annualGradeGain  = 0;
   STATE.annualStudyCount = 0;

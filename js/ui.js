@@ -210,6 +210,9 @@ const FULL_TIME_NO_DEGREE_GROWTH_JOBS = [
   { title:'Firefighter', company:'City Fire Service', salary:'£30,000/year', icon:'mdi:fire-truck', accent:'#d26b4b' },
   { title:'Estate Agent', company:'Ashdown Estates', salary:'£24,000/year', icon:'mdi:home-city-outline', accent:'#9f7f58' },
   { title:'Sales Executive', company:'Orbit Telecom', salary:'£23,800/year', icon:'mdi:chart-line', accent:'#5a9e76' },
+  { title:'Legal Secretary', company:'Crown Chambers', salary:'£24,000/year', icon:'mdi:typewriter', accent:'#a07a62' },
+  { title:'Legal Assistant', company:'Avery & Co.', salary:'£26,000/year', icon:'mdi:file-document-outline', accent:'#897667' },
+  { title:'Paralegal', company:'Hawthorne Legal', salary:'£28,000/year', icon:'mdi:scale-balance', accent:'#7c6a91' },
   { title:'Recruitment Consultant', company:'TalentBridge', salary:'£24,500/year', icon:'mdi:account-search-outline', accent:'#8a6fb0' },
   { title:'Content Creator', company:'Creator Studio', salary:'£20,000/year', icon:'mdi:video-outline', accent:'#ca7a63' },
   { title:'Actor', company:'Open Casting', salary:'£19,500/year', icon:'mdi:movie-open-outline', accent:'#b48457' },
@@ -220,13 +223,6 @@ const FULL_TIME_NO_DEGREE_GROWTH_JOBS = [
 ];
 const FULL_TIME_DEGREE_JOB_POOLS = {
   Law: [
-    { title:'Paralegal', company:'Hawthorne Legal', salary:'£24,000/year', icon:'mdi:scale-balance', accent:'#7c6a91' },
-    { title:'Legal Assistant', company:'Avery & Co.', salary:'£23,500/year', icon:'mdi:file-document-outline', accent:'#897667' },
-    { title:'Legal Secretary', company:'Crown Chambers', salary:'£22,800/year', icon:'mdi:typewriter', accent:'#a07a62' },
-    { title:'Trainee Solicitor', company:'Marlow Partners', salary:'£28,000/year', icon:'mdi:briefcase-outline', accent:'#5f74b7' },
-    { title:'Trainee Solicitor', company:'Blackwell Legal', salary:'£31,000/year', icon:'mdi:briefcase-outline', accent:'#4c6db5' },
-    { title:'Trainee Solicitor', company:'Kingsley Stone', salary:'£34,000/year', icon:'mdi:briefcase-outline', accent:'#395ea8' },
-    { title:'Junior Solicitor', company:'Blackwell Legal', salary:'£36,000/year', icon:'mdi:scale-balance', accent:'#4969b0' },
     { title:'Compliance Assistant', company:'Westbridge Risk', salary:'£24,500/year', icon:'mdi:shield-check-outline', accent:'#6078a3' },
     { title:'Court Clerk', company:'Central Courts', salary:'£23,200/year', icon:'mdi:gavel', accent:'#906f59' },
     { title:'Claims Handler', company:'Alder Insurance', salary:'£23,700/year', icon:'mdi:file-check-outline', accent:'#7f8aa4' },
@@ -274,6 +270,54 @@ const FULL_TIME_DEGREE_JOB_POOLS = {
     { title:'Operations Analyst', company:'Westbridge Projects', salary:'£26,000/year', icon:'mdi:cog-outline', accent:'#687d9a' },
   ],
 };
+const LEGAL_FURTHER_EDUCATION_OPTIONS = [
+  {
+    id:'Law Masters',
+    icon:'mdi:school-outline',
+    accent:'#6c58c7',
+    durationYears:1,
+    fundingCost: 9250,
+    blurb:'A one-year postgraduate legal course that opens the solicitor and barrister qualification routes.',
+  },
+];
+const LEGAL_SUPPORT_ROLE_CONFIG = {
+  'Legal Secretary': { salaryMin:24000, salaryMax:38000, prestige:1, stress:38, path:['Legal Secretary', 'Senior Legal Secretary', 'Legal Office Manager'] },
+  'Legal Assistant': { salaryMin:26000, salaryMax:42000, prestige:2, stress:44, path:['Legal Assistant', 'Paralegal', 'Senior Paralegal', 'Lead Paralegal'] },
+  'Paralegal': { salaryMin:28000, salaryMax:55000, prestige:3, stress:52, path:['Paralegal', 'Senior Paralegal', 'Lead Paralegal', 'Principal Paralegal'] },
+  'Senior Legal Secretary': { salaryMin:32000, salaryMax:45000, prestige:2, stress:44, path:['Legal Secretary', 'Senior Legal Secretary', 'Legal Office Manager'] },
+  'Legal Office Manager': { salaryMin:38000, salaryMax:52000, prestige:3, stress:48, path:['Legal Secretary', 'Senior Legal Secretary', 'Legal Office Manager'] },
+  'Senior Paralegal': { salaryMin:38000, salaryMax:65000, prestige:4, stress:58, path:['Paralegal', 'Senior Paralegal', 'Lead Paralegal', 'Principal Paralegal'] },
+  'Lead Paralegal': { salaryMin:50000, salaryMax:82000, prestige:5, stress:61, path:['Paralegal', 'Senior Paralegal', 'Lead Paralegal', 'Principal Paralegal'] },
+  'Principal Paralegal': { salaryMin:65000, salaryMax:95000, prestige:6, stress:66, path:['Paralegal', 'Senior Paralegal', 'Lead Paralegal', 'Principal Paralegal'] },
+};
+const LEGAL_QUALIFIED_ROLE_CONFIG = {
+  'Year 1 Trainee Solicitor': { salaryMin:50000, salaryMax:60000, prestige:5, stress:82, pathway:'solicitor', yearsToNext:1, nextRole:'Year 2 Trainee Solicitor' },
+  'Year 2 Trainee Solicitor': { salaryMin:55000, salaryMax:70000, prestige:6, stress:85, pathway:'solicitor', yearsToNext:1, nextRole:'Junior Associate', qualificationAward:'solicitor' },
+  'Junior Associate': { salaryMin:100000, salaryMax:180000, prestige:7, stress:80, pathway:'solicitor', yearsToNext:3, nextRole:'Associate' },
+  'Associate': { salaryMin:140000, salaryMax:260000, prestige:8, stress:84, pathway:'solicitor', yearsToNext:4, nextRole:'Senior Associate' },
+  'Senior Associate': { salaryMin:200000, salaryMax:450000, prestige:9, stress:88, pathway:'solicitor', yearsToNext:3, yearsToNextMax:6, nextRole:'Partner' },
+  'Partner': { salaryMin:700000, salaryMax:5000000, prestige:10, stress:92, pathway:'solicitor' },
+  'Pupil Barrister': { salaryMin:25000, salaryMax:75000, prestige:6, stress:78, pathway:'barrister', yearsToNext:1, nextRole:'Junior Barrister', qualificationAward:'barrister' },
+  'Junior Barrister': { salaryMin:50000, salaryMax:250000, prestige:7, stress:79, pathway:'barrister', yearsToNext:5, nextRole:'Barrister' },
+  'Barrister': { salaryMin:150000, salaryMax:500000, prestige:8, stress:83, pathway:'barrister', yearsToNext:5, nextRole:'KC / Senior Barrister' },
+  'KC / Senior Barrister': { salaryMin:300000, salaryMax:2000000, prestige:10, stress:87, pathway:'barrister', yearsToNext:6, nextRole:'Judge' },
+  'Judge': { salaryMin:350000, salaryMax:900000, prestige:10, stress:76, pathway:'judge' },
+};
+const LEGAL_JOB_LISTINGS = [
+  { title:'Year 1 Trainee Solicitor', company:'Marlow Partners', icon:'mdi:briefcase-outline', accent:'#5f74b7' },
+  { title:'Year 1 Trainee Solicitor', company:'Blackwell Legal', icon:'mdi:briefcase-outline', accent:'#4c6db5' },
+  { title:'Year 1 Trainee Solicitor', company:'Kingsley Stone', icon:'mdi:briefcase-outline', accent:'#395ea8' },
+  { title:'Pupil Barrister', company:'Crown Chambers', icon:'mdi:gavel', accent:'#8a5e52' },
+  { title:'Pupil Barrister', company:'Temple Row Chambers', icon:'mdi:gavel', accent:'#6c5b94' },
+  { title:'Junior Associate', company:'Blackwell Legal', icon:'mdi:scale-balance', accent:'#4969b0' },
+  { title:'Associate', company:'Kingsley Stone', icon:'mdi:scale-balance', accent:'#365999' },
+  { title:'Senior Associate', company:'Marlow Partners', icon:'mdi:scale-balance', accent:'#274f8f' },
+  { title:'Partner', company:'Ashcroft & Vale', icon:'mdi:crown-outline', accent:'#c08b2d' },
+  { title:'Junior Barrister', company:'Temple Row Chambers', icon:'mdi:gavel', accent:'#8c654f' },
+  { title:'Barrister', company:'Stone Court Chambers', icon:'mdi:gavel', accent:'#73548f' },
+  { title:'KC / Senior Barrister', company:'Temple Row Chambers', icon:'mdi:crown-outline', accent:'#b6812c' },
+  { title:'Judge', company:'Royal Courts of Justice', icon:'mdi:account-tie-hat', accent:'#394b74' },
+];
 let _jobBoardCategory = 'full-time';
 let _cachedFullTimeJobs = [];
 let _cachedFullTimeSignature = '';
@@ -1344,7 +1388,129 @@ const UNI_TYPE_PREVIEW = {
 
 function ensurePostSchoolState() {
   if (!STATE.school.postSchool) STATE.school.postSchool = { schoolFinishedShown:false, uniApplication:null };
+  if (!STATE.school.postSchool.furtherEducation) {
+    STATE.school.postSchool.furtherEducation = { current:null, completed:[], applications:[] };
+  }
   return STATE.school.postSchool;
+}
+
+function ensureFurtherEducationState() {
+  return ensurePostSchoolState().furtherEducation;
+}
+
+function ensureLegalCareerState() {
+  if (!STATE.career) STATE.career = { job:'None', salary:0, level:0 };
+  if (!STATE.career.legal) {
+    STATE.career.legal = {
+      qualifications: { solicitor:false, barrister:false },
+      supportYears: 0,
+      pathwaysTried: [],
+      achievementsShown: { solicitor:false, barrister:false },
+    };
+  }
+  return STATE.career.legal;
+}
+
+function hasFurtherEducation(qualificationId) {
+  return ensureFurtherEducationState().completed.includes(qualificationId);
+}
+
+function isLawGraduate() {
+  return getDegreeCourse() === 'Law';
+}
+
+function hasQualifiedSolicitor() {
+  return !!ensureLegalCareerState().qualifications.solicitor;
+}
+
+function hasQualifiedBarrister() {
+  return !!ensureLegalCareerState().qualifications.barrister;
+}
+
+function isLegalSupportRole(jobTitle) {
+  return !!LEGAL_SUPPORT_ROLE_CONFIG[jobTitle];
+}
+
+function isQualifiedLegalRole(jobTitle) {
+  return !!LEGAL_QUALIFIED_ROLE_CONFIG[jobTitle];
+}
+
+function isAnyLegalRole(jobTitle) {
+  return isLegalSupportRole(jobTitle) || isQualifiedLegalRole(jobTitle);
+}
+
+function getCurrentJobYears() {
+  if (!STATE.career?.job || STATE.career.job === 'None') return 0;
+  return Math.max(0, STATE.age - (STATE.career.startedAge ?? STATE.age));
+}
+
+function getGeneratedSalaryForRange(min, max, skew = 0.5) {
+  const clampedSkew = Math.max(0, Math.min(1, skew));
+  return Math.round(min + (max - min) * clampedSkew);
+}
+
+function formatSalaryRange(min, max) {
+  return max >= 1000000
+    ? `${fmtMoney(min)}–${fmtMoney(max)}+ / year`
+    : `${fmtMoney(min)}–${fmtMoney(max)} / year`;
+}
+
+function getLegalRoleProfile(jobTitle) {
+  return LEGAL_SUPPORT_ROLE_CONFIG[jobTitle] || LEGAL_QUALIFIED_ROLE_CONFIG[jobTitle] || null;
+}
+
+function getLegalPathForJob(jobTitle) {
+  const profile = getLegalRoleProfile(jobTitle);
+  if (profile?.path) return profile.path;
+  if (profile?.pathway === 'solicitor') return ['Year 1 Trainee Solicitor', 'Year 2 Trainee Solicitor', 'Junior Associate', 'Associate', 'Senior Associate', 'Partner'];
+  if (profile?.pathway === 'barrister' || profile?.pathway === 'judge') return ['Pupil Barrister', 'Junior Barrister', 'Barrister', 'KC / Senior Barrister', 'Judge'];
+  return null;
+}
+
+function getLegalQualificationStatus() {
+  if (hasQualifiedSolicitor()) return 'Qualified Solicitor';
+  if (hasQualifiedBarrister()) return 'Qualified Barrister';
+  if (hasFurtherEducation('Law Masters')) return 'Law Masters Completed';
+  if (isLawGraduate()) return 'Law Graduate';
+  return 'Not Qualified';
+}
+
+function getLegalJobRequirements(job) {
+  const reasons = [];
+  const title = job.title;
+  const currentYears = getCurrentJobYears();
+  const publicRep = STATE.stats.rep || 0;
+
+  if (title.startsWith('Year 1 Trainee Solicitor')) {
+    if (!isLawGraduate()) reasons.push('Requires Law degree');
+    if (!hasFurtherEducation('Law Masters')) reasons.push('Requires Law Masters');
+  } else if (title === 'Pupil Barrister') {
+    if (!isLawGraduate()) reasons.push('Requires Law degree');
+    if (!hasFurtherEducation('Law Masters')) reasons.push('Requires Law Masters');
+  } else if (title === 'Junior Associate') {
+    if (!hasQualifiedSolicitor()) reasons.push('Requires Qualification');
+  } else if (title === 'Associate') {
+    if (!hasQualifiedSolicitor()) reasons.push('Requires Qualification');
+    if (STATE.career.job !== 'Junior Associate' || currentYears < 3) reasons.push('Requires 3 Years Experience');
+  } else if (title === 'Senior Associate') {
+    if (STATE.career.job !== 'Associate' || currentYears < 4) reasons.push('Requires 4 Years Experience');
+  } else if (title === 'Partner') {
+    if (STATE.career.job !== 'Senior Associate' || currentYears < 3) reasons.push('Requires 3 Years Experience');
+    if (publicRep < 45) reasons.push('Requires Strong Reputation');
+  } else if (title === 'Junior Barrister') {
+    if (!hasQualifiedBarrister()) reasons.push('Requires Qualification');
+  } else if (title === 'Barrister') {
+    if (STATE.career.job !== 'Junior Barrister' || currentYears < 5) reasons.push('Requires 5 Years Experience');
+  } else if (title === 'KC / Senior Barrister') {
+    if (STATE.career.job !== 'Barrister' || currentYears < 5) reasons.push('Requires 5 Years Experience');
+    if (publicRep < 55) reasons.push('Requires Elite Reputation');
+  } else if (title === 'Judge') {
+    if (!hasQualifiedBarrister()) reasons.push('Requires Barrister Qualification');
+    if (STATE.career.job !== 'KC / Senior Barrister' || currentYears < 6) reasons.push('Requires 6 Years Experience');
+    if (publicRep < 70) reasons.push('Requires Exceptional Reputation');
+  }
+
+  return reasons;
 }
 
 function openUniApplication() {
@@ -1362,6 +1528,98 @@ function closeUniApplication() {
   _learnScreen = 'main';
   _uniApplyDraft = null;
   renderLearnTab();
+}
+
+function canAccessFurtherEducation() {
+  return isGraduate();
+}
+
+function openFurtherEducation() {
+  if (!canAccessFurtherEducation()) return;
+  _learnScreen = 'furtherEducation';
+  const furtherEducation = ensureFurtherEducationState();
+  _uniApplyDraft = {
+    course: 'Law Masters',
+    funding: furtherEducation.current?.funding || 'Student loan',
+  };
+  renderLearnTab();
+  const tab = document.getElementById('tab-learn');
+  if (tab) tab.scrollTop = 0;
+}
+
+function closeFurtherEducation() {
+  _learnScreen = 'main';
+  _uniApplyDraft = null;
+  renderLearnTab();
+}
+
+function startFurtherEducationCourse(courseId) {
+  const furtherEducation = ensureFurtherEducationState();
+  if (!_uniApplyDraft?.funding) {
+    showToast('Choose funding first.');
+    return;
+  }
+  furtherEducation.current = {
+    id: courseId,
+    funding: _uniApplyDraft.funding,
+    startedAge: STATE.age,
+    durationYears: 1,
+    status: 'studying',
+  };
+  furtherEducation.applications.push({
+    id: courseId,
+    funding: _uniApplyDraft.funding,
+    age: STATE.age,
+  });
+  logActivity(`Started ${courseId}.`, null);
+  saveGame();
+  closeFurtherEducation();
+  showToast(`${courseId} started.`);
+}
+
+function buildFurtherEducationScreen() {
+  const furtherEducation = ensureFurtherEducationState();
+  const current = furtherEducation.current;
+  const completed = hasFurtherEducation('Law Masters');
+  const funding = getUniFundingConfig(_uniApplyDraft?.funding || 'Student loan');
+  const canStart = !completed && !current;
+  return `
+    <div style="display:flex;flex-direction:column;gap:16px;padding-bottom:10px">
+      ${buildUniPageHeader('Further Education', 'Professional legal routes open after postgraduate study.')}
+      <div style="padding:18px;border-radius:24px;border:1px solid #e8ded4;background:linear-gradient(180deg, #fffdfb, #f8f2ec)">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+          <div>
+            <div style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#efe9ff;color:#5f48bc;font-size:11px;font-weight:800">Further Education</div>
+            <div style="font-size:25px;font-weight:800;color:#171510;margin-top:10px">Law Masters</div>
+            <div style="font-size:13px;line-height:1.5;color:#675d54;margin-top:8px">Required before solicitor or barrister training. One year. Competitive careers unlock after completion.</div>
+          </div>
+          <div style="width:54px;height:54px;border-radius:18px;background:#f3edff;color:#6b57c6;display:flex;align-items:center;justify-content:center;font-size:28px">
+            <iconify-icon icon="mdi:school-outline"></iconify-icon>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:10px;margin-top:14px">
+          <div style="padding:12px;border-radius:16px;background:#fff;border:1px solid #ece3d8"><div style="font-size:10px;font-weight:800;color:#8a7f73;text-transform:uppercase">Duration</div><div style="font-size:14px;font-weight:800;color:#1a1814;margin-top:6px">1 Year</div></div>
+          <div style="padding:12px;border-radius:16px;background:#fff;border:1px solid #ece3d8"><div style="font-size:10px;font-weight:800;color:#8a7f73;text-transform:uppercase">Status</div><div style="font-size:14px;font-weight:800;color:#1a1814;margin-top:6px">${completed ? 'Completed' : current ? 'In Progress' : 'Available'}</div></div>
+          <div style="padding:12px;border-radius:16px;background:#fff;border:1px solid #ece3d8"><div style="font-size:10px;font-weight:800;color:#8a7f73;text-transform:uppercase">Career Gate</div><div style="font-size:14px;font-weight:800;color:#1a1814;margin-top:6px">Legal Qualification</div></div>
+        </div>
+      </div>
+      ${current ? `
+        <div style="padding:14px 16px;border-radius:18px;background:#eef6ff;border:1px solid #d5e4f3;color:#355777;font-size:13px;font-weight:700">
+          You are studying ${current.id}. It completes when you age up.
+        </div>` : ''}
+      ${completed ? `
+        <div style="padding:14px 16px;border-radius:18px;background:#edf7ee;border:1px solid #d5e8d7;color:#4d7e52;font-size:13px;font-weight:700">
+          Law Masters completed. Solicitor and barrister pathways are now open.
+        </div>` : `
+        <div>
+          ${buildUniSectionTitle('£', 'Confirm Funding')}
+          ${buildUniFundingCards()}
+        </div>`}
+      <button onclick="${canStart ? `startFurtherEducationCourse('Law Masters')` : 'closeFurtherEducation()'}"
+        style="width:100%;padding:18px;border-radius:24px;border:1px solid ${canStart ? '#6d56c9' : '#d9d0c5'};background:${canStart ? 'linear-gradient(90deg, #6d56c9, #846be6)' : '#ebe5dd'};color:${canStart ? '#fff' : '#7e7469'};font-size:15px;font-weight:800">
+        ${completed ? 'Back' : current ? 'Studying' : `Start with ${funding.id}`}
+      </button>
+    </div>`;
 }
 
 function openJobBoard(category = 'full-time') {
@@ -1396,7 +1654,7 @@ function inferJobCategory(job, type = 'full-time') {
   if (/police|firefighter|doctor/.test(text)) return 'emergency';
   if (/sales|estate agent|recruitment/.test(text)) return 'sales';
   if (/designer|illustrator|creator|actor|musician|gallery/.test(text)) return 'creative';
-  if (/solicitor|paralegal|compliance|finance|operations analyst|civil service|project coordinator|pilot trainee/.test(text)) return 'corporate';
+  if (/solicitor|paralegal|barrister|judge|compliance|finance|operations analyst|civil service|project coordinator|pilot trainee/.test(text)) return 'corporate';
   if (/assistant|receptionist|admin|customer service|clerk|claims|lab/.test(text)) return 'office';
   if (/cafe|retail|cashier|warehouse|fast food|delivery|supermarket|care assistant|trainer|apprentice/.test(text)) return type === 'part-time' ? 'retail' : 'office';
   return type === 'part-time' ? 'retail' : 'office';
@@ -1418,10 +1676,15 @@ function buildJobDescription(job, type, category) {
 function normalizeJob(job, type = 'full-time') {
   const companyName = job.companyName || job.company;
   const category = inferJobCategory(job, type);
-  const payLabel = type === 'full-time' ? job.salary : `£${job.rate} / hr`;
+  const legalProfile = getLegalRoleProfile(job.title);
+  const legalRequirements = type === 'full-time' && legalProfile ? getLegalJobRequirements(job) : [];
+  const locked = legalRequirements.length > 0;
+  const payLabel = type === 'full-time'
+    ? (legalProfile ? formatSalaryRange(legalProfile.salaryMin, legalProfile.salaryMax) : job.salary)
+    : `£${job.rate} / hr`;
   const difficultyBase = type === 'full-time' ? 44 + Math.max(0, parseSalaryValue(job.salary) - 20000) / 1200 : 22 + Math.max(0, (job.rate || 10) - 10) * 3.5;
   const categoryDifficulty = { retail:0, office:6, creative:8, emergency:14, sales:9, corporate:18 }[category] || 0;
-  const difficulty = Math.round(difficultyBase + categoryDifficulty);
+  const difficulty = Math.round(difficultyBase + categoryDifficulty + (legalProfile?.pathway === 'barrister' ? 8 : 0));
   const immediateHire = type === 'part-time' || (/warehouse|fast food|retail assistant|delivery|cashier|cafe/i.test(job.title) && difficulty < 38);
   return {
     ...job,
@@ -1431,10 +1694,13 @@ function normalizeJob(job, type = 'full-time') {
     type: type === 'full-time' ? 'Full-Time' : 'Part-Time',
     jobCategory: category,
     description: buildJobDescription({ ...job, companyName }, type, category),
-    requiresInterview: immediateHire ? false : (job.requiresInterview ?? difficulty >= 34),
+    requiresInterview: locked ? false : (immediateHire ? false : (job.requiresInterview ?? difficulty >= 34)),
     applicationDifficulty: difficulty,
     hiringChance: Math.round(66 - difficulty * 0.45 + (type === 'part-time' ? 10 : 0)),
     interviewQuestionPool: JOB_INTERVIEW_QUESTION_POOLS[category] || JOB_INTERVIEW_QUESTION_POOLS.office,
+    legalProfile,
+    locked,
+    lockReasons: legalRequirements,
   };
 }
 
@@ -1511,6 +1777,12 @@ function buildFullTimeSignature() {
     degree: getDegreeCourse(),
     standing: getUniversityStanding(),
     gradYears: getYearsSinceGraduation(),
+    lawMasters: hasFurtherEducation('Law Masters'),
+    solicitor: hasQualifiedSolicitor(),
+    barrister: hasQualifiedBarrister(),
+    legalJob: STATE.career?.job || 'None',
+    legalYears: getCurrentJobYears(),
+    rep: STATE.stats.rep || 0,
   });
 }
 
@@ -1538,9 +1810,16 @@ function generateFullTimeJobs() {
     ...degreePool,
   ];
   if (jobs.length < 16) jobs.push(...weightedUniqueSample(fallbackPools, 16 - jobs.length, usedTitles, degree));
+  if (degree === 'Law' || isAnyLegalRole(STATE.career?.job || '') || hasFurtherEducation('Law Masters') || hasQualifiedSolicitor() || hasQualifiedBarrister()) {
+    const legalListings = LEGAL_JOB_LISTINGS.map(job => {
+      const profile = getLegalRoleProfile(job.title);
+      return { ...job, salary: `£${profile.salaryMin.toLocaleString()}/year` };
+    });
+    jobs.push(...weightedUniqueSample(legalListings, 10, usedTitles, degree));
+  }
   return jobs
     .sort((a, b) => parseSalaryValue(b.salary) - parseSalaryValue(a.salary))
-    .slice(0, 16);
+    .slice(0, 22);
 }
 
 function getFullTimeJobs() {
@@ -1571,6 +1850,7 @@ function getPlayerApplicationScore(job) {
   const smarts = clamp(STATE.stats.smarts || 0, 0, 100);
   const experience = getCurrentCareerExperience();
   const work = STATE.career?.work;
+  const legalState = ensureLegalCareerState();
   let score = 46;
 
   if (STATE.school.level === 'graduated') score += 10;
@@ -1602,6 +1882,26 @@ function getPlayerApplicationScore(job) {
   if (STATE.traits.includes('intelligent') && ['office','corporate'].includes(job.jobCategory)) score += 5;
   if (STATE.traits.includes('anxious') && ['sales','emergency','corporate'].includes(job.jobCategory)) score -= 5;
   if (STATE.traits.includes('risk_taker')) score += ['creative','sales'].includes(job.jobCategory) ? 4 : -5;
+
+  if (job.legalProfile) {
+    score += legalState.supportYears * (job.title === 'Pupil Barrister' ? 4 : 5);
+    score += getUniversityStanding() * (job.title === 'Pupil Barrister' ? 24 : 18);
+    if (hasFurtherEducation('Law Masters')) score += 14;
+    if (job.title === 'Pupil Barrister') {
+      score += (STATE.relationships.friends || 0) * 0.08;
+      score += reputation * 0.12;
+      score += smarts * 0.08;
+      score -= 8;
+    }
+    if (job.title.startsWith('Year 1 Trainee Solicitor')) {
+      score += reputation * 0.08;
+      score += smarts * 0.06;
+      score += (work?.performance || 50) * 0.06;
+      score -= 2;
+    }
+    if (job.title === 'Partner') score -= 18;
+    if (job.title === 'Judge') score -= 20;
+  }
 
   score += Math.floor(Math.random() * 19) - 9;
   score -= job.applicationDifficulty * 0.55;
@@ -1767,11 +2067,9 @@ function maybeTriggerWorkplaceEvent(work, actionId, apply) {
 }
 
 function getCareerPathForJob(jobTitle) {
+  const legalPath = getLegalPathForJob(jobTitle);
+  if (legalPath) return legalPath;
   const exactPaths = {
-    'Legal Assistant': ['Legal Assistant', 'Paralegal', 'Senior Paralegal', 'Trainee Solicitor'],
-    'Paralegal': ['Legal Assistant', 'Paralegal', 'Senior Paralegal', 'Trainee Solicitor'],
-    'Trainee Solicitor': ['Paralegal', 'Senior Paralegal', 'Trainee Solicitor', 'Junior Solicitor'],
-    'Junior Solicitor': ['Paralegal', 'Senior Paralegal', 'Trainee Solicitor', 'Junior Solicitor'],
     'Junior Doctor': ['Healthcare Assistant', 'Lab Assistant', 'Junior Doctor', 'Senior Doctor'],
     'Finance Assistant': ['Finance Assistant', 'Operations Analyst', 'Management Trainee', 'Finance Manager'],
     'Marketing Assistant': ['Marketing Assistant', 'Project Coordinator', 'Management Trainee', 'Marketing Manager'],
@@ -1792,7 +2090,7 @@ function getCareerPathForJob(jobTitle) {
   };
   if (exactPaths[jobTitle]) return exactPaths[jobTitle];
   if (/doctor/i.test(jobTitle)) return ['Healthcare Assistant', 'Lab Assistant', 'Junior Doctor', 'Senior Doctor'];
-  if (/solicitor|legal|paralegal/i.test(jobTitle)) return ['Legal Assistant', 'Paralegal', 'Senior Paralegal', 'Trainee Solicitor'];
+  if (/solicitor|legal|paralegal|barrister|judge/i.test(jobTitle)) return ['Legal Assistant', 'Paralegal', 'Senior Paralegal', 'Lead Paralegal'];
   if (/sales|recruitment|estate/i.test(jobTitle)) return ['Sales Executive', 'Senior Sales Executive', 'Sales Manager', 'Regional Manager'];
   if (/office|admin|reception|customer/i.test(jobTitle)) return ['Receptionist', 'Admin Assistant', 'Office Coordinator', 'Office Manager'];
   if (/creator|designer|illustrator|actor|musician/i.test(jobTitle)) return ['Creative Assistant', 'Graphic Designer', 'Senior Designer', 'Creative Director'];
@@ -1895,6 +2193,7 @@ function buildCareerActionsSection() {
 }
 
 function buildCareerProgressionSection(work) {
+  if (isAnyLegalRole(STATE.career.job)) return buildLegalCareerProgressionSection(work);
   const path = work.progression || getCareerPathForJob(STATE.career.job);
   const currentIndex = getCareerPathIndex(path, STATE.career.job);
   return `
@@ -1903,6 +2202,70 @@ function buildCareerProgressionSection(work) {
         ${index ? '<div class="career-path-arrow">↓</div>' : ''}
         <div class="career-path-node ${index === currentIndex ? 'current' : index > currentIndex ? 'future' : ''}">${role}</div>
       `).join('')}
+    </div>`;
+}
+
+function getLegalPromotionChance() {
+  const work = ensureCareerState();
+  const title = STATE.career.job;
+  const years = getCurrentJobYears();
+  const rep = STATE.stats.rep || 0;
+  let chance = 0;
+  if (title === 'Year 1 Trainee Solicitor') chance = years >= 1 ? 100 : 0;
+  else if (title === 'Year 2 Trainee Solicitor') chance = years >= 1 ? 100 : 0;
+  else if (title === 'Pupil Barrister') chance = years >= 1 ? 100 : 0;
+  else if (title === 'Junior Associate' && years >= 1) chance = 28 + (work.performance - 60) * 0.8 + (work.reputation - 55) * 0.6;
+  else if (title === 'Associate' && years >= 2) chance = 18 + (work.performance - 62) * 0.7 + (work.reputation - 58) * 0.7;
+  else if (title === 'Senior Associate' && years >= 3) chance = 5 + (work.performance - 70) * 0.45 + (work.reputation - 66) * 0.4 + rep * 0.18;
+  else if (title === 'Junior Barrister' && years >= 3) chance = 22 + (work.performance - 60) * 0.75 + rep * 0.16;
+  else if (title === 'Barrister' && years >= 4) chance = 12 + (work.performance - 65) * 0.55 + rep * 0.18;
+  else if (title === 'KC / Senior Barrister' && years >= 5) chance = 6 + (work.performance - 70) * 0.4 + rep * 0.2;
+  return clamp(Math.round(chance), 0, 92);
+}
+
+function getLegalRoleRequirementText(role) {
+  const reasons = getLegalJobRequirements({ title: role });
+  if (!reasons.length) return 'Unlocked';
+  return reasons[0];
+}
+
+function buildLegalCareerProgressionSection(work) {
+  const profile = getLegalRoleProfile(STATE.career.job) || {};
+  const path = getLegalPathForJob(STATE.career.job) || [];
+  const currentIndex = getCareerPathIndex(path, STATE.career.job);
+  const years = getCurrentJobYears();
+  const nextRole = path[currentIndex + 1] || 'Top of path';
+  const yearsRequired = profile.yearsToNextMax
+    ? `${profile.yearsToNext}-${profile.yearsToNextMax}`
+    : (profile.yearsToNext || '—');
+  const promotionChance = getLegalPromotionChance();
+  return `
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:10px">
+        <div class="career-stat-card"><div class="career-stat-top"><div class="career-stat-label">Qualification</div><div class="career-stat-value" style="font-size:12px">${getLegalQualificationStatus()}</div></div></div>
+        <div class="career-stat-card"><div class="career-stat-top"><div class="career-stat-label">Promotion Chance</div><div class="career-stat-value">${promotionChance}%</div></div></div>
+        <div class="career-stat-card"><div class="career-stat-top"><div class="career-stat-label">Prestige</div><div class="career-stat-value">${'★'.repeat(profile.prestige || 1)}</div></div></div>
+      </div>
+      <div style="padding:14px;border-radius:18px;background:#fff;border:1px solid #e6ddd3">
+        <div style="display:grid;grid-template-columns:repeat(4, minmax(0, 1fr));gap:10px">
+          <div><div style="font-size:10px;font-weight:800;color:#8a8074;text-transform:uppercase">Current Title</div><div style="font-size:13px;font-weight:800;color:#1a1814;margin-top:6px">${STATE.career.job}</div></div>
+          <div><div style="font-size:10px;font-weight:800;color:#8a8074;text-transform:uppercase">Years Done</div><div style="font-size:13px;font-weight:800;color:#1a1814;margin-top:6px">${years}</div></div>
+          <div><div style="font-size:10px;font-weight:800;color:#8a8074;text-transform:uppercase">Years Needed</div><div style="font-size:13px;font-weight:800;color:#1a1814;margin-top:6px">${yearsRequired}</div></div>
+          <div><div style="font-size:10px;font-weight:800;color:#8a8074;text-transform:uppercase">Stress Level</div><div style="font-size:13px;font-weight:800;color:#1a1814;margin-top:6px">${profile.stress || work.stress}/100</div></div>
+        </div>
+      </div>
+      <div class="career-path-card">
+        ${path.map((role, index) => `
+          ${index ? '<div class="career-path-arrow">↓</div>' : ''}
+          <div class="career-path-node ${index === currentIndex ? 'current' : index > currentIndex ? 'future' : ''}">
+            <div>${role}</div>
+            <div style="font-size:11px;font-weight:700;opacity:.72;margin-top:4px">${index <= currentIndex ? 'Unlocked' : getLegalRoleRequirementText(role)}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div style="padding:12px 14px;border-radius:16px;background:#f8f1eb;border:1px solid #eadfd2;font-size:12px;font-weight:700;color:#6c6156">
+        Next role: ${nextRole}. Current salary ${fmtMoney(STATE.finances.income)}. Promotions are performance, reputation, networking, and luck driven.
+      </div>
     </div>`;
 }
 
@@ -1945,12 +2308,23 @@ function maybePromoteCareer(work) {
   const path = work.progression || [];
   const currentIndex = getCareerPathIndex(path, STATE.career.job);
   if (currentIndex >= path.length - 1) return false;
+  if (isQualifiedLegalRole(STATE.career.job)) return false;
   if (work.performance < 76 || work.reputation < 58) return false;
+  if (isLegalSupportRole(STATE.career.job)) {
+    const chance = 0.22 + (work.performance - 70) * 0.008 + (work.reputation - 55) * 0.008;
+    if (Math.random() >= chance) return false;
+  }
   const nextRole = path[currentIndex + 1];
   STATE.career.job = nextRole;
   STATE.career.level = Math.max(STATE.career.level || 0, currentIndex + 2);
-  STATE.finances.income = Math.round(STATE.finances.income * 1.12);
+  if (isLegalSupportRole(nextRole)) {
+    const nextProfile = getLegalRoleProfile(nextRole);
+    STATE.finances.income = getGeneratedSalaryForRange(nextProfile.salaryMin, nextProfile.salaryMax, clamp((work.performance + work.reputation) / 200));
+  } else {
+    STATE.finances.income = Math.round(STATE.finances.income * 1.12);
+  }
   STATE.finances.job = nextRole;
+  STATE.career.salary = STATE.finances.income;
   work.progression = getCareerPathForJob(nextRole);
   work.performance = clamp(work.performance - 12);
   work.stress = clamp(work.stress + 8);
@@ -2058,6 +2432,174 @@ function runCareerAction(actionId) {
   updateAllUI();
 }
 
+function buildLegalAchievementMilestone(pathway) {
+  if (pathway === 'solicitor') {
+    return {
+      emoji:'⚖️',
+      title:'Qualified Solicitor',
+      body:'You completed your training contract and qualified as a solicitor. Elite legal roles now open to you.',
+    };
+  }
+  return {
+    emoji:'🏛️',
+    title:'Qualified Barrister',
+    body:'You completed pupillage and qualified as a barrister. The Bar is now fully open to you.',
+  };
+}
+
+function queueLegalAchievement(pathway) {
+  STATE.pendingMilestone = buildLegalAchievementMilestone(pathway);
+}
+
+function maybeCompleteFurtherEducationYear() {
+  const furtherEducation = ensureFurtherEducationState();
+  const current = furtherEducation.current;
+  if (!current || current.status !== 'studying') return false;
+  if (STATE.age - current.startedAge < current.durationYears) return false;
+  current.status = 'completed';
+  furtherEducation.completed.push(current.id);
+  furtherEducation.current = null;
+  logActivity(`Completed ${current.id}.`, 8);
+  STATE.pendingMilestone = {
+    emoji:'🎓',
+    title:'Law Masters Complete',
+    body:'You completed your Law Masters. Solicitor and barrister qualification routes are now unlocked.',
+  };
+  return true;
+}
+
+function applyAnnualLegalCareerProgression() {
+  ensureLegalCareerState();
+  const legalState = ensureLegalCareerState();
+  const work = STATE.career?.work;
+  const title = STATE.career?.job;
+  if (!title || title === 'None') return;
+
+  if (isLegalSupportRole(title)) legalState.supportYears += 1;
+  if (!isAnyLegalRole(title) || !work) return;
+
+  const profile = getLegalRoleProfile(title);
+  const publicRep = STATE.stats.rep || 0;
+  const networking = STATE.relationships.friends || 0;
+  const currentYears = getCurrentJobYears();
+  const raiseBase = isQualifiedLegalRole(title) ? 0.04 : 0.025;
+  const raiseBonus = Math.max(0, (work.performance - 55) * 0.0015) + Math.max(0, (work.reputation - 55) * 0.0012);
+  const volatility = profile.pathway === 'barrister' ? ((Math.random() * 0.18) - 0.06) : ((Math.random() * 0.08) - 0.02);
+  const annualRaise = Math.max(-0.03, raiseBase + raiseBonus + volatility);
+  STATE.finances.income = Math.max(0, Math.round(STATE.finances.income * (1 + annualRaise)));
+  STATE.career.salary = STATE.finances.income;
+
+  work.stress = clamp(work.stress + Math.round((profile.stress - 50) * 0.12));
+  work.satisfaction = clamp(work.satisfaction - Math.round((profile.stress - 45) * 0.05));
+  if (work.stress >= 85) {
+    STATE.stats.happy = clamp(STATE.stats.happy - 4);
+    STATE.stats.health = clamp(STATE.stats.health - 3);
+  }
+
+  if (title === 'Year 1 Trainee Solicitor' && currentYears >= 1) {
+    STATE.career.job = 'Year 2 Trainee Solicitor';
+    STATE.finances.job = 'Year 2 Trainee Solicitor';
+    STATE.career.startedAge = STATE.age;
+    STATE.finances.income = getGeneratedSalaryForRange(55000, 70000, clamp((work.performance + work.reputation) / 200));
+    STATE.career.salary = STATE.finances.income;
+    work.progression = getCareerPathForJob('Year 2 Trainee Solicitor');
+    logActivity('Moved into your second year as a trainee solicitor.', 8);
+    return;
+  }
+
+  if (title === 'Year 2 Trainee Solicitor' && currentYears >= 1) {
+    legalState.qualifications.solicitor = true;
+    STATE.stats.rep = clampRep((STATE.stats.rep || 0) + 18);
+    STATE.career.job = 'Junior Associate';
+    STATE.finances.job = 'Junior Associate';
+    STATE.career.startedAge = STATE.age;
+    STATE.finances.income = getGeneratedSalaryForRange(100000, 180000, clamp((work.performance + work.reputation) / 200));
+    STATE.career.salary = STATE.finances.income;
+    work.progression = getCareerPathForJob('Junior Associate');
+    queueLegalAchievement('solicitor');
+    return;
+  }
+
+  if (title === 'Pupil Barrister' && currentYears >= 1) {
+    legalState.qualifications.barrister = true;
+    STATE.stats.rep = clampRep((STATE.stats.rep || 0) + 20);
+    STATE.career.job = 'Junior Barrister';
+    STATE.finances.job = 'Junior Barrister';
+    STATE.career.startedAge = STATE.age;
+    STATE.finances.income = getGeneratedSalaryForRange(50000, 250000, clamp((work.performance + work.reputation) / 200));
+    STATE.career.salary = STATE.finances.income;
+    work.progression = getCareerPathForJob('Junior Barrister');
+    queueLegalAchievement('barrister');
+    return;
+  }
+
+  if (title === 'Junior Associate' && currentYears >= 3) {
+    const chance = 0.32 + (work.performance - 60) * 0.008 + (work.reputation - 55) * 0.007 + publicRep * 0.002;
+    if (Math.random() < chance) {
+      STATE.career.job = 'Associate';
+      STATE.finances.job = 'Associate';
+      STATE.career.startedAge = STATE.age;
+      STATE.finances.income = getGeneratedSalaryForRange(140000, 260000, clamp((work.performance + work.reputation) / 200));
+      STATE.career.salary = STATE.finances.income;
+      logActivity('Promoted to Associate.', 12);
+    }
+  } else if (title === 'Associate' && currentYears >= 4) {
+    const chance = 0.22 + (work.performance - 62) * 0.006 + (work.reputation - 58) * 0.006 + publicRep * 0.002;
+    if (Math.random() < chance) {
+      STATE.career.job = 'Senior Associate';
+      STATE.finances.job = 'Senior Associate';
+      STATE.career.startedAge = STATE.age;
+      STATE.finances.income = getGeneratedSalaryForRange(200000, 450000, clamp((work.performance + work.reputation) / 200));
+      STATE.career.salary = STATE.finances.income;
+      logActivity('Promoted to Senior Associate.', 14);
+    }
+  } else if (title === 'Senior Associate' && currentYears >= 3) {
+    const chance = 0.04 + (work.performance - 70) * 0.003 + (work.reputation - 66) * 0.003 + networking * 0.001 + publicRep * 0.001;
+    if (Math.random() < chance) {
+      STATE.career.job = 'Partner';
+      STATE.finances.job = 'Partner';
+      STATE.career.startedAge = STATE.age;
+      STATE.finances.income = getGeneratedSalaryForRange(700000, 5000000, clamp((work.performance + work.reputation) / 200));
+      STATE.career.salary = STATE.finances.income;
+      logActivity('Made Partner. Very few reach this level.', 20);
+    }
+  } else if (title === 'Junior Barrister' && currentYears >= 5) {
+    const chance = 0.28 + (work.performance - 60) * 0.007 + publicRep * 0.0025;
+    if (Math.random() < chance) {
+      STATE.career.job = 'Barrister';
+      STATE.finances.job = 'Barrister';
+      STATE.career.startedAge = STATE.age;
+      STATE.finances.income = getGeneratedSalaryForRange(150000, 500000, clamp((work.performance + work.reputation) / 200));
+      STATE.career.salary = STATE.finances.income;
+      logActivity('Moved up to Barrister.', 14);
+    }
+  } else if (title === 'Barrister' && currentYears >= 5) {
+    const chance = 0.14 + (work.performance - 65) * 0.005 + publicRep * 0.003 + networking * 0.0015;
+    if (Math.random() < chance) {
+      STATE.career.job = 'KC / Senior Barrister';
+      STATE.finances.job = 'KC / Senior Barrister';
+      STATE.career.startedAge = STATE.age;
+      STATE.finances.income = getGeneratedSalaryForRange(300000, 2000000, clamp((work.performance + work.reputation) / 200));
+      STATE.career.salary = STATE.finances.income;
+      logActivity('Took silk and became KC / Senior Barrister.', 18);
+    }
+  } else if (title === 'KC / Senior Barrister' && currentYears >= 6) {
+    const chance = 0.06 + (work.performance - 70) * 0.003 + publicRep * 0.003 + networking * 0.001;
+    if (Math.random() < chance) {
+      STATE.career.job = 'Judge';
+      STATE.finances.job = 'Judge';
+      STATE.career.startedAge = STATE.age;
+      STATE.finances.income = getGeneratedSalaryForRange(350000, 900000, clamp((work.performance + work.reputation) / 200));
+      STATE.career.salary = STATE.finances.income;
+      logActivity('Appointed as a Judge.', 20);
+    }
+  }
+
+  if (work.stress >= 94 && work.satisfaction <= 24 && Math.random() < 0.22) {
+    fireFromJob('Burnout pushed you out of legal work.');
+  }
+}
+
 function openJobDetail(index, category = 'full-time') {
   const jobs = getJobListByCategory(category);
   const job = jobs[index];
@@ -2093,6 +2635,9 @@ function renderJobFlow() {
 
 function renderJobDetailScreen() {
   const { job } = _jobFlowState;
+  const requirementBlock = job.locked
+    ? `<div class="job-flow-copy" style="margin-top:12px;padding:12px 14px;border-radius:14px;background:#fff4f1;border:1px solid #efd2ca;color:#a05b4f;font-weight:700">${job.lockReasons.join('<br>')}</div>`
+    : '';
   document.getElementById('job-inner').innerHTML = `
     <div class="job-flow-topbar">
       <button onclick="closeJobFlow()">Back</button>
@@ -2108,14 +2653,19 @@ function renderJobDetailScreen() {
         <span class="job-flow-stat">${job.jobCategory.replace(/^\w/, c => c.toUpperCase())}</span>
       </div>
       <div class="job-flow-copy">${job.description}</div>
+      ${requirementBlock}
     </div>
-    <button class="continue-btn" onclick="applyToSelectedJob()">Apply</button>
+    <button class="continue-btn" onclick="${job.locked ? `showToast('Requirements not met.')` : 'applyToSelectedJob()'}">${job.locked ? 'Locked' : 'Apply'}</button>
     <button class="birth-btn secondary" onclick="closeJobFlow()">Back</button>`;
 }
 
 function applyToSelectedJob() {
   if (!_jobFlowState?.job) return;
   const job = _jobFlowState.job;
+  if (job.locked) {
+    showToast('Requirements not met.');
+    return;
+  }
   const applicationScore = getPlayerApplicationScore(job);
   _jobFlowState.applicationScore = applicationScore;
 
@@ -2245,19 +2795,29 @@ function renderJobResultScreen() {
 function acceptJobOffer() {
   if (!_jobFlowState?.job) return;
   const job = _jobFlowState.job;
+  const legalState = ensureLegalCareerState();
   const currentYears = STATE.career.job && STATE.career.job !== 'None'
     ? Math.max(0, STATE.age - (STATE.career.startedAge ?? STATE.age))
     : 0;
   STATE.career.experience = (STATE.career.experience || 0) + currentYears;
   STATE.career.job = job.title;
-  STATE.career.salary = getJobAnnualIncome(job);
+  const legalSalary = job.legalProfile
+    ? getGeneratedSalaryForRange(
+        job.legalProfile.salaryMin,
+        job.legalProfile.salaryMax,
+        clamp(((_jobFlowState.applicationScore || 55) - 25), 0, 100) / 100
+      )
+    : getJobAnnualIncome(job);
+  STATE.career.salary = legalSalary;
   STATE.career.level = Math.max(STATE.career.level || 0, getCareerLevelForJob(job));
   STATE.career.startedAge = STATE.age;
   STATE.career.category = job.jobCategory;
   STATE.career.companyName = job.companyName;
   STATE.career.work = null;
-  STATE.finances.income = getJobAnnualIncome(job);
+  STATE.finances.income = legalSalary;
   STATE.finances.job = job.title;
+  if (job.title.startsWith('Year 1 Trainee Solicitor')) legalState.pathwaysTried.push('solicitor');
+  if (job.title === 'Pupil Barrister') legalState.pathwaysTried.push('barrister');
   ensureCareerState(job);
   logActivity(`Accepted a job as ${job.title} at ${job.companyName}.`, null);
   saveGame();
@@ -2446,7 +3006,9 @@ function buildUniSectionTitle(step, title, sideText='') {
 }
 
 function buildUniPageHeader(title, subtitle='') {
-  const backAction = _learnScreen === 'uniApplyBasics' ? 'closeUniApplication()' : 'previousUniApplicationStep()';
+  const backAction = _learnScreen === 'furtherEducation'
+    ? 'closeFurtherEducation()'
+    : (_learnScreen === 'uniApplyBasics' ? 'closeUniApplication()' : 'previousUniApplicationStep()');
   return `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
       <button onclick="${backAction}"
@@ -3222,8 +3784,9 @@ function buildFullTimeJobRow(job, index) {
       <div class="job-row-copy">
         <div class="job-row-title">${job.title}</div>
         <div class="job-row-meta">${job.companyName} • ${job.payLabel}</div>
+        ${job.locked ? `<div style="font-size:11px;font-weight:700;color:#b05e53;margin-top:4px">${job.lockReasons[0]}</div>` : ''}
       </div>
-      <div class="job-row-cta">›</div>
+      <div class="job-row-cta">${job.locked ? '🔒' : '›'}</div>
     </button>`;
 }
 
@@ -3265,15 +3828,23 @@ function buildWorkHomeActions() {
   const application = STATE.school.postSchool?.uniApplication;
   const pending = application?.status === 'pending';
   const graduated = isGraduate();
+  const showFurtherEducation = graduated;
+  const lawMastersDone = hasFurtherEducation('Law Masters');
+  const lawMastersCurrent = ensureFurtherEducationState().current?.id === 'Law Masters';
   return `
     <div class="actions-section">
+      ${showFurtherEducation ? `
+      <button onclick="openFurtherEducation()"
+        style="width:100%;padding:14px 16px;background:var(--surface);border:1px solid var(--border-light);border-radius:14px;font-size:13px;font-weight:800;color:var(--text);display:flex;justify-content:space-between;align-items:center;cursor:pointer">
+        <span>Further Education</span><span>${lawMastersDone ? 'Completed' : lawMastersCurrent ? 'Studying' : '›'}</span>
+      </button>` : ''}
       ${graduated ? '' : `
       <button onclick="${pending ? '' : 'openUniApplication()'}"
         style="width:100%;padding:14px 16px;background:var(--surface);border:1px solid var(--border-light);border-radius:14px;font-size:13px;font-weight:800;color:var(--text);display:flex;justify-content:space-between;align-items:center;opacity:${pending ? '.6' : '1'};cursor:${pending ? 'default' : 'pointer'}">
         <span>Apply to University</span><span>${pending ? 'Pending' : '›'}</span>
       </button>`}
       <button onclick="openJobBoard('full-time')"
-        style="width:100%;padding:14px 16px;background:var(--surface);border:1px solid var(--border-light);border-radius:14px;font-size:13px;font-weight:800;color:var(--text);display:flex;justify-content:space-between;align-items:center;margin-top:${graduated ? '0' : '10px'};cursor:pointer">
+        style="width:100%;padding:14px 16px;background:var(--surface);border:1px solid var(--border-light);border-radius:14px;font-size:13px;font-weight:800;color:var(--text);display:flex;justify-content:space-between;align-items:center;margin-top:10px;cursor:pointer">
         <span>Apply to Jobs</span><span>›</span>
       </button>
     </div>`;
@@ -3545,6 +4116,19 @@ function renderLearnTab() {
     uniApplyScreen.className = 'uni-apply-screen';
     uniApplyScreen.innerHTML = buildUniApplicationScreen();
     container.appendChild(uniApplyScreen);
+    if (tab) tab.scrollTop = 0;
+    return;
+  }
+
+  if (_learnScreen === 'furtherEducation') {
+    hero.style.display = 'none';
+    gradeBlockWrap.style.display = 'none';
+    rosterToggleWrap.style.display = 'none';
+    learnActions.style.display = 'none';
+    const furtherEducationScreen = document.createElement('div');
+    furtherEducationScreen.className = 'uni-apply-screen';
+    furtherEducationScreen.innerHTML = buildFurtherEducationScreen();
+    container.appendChild(furtherEducationScreen);
     if (tab) tab.scrollTop = 0;
     return;
   }
@@ -3931,6 +4515,16 @@ document.getElementById('age-up-btn').addEventListener('click', () => {
   }
   if (STATE.age === 18 && STATE.school.level === 'finished_school' && !postSchool.schoolFinishedShown) {
     showSchoolFinishedTransition(() => {
+      const ev = pickEvent();
+      if (ev) setTimeout(() => openEvent(ev), 200);
+    });
+    saveGame();
+    return;
+  }
+  if (STATE.pendingMilestone) {
+    const pending = STATE.pendingMilestone;
+    STATE.pendingMilestone = null;
+    showMilestone(pending, () => {
       const ev = pickEvent();
       if (ev) setTimeout(() => openEvent(ev), 200);
     });
