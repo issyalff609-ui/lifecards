@@ -43,7 +43,7 @@ function generateFamilyAppearance(gender, parentAppearances = []) {
 function getStageKey(age, gender) {
   if (age <= 3)  return 'baby';
   if (age <= 11) return gender === 'female' ? 'child_girl'       : 'child_boy';
-  if (age <= 17) return gender === 'female' ? 'teen_girl'        : 'young_adult_male';
+  if (age <= 17) return gender === 'female' ? 'teen_girl'        : 'teen_boy';
   if (age <= 24) return gender === 'female' ? 'young_adult_girl' : 'young_adult_male';
   return gender === 'female' ? 'young_adult_girl' : 'young_adult_male';
 }
@@ -57,6 +57,7 @@ function getCharacterLayers(appearance, age, options = {}) {
     baby: '1. baby',
     child_boy: '2.1 child_boy',
     child_girl: '2.2 child_girl',
+    teen_boy: '3.1 teen_boy TO ADD',
     teen_girl: '3.2 teen_girl',
     young_adult_male: '4.1 young_adult_boy',
     young_adult_girl: '4.2 young_adult_girl',
@@ -74,7 +75,7 @@ function getCharacterLayers(appearance, age, options = {}) {
   }
 
   if (!isBaby && app.hairColor) {
-    const adultHairStages = ['young_adult_male', 'young_adult_girl'];
+    const adultHairStages = ['teen_boy', 'young_adult_male', 'young_adult_girl'];
     const hairFile = adultHairStages.includes(stage)
       ? `${stage}_hair_${app.hairColor}_${app.hairStyle}.png`
       : `${stage}_hair_${app.hairStyle}_${app.hairColor}.png`;

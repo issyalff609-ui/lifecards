@@ -174,6 +174,7 @@ function startGame() {
   document.getElementById('screen-birth').classList.remove('active');
   document.getElementById('screen-game').classList.add('active');
   updateAllUI();
+  saveGame();
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────────
@@ -5657,11 +5658,13 @@ function handleChoice(ev, choice) {
       });
       logActivity(`Adopted ${name} the ${choice.petType||'dog'} 🐾`, 10);
       showOutcome(choice, totalDelta);
+      saveGame();
     });
     return;
   }
   showOutcome(choice, totalDelta);
   updateAllUI();
+  saveGame();
 }
 function showOutcome(choice, totalDelta) {
   const labels = {
