@@ -41,7 +41,6 @@ const PARENT_TRAITS_POOL = [
   { id:'hardworking', label:'Hardworking', positive:true,  effect:'Models discipline. Slightly boosts your work ethic events.' },
   { id:'funny',       label:'Funny',       positive:true,  effect:'Home is warm and easy. Happiness gets a small boost.' },
   { id:'strict',      label:'Strict',      positive:false, effect:'High expectations. Grades matter a lot to them.' },
-  { id:'absent',      label:'Absent',      positive:false, effect:'Rarely there. Relationship decays unless you make effort.' },
   { id:'ambitious',   label:'Ambitious',   positive:true,  effect:'Pushes you toward success. More career opportunities.' },
   { id:'kind',        label:'Kind',        positive:true,  effect:'Nurturing. Gives relationship boosts on interactions.' },
 ];
@@ -425,7 +424,6 @@ function getParentPrivateSupportScore() {
     if (traits.includes('hardworking')) score += 4;
     if (traits.includes('strict')) score += 3;
     if (traits.includes('distant')) score -= 6;
-    if (traits.includes('absent')) score -= 10;
     if (traits.includes('overbearing')) score -= 4;
   });
   return score;
@@ -656,10 +654,10 @@ function randomStat(min = 20, max = 85) {
 
 function buildParentNpcStats(parent) {
   const traits = parent.traits || [];
-  let looks = randomStat(30, 80);
-  let smarts = randomStat(35, 80);
-  let warmth = randomStat(25, 80);
-  let generosity = randomStat(20, 75);
+  let looks = randomStat(0, 100);
+  let smarts = randomStat(0, 100);
+  let warmth = randomStat(0, 100);
+  let generosity = randomStat(0, 100);
 
   if (isHighPayingParentJob(parent.job)) generosity += 10;
   if (['Teacher','University Lecturer','Doctor','Engineer','Architect','Accountant','Financial Advisor'].includes(parent.job)) smarts += 12;
@@ -669,7 +667,6 @@ function buildParentNpcStats(parent) {
   if (traits.includes('ambitious')) smarts += 10;
   if (traits.includes('funny')) warmth += 8;
   if (traits.includes('distant')) warmth -= 16;
-  if (traits.includes('absent')) warmth -= 24;
   if (traits.includes('overbearing')) warmth -= 10;
   if (traits.includes('strict')) warmth -= 8;
 
@@ -683,10 +680,10 @@ function buildParentNpcStats(parent) {
 
 function buildSiblingNpcStats(sibling) {
   const traits = sibling.traits || [];
-  let looks = randomStat(25, 80);
-  let smarts = randomStat(25, 80);
-  let warmth = randomStat(20, 80);
-  let trouble = randomStat(10, 70);
+  let looks = randomStat(0, 100);
+  let smarts = randomStat(0, 100);
+  let warmth = randomStat(0, 100);
+  let trouble = randomStat(0, 100);
 
   if (traits.includes('creative')) looks += 6;
   if (traits.includes('ambitious')) smarts += 8;
@@ -710,10 +707,10 @@ function buildSiblingNpcStats(sibling) {
 
 function buildClassmateNpcStats(classmate) {
   const traits = classmate.traits || [];
-  let popularity = clamp((classmate.socialStanding ?? randomStat(20, 80)) + Math.floor(Math.random() * 11) - 5);
-  let looks = randomStat(25, 85);
+  let popularity = clamp((classmate.socialStanding ?? randomStat(0, 100)) + Math.floor(Math.random() * 11) - 5);
+  let looks = randomStat(0, 100);
   let smarts = clamp((classmate.gradeScore ?? 50) + Math.floor(Math.random() * 25) - 12);
-  let reputation = randomStat(20, 75);
+  let reputation = randomStat(0, 100);
 
   if (traits.includes('charismatic')) popularity += 0;
   if (traits.includes('creative')) looks += 6;
@@ -737,10 +734,10 @@ function buildClassmateNpcStats(classmate) {
 }
 
 function buildTeacherNpcStats(teacher) {
-  let looks = randomStat(25, 75);
-  let smarts = randomStat(65, 95);
-  let warmth = randomStat(25, 80);
-  let strictness = clamp(teacher.strictness ?? randomStat(20, 85));
+  let looks = randomStat(0, 100);
+  let smarts = randomStat(0, 100);
+  let warmth = randomStat(0, 100);
+  let strictness = clamp(teacher.strictness ?? randomStat(0, 100));
 
   if (teacher.subject === 'Art' || teacher.subject === 'Music') warmth += 4;
   if (teacher.subject === 'Maths' || teacher.subject === 'Science') smarts += 4;
@@ -1030,6 +1027,10 @@ function ensureNpcCoreFields(npc, context = {}) {
 function sanitizeParentNpcState(parent) {
   if (!parent) return;
   ensureNpcCoreFields(parent, { role: 'parent' });
+  if (Array.isArray(parent.traits)) {
+    parent.traits = parent.traits.filter(trait => trait !== 'absent');
+  }
+  parent.npcStats = buildParentNpcStats(parent);
   parent.housingStatus = (parent.age ?? 0) >= 65 && parent.employmentStatus === 'Retired'
     ? 'Retired at home'
     : 'Living with family';
@@ -2098,6 +2099,72 @@ function syncSharedFamilyRelationshipFromParents() {
   ));
 }
 
+function getAllLivingFamilyMembers() {
+  const members = [];
+  [STATE.family?.mum, STATE.family?.dad].forEach(parent => {
+    if (parent && parent.alive !== false) members.push(parent);
+  });
+  (STATE.family?.siblings || []).forEach(sibling => {
+    if (sibling && sibling.alive !== false) members.push(sibling);
+  });
+  (STATE.romance?.children || []).forEach(child => {
+    if (child && child.alive !== false) members.push(child);
+  });
+  return members;
+}
+
+function getAllActiveFriends() {
+  ensurePersistentFriendState();
+  const activePartnerId = STATE.romance?.partner?.id || null;
+  const seen = new Set();
+  const friends = [];
+  [...(STATE.school?.classmates || []), ...(STATE.social?.friends || [])].forEach(friend => {
+    if (!friend || friend.id === activePartnerId) return;
+    if (friend.status && friend.status !== 'friend') return;
+    if (seen.has(friend.id)) return;
+    seen.add(friend.id);
+    if (typeof normalizeFriendRelationshipState === 'function') normalizeFriendRelationshipState(friend);
+    friends.push(friend);
+  });
+  return friends;
+}
+
+function applyGroupRelationshipChange(group, amount) {
+  if (group === 'family') {
+    getAllLivingFamilyMembers().forEach(person => {
+      person.relationship = clamp((person.relationship ?? 60) + amount);
+    });
+    syncSharedFamilyRelationshipFromParents();
+    return getAllLivingFamilyMembers().length;
+  }
+  if (group === 'friends') {
+    const friends = getAllActiveFriends();
+    friends.forEach(friend => {
+      friend.relationship = clamp((friend.relationship ?? friend.friendshipCloseness ?? 60) + amount);
+      friend.friendshipCloseness = friend.relationship;
+      if (typeof syncFriendSnapshot === 'function') syncFriendSnapshot(friend);
+    });
+    STATE.relationships.friends = clamp((STATE.relationships.friends || 0) + amount);
+    return friends.length;
+  }
+  return 0;
+}
+
+function runQuickContactAction(action) {
+  const amount = Math.floor(Math.random() * 9) + 2;
+  const familyCount = action.customType === 'quick_contact_family' ? applyGroupRelationshipChange('family', amount) : 0;
+  const friendCount = action.customType === 'quick_contact_friends' ? applyGroupRelationshipChange('friends', amount) : 0;
+  if (action.customType === 'quick_contact_family' && !familyCount) {
+    return { ok:false, toast:'No family members available right now.' };
+  }
+  if (action.customType === 'quick_contact_friends' && !friendCount) {
+    return { ok:false, toast:'No friends available right now.' };
+  }
+  if (action.cooldown > 0) STATE.actionCooldowns[action.id] = STATE.age;
+  logActivity(action.name, amount);
+  return { ok:true, toast:`${action.name} +${amount}` };
+}
+
 function applyTargetedParentEffects(effects, person) {
   if (!effects) return 0;
   markNpcInteraction(person);
@@ -2179,9 +2246,6 @@ function diaryPlaceholderFor(actionId, role, variant='success') {
       distant: [
         `PLACEHOLDER: My ${parent} felt too distant to teach me anything today.`,
       ],
-      absent: [
-        `PLACEHOLDER: My ${parent} was not around to teach me anything today.`,
-      ],
     },
     ask_for_money_young_adult: {
       success_easy: [
@@ -2231,10 +2295,6 @@ function runParentRelationshipAction(action, person, role) {
 
   if (action.customType === 'parent_learn') {
     const traits = person.traits || [];
-    if (traits.includes('absent') && Math.random() < 0.85) {
-      logActivity(diaryPlaceholderFor(action.id, role, 'absent'), 0);
-      return { ok:true, toast:`${person.firstName} was not around.` };
-    }
     if (traits.includes('distant') && Math.random() < 0.65) {
       logActivity(diaryPlaceholderFor(action.id, role, 'distant'), 0);
       return { ok:true, toast:`${person.firstName} kept their distance.` };
@@ -2382,10 +2442,13 @@ function getAvailableActions(role, age = STATE.age, person = null) {
   return actionList.filter(a => {
     const minAge = a.minAge ?? 0;
     const maxAge = a.maxAge ?? Infinity;
+    const isAdultParentCarryOver = (role === 'Mother' || role === 'Father')
+      && age >= 23
+      && maxAge === 22;
     const isAdultFriendCarryOver = role === 'Friend'
       && age >= 18
       && a.id.endsWith('_older');
-    if (!(minAge <= age && (isAdultFriendCarryOver || age <= maxAge))) return false;
+    if (!(minAge <= age && (isAdultParentCarryOver || isAdultFriendCarryOver || age <= maxAge))) return false;
     if (a.id === 'contribute_financially_young_adult') {
       const currentHome = typeof getCurrentHome === 'function' ? getCurrentHome() : null;
       if (currentHome?.source !== 'family') return false;
@@ -2423,10 +2486,13 @@ function triggerAction(actionId, personId, role) {
 
   const minAge = action.minAge ?? 0;
   const maxAge = action.maxAge ?? Infinity;
+  const isAdultParentCarryOver = (role === 'Mother' || role === 'Father')
+    && STATE.age >= 23
+    && maxAge === 22;
   const isAdultFriendCarryOver = role === 'Friend'
     && STATE.age >= 18
     && action.id.endsWith('_older');
-  if (STATE.age < minAge || (!isAdultFriendCarryOver && STATE.age > maxAge)) {
+  if (STATE.age < minAge || (!isAdultParentCarryOver && !isAdultFriendCarryOver && STATE.age > maxAge)) {
     console.warn(`Action ${actionId} not available at age ${STATE.age}`);
     return;
   }
@@ -2500,7 +2566,6 @@ function requestMoneyFromParent(personId, role, amount) {
   if (traits.includes('funny')) chance += 0.04;
   if (positiveTraitCount >= 2) chance += 0.08;
   if (traits.includes('distant')) chance -= 0.12;
-  if (traits.includes('absent')) chance -= 0.2;
   if (traits.includes('strict')) chance -= 0.08;
   if (traits.includes('overbearing')) chance -= 0.08;
   if (roundedAmount > 5000) chance -= 0.15;
@@ -2771,15 +2836,28 @@ function annualTick() {
 
   if (STATE.career?.job && STATE.career.job !== 'None' && STATE.career.work) {
     const work = STATE.career.work;
+    if (typeof advanceWorkplaceOneYear === 'function') advanceWorkplaceOneYear();
     work.performance = clamp(work.performance + Math.floor(Math.random() * 5) - 2);
     work.stress = clamp(work.stress + Math.floor(Math.random() * 7) - 3);
     work.reputation = clamp(work.reputation + Math.floor(Math.random() * 5) - 2);
     work.satisfaction = clamp(work.satisfaction + Math.floor(Math.random() * 7) - 3);
     work.energy = clamp((work.energy || 60) - 8 + Math.floor(Math.random() * 7));
 
+    if ((STATE.stats.happy || 0) > 80) {
+      work.stress = clamp(work.stress - Math.floor(Math.random() * 6));
+    }
+
     if (work.stress >= 82) {
       STATE.stats.health = clamp(STATE.stats.health - 2);
       STATE.stats.happy = clamp(STATE.stats.happy - 3);
+    }
+    if (work.stress >= 90) {
+      work.performance = clamp(work.performance - Math.floor(Math.random() * 11));
+      work.reputation = clamp(work.reputation - Math.floor(Math.random() * 11));
+      STATE.stats.health = clamp(STATE.stats.health - (Math.floor(Math.random() * 3) + 1));
+      if (Math.random() < 0.32) {
+        logActivity('Work stress started hurting your health this year.', -5);
+      }
     }
     if (work.satisfaction <= 28) {
       STATE.stats.happy = clamp(STATE.stats.happy - 2);

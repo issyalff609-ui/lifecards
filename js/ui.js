@@ -463,6 +463,9 @@ function switchTab(tab, el) {
     _learnScreen = 'main';
     _learnClassmateId = null;
   }
+  if (tab !== 'family') {
+    _expandedCardId = null;
+  }
   if (tab === 'activities') {
     window._playSubTab = null;
     window._homeView = null;
@@ -697,13 +700,12 @@ function closeEventOverlay() {
 
 // ── FAMILY TAB ────────────────────────────────────────────
 function renderFamilyTab() {
-  const currentSubTab = window._familySubTab || 'family';
-  document.getElementById('family-tab-bar').innerHTML = ['Children','Family','Partner','Friends','Quick Contact']
+  const currentSubTab = ['family', 'partner', 'friends', 'quick'].includes(window._familySubTab) ? window._familySubTab : 'family';
+  document.getElementById('family-tab-bar').innerHTML = ['Family','Partner','Friends','Quick Contact']
     .map((label, i) => {
-      const key = ['children','family','partner','friends','quick'][i];
+      const key = ['family','partner','friends','quick'][i];
       return `<button class="family-subtab ${currentSubTab === key ? 'active' : ''}" onclick="switchFamilyTab('${key}')">${label}</button>`;
     }).join('');
-  if (currentSubTab === 'children') renderFamilyChildren();
   if (currentSubTab === 'family')  renderFamilyPeople();
   if (currentSubTab === 'partner') renderFamilyPartner();
   if (currentSubTab === 'friends') renderFamilyFriends();
@@ -727,8 +729,6 @@ function getFamilyPeopleEntries() {
     people.push({ person:STATE.family.dad, role:'Father', rel:STATE.family.dad.relationship ?? STATE.relationships.family, traitPool:PARENT_TRAITS_POOL });
   STATE.family.siblings.forEach(s =>
     people.push({ person:s, role:s.gender==='male'?'Brother':'Sister', rel:s.relationship||60, traitPool:CLASSMATE_TRAITS_POOL }));
-  STATE.family.pets.filter(p => !p.dead).forEach(p =>
-    people.push({ person:{...p, firstName:p.name, traits:[]}, role:'Pet', rel:p.happiness, traitPool:[] }));
   return people;
 }
 function getChildrenEntries() {
@@ -788,27 +788,38 @@ function renderRelationshipList(listKey, heading, entries) {
       <div style="display:flex;flex-direction:column;gap:2px">
         <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint)">${heading}</span>
       </div>
-      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint)">${orderedEntries.length} contacts</span>
     </div>
     <div class="relationship-list" id="${listId}" data-reorder-list="${listKey}">
       ${orderedEntries.map(({ person, role, rel, traitPool }) => buildPersonCard(person, role, rel, traitPool, { reorderable:true, listKey })).join('')}
-    </div>
-    ${listKey === 'family' ? `<div class="family-find-card" onclick="showToast('Coming soon!')">
-      <span style="font-size:18px">＋</span>
-      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Find Extended Family</span>
-    </div>` : ''}`;
+    </div>`;
   wireRelationshipReorder(listId, listKey);
 }
 function renderFamilyPeople() {
-  renderRelationshipList('family', 'Immediate Family', getFamilyPeopleEntries());
-}
-function renderFamilyChildren() {
-  const children = getChildrenEntries();
-  if (!children.length) {
-    document.getElementById('family-tab-content').innerHTML = buildEmptyState('🧸', 'No children yet.', 'Children will appear here later.');
-    return;
+  const children = getChildrenEntries().filter(({ person }) => person?.alive !== false);
+  const parents = getFamilyPeopleEntries().filter(entry => entry.role === 'Mother' || entry.role === 'Father');
+  const siblings = getFamilyPeopleEntries()
+    .filter(entry => entry.role === 'Brother' || entry.role === 'Sister')
+    .sort((a, b) => {
+      const ageDiff = (b.person?.age ?? -1) - (a.person?.age ?? -1);
+      if (ageDiff !== 0) return ageDiff;
+      return String(a.person?.id || '').localeCompare(String(b.person?.id || ''));
+    });
+  const sections = [];
+  if (children.length) {
+    sections.push(buildFamilyDivision('Children'));
+    sections.push(children.map(({ person, role, rel, traitPool }) => buildPersonCard(person, role, rel, traitPool, { listKey:'family' })).join(''));
   }
-  renderRelationshipList('children', 'Children', children);
+  if (parents.length) {
+    sections.push(buildFamilyDivision('Parents'));
+    sections.push(parents.map(({ person, role, rel, traitPool }) => buildPersonCard(person, role, rel, traitPool, { listKey:'family' })).join(''));
+  }
+  if (siblings.length) {
+    sections.push(buildFamilyDivision('Siblings'));
+    sections.push(siblings.map(({ person, role, rel, traitPool }) => buildPersonCard(person, role, rel, traitPool, { listKey:'family' })).join(''));
+  }
+  document.getElementById('family-tab-content').innerHTML = sections.length
+    ? `<div class="relationship-list">${sections.join('')}</div>`
+    : buildEmptyState('🏠', 'No family listed.', 'Family members will appear here.');
 }
 
 function openDatingInPlay(view = 'hub') {
@@ -945,7 +956,7 @@ function buildPartnerStatusPanel(partner) {
         <button onclick="openPersonSheet('${partner.id}','Partner')" style="width:38px;height:38px;border-radius:99px;background:#fff8ea;border:1px solid #e7d7bf;box-shadow:0 3px 10px rgba(26,24,20,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">${buildDotsIcon()}</button>
       </div>
       <div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:12px;font-weight:700;color:var(--text-muted)">Relationship</span><span style="font-family:var(--mono);font-size:12px;font-weight:700;color:#d46f8f">${partner.relationship}%</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:12px;font-weight:700;color:var(--text-muted)">Relationship</span></div>
         <div style="height:8px;background:#e8e2d8;border-radius:99px;overflow:hidden"><div style="width:${partner.relationship}%;height:100%;background:#e86e95;border-radius:99px"></div></div>
       </div>
       <div>
@@ -1007,12 +1018,18 @@ function renderFamilyFriends() {
   renderRelationshipList('friends', 'Friends', friends);
 }
 function renderFamilyQuick() {
+  const quickActions = FAMILY_ACTIONS.filter(action => {
+    if ((action.id === 'call_family' || action.id === 'visit_family') && typeof getCurrentHome === 'function') {
+      return getCurrentHome()?.source !== 'family';
+    }
+    return true;
+  });
   document.getElementById('family-tab-content').innerHTML = `
     <div class="section-title">Quick Contact</div>
     <div class="action-list" id="quick-contact-actions">
-      ${FAMILY_ACTIONS.map(a => buildActionHTML(a)).join('')}
+      ${quickActions.map(a => buildActionHTML(a, 'hide-cost')).join('')}
     </div>`;
-  wireActions(document.getElementById('quick-contact-actions'), FAMILY_ACTIONS, () => {
+  wireActions(document.getElementById('quick-contact-actions'), quickActions, () => {
     updateAllUI();
     renderFamilyTab();
   });
@@ -1024,11 +1041,10 @@ let _relationshipDrag = null;
 let _personSheetDrag = null;
 
 function buildPersonCardAvatar(person) {
-  const accent = familyRoleAccent(person._roleCard || person._role || '');
   const content = person.appearance
     ? getCharacterHTML(person.appearance, person.age || STATE.age, 52, { showBg: false })
     : `<span style="font-size:26px">${person.emoji || '👤'}</span>`;
-  return `<div class="person-avatar-sq" style="border:2px solid ${accent.outline};box-shadow:0 0 0 3px ${accent.ring}">${content}</div>`;
+  return `<div class="person-avatar-sq">${content}</div>`;
 }
 
 function buildPersonCardRelBar(rel) {
@@ -1037,7 +1053,6 @@ function buildPersonCardRelBar(rel) {
       <div style="flex:1;height:8px;background:#e8e2d8;border-radius:99px;overflow:hidden">
         <div style="width:${rel}%;height:100%;background:#74b551;border-radius:99px"></div>
       </div>
-      <span style="font-family:var(--mono);font-size:11px;color:#74b551;font-weight:700">${rel}%</span>
     </div>`;
 }
 
@@ -1096,7 +1111,6 @@ function buildPersonCardExpandedBody(person, role, rel, traitPool) {
     <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-light)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
         <span style="font-size:12px;font-weight:600;color:var(--text-muted)">Relationship</span>
-        <span style="font-family:var(--mono);font-size:12px;font-weight:700;color:#74b551">${rel}%</span>
       </div>
       <div style="width:100%;height:8px;background:#e8e2d8;border-radius:99px;overflow:hidden;margin-bottom:14px">
         <div style="width:${rel}%;height:100%;background:#74b551;border-radius:99px"></div>
@@ -1117,14 +1131,14 @@ function buildPersonCard(person, role, rel, traitPool, options = {}) {
   const rawName    = `${person.firstName}${person.surname ? ' ' + person.surname : ''}`;
   const fullName   = (role === 'Friend' || role === 'classmate') ? classmateDisplayName(person) : rawName;
   const accent     = familyRoleAccent(role);
-  const ageLabel   = person.age !== undefined ? ` <strong style="font-weight:800;color:var(--text)">•</strong> <strong style="font-weight:800;color:var(--text)">Age ${person.age}</strong>` : '';
+  const ageLabel   = person.age !== undefined ? ` • Age ${person.age}` : '';
   return `
     <div class="person-card" data-person-id="${person.id}" data-list-key="${options.listKey || ''}" style="flex-direction:column;align-items:stretch;gap:0;cursor:default">
       <div style="display:flex;align-items:center;gap:14px">
         ${avatar}
         <div style="flex:1;min-width:0">
           <div style="font-size:17px;font-weight:800;letter-spacing:-.02em">${fullName}</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:2px"><strong style="font-weight:800;color:var(--text)">${role}</strong>${ageLabel}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${role}${ageLabel}</div>
           ${traits ? `<div class="trait-pills" style="margin-top:8px">${traits}</div>` : ''}
           ${relBar}
         </div>
@@ -1239,7 +1253,19 @@ function togglePersonCard(personId) {
     renderActivitiesTab();
     return;
   }
+  if (_currentTab === 'learn') {
+    renderLearnTab();
+    return;
+  }
   renderFamilyTab();
+}
+function buildFamilyDivision(label) {
+  return `
+    <div style="display:flex;align-items:center;gap:10px;margin:8px 0 12px">
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+      <div style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint);text-align:center">${label}</div>
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+    </div>`;
 }
 function buildEmptyState(emoji, title, subtitle) {
   return `<div class="placeholder-tab">
@@ -1852,6 +1878,8 @@ function reputationValueFor(person, role) {
   if (person.isPet) return { label:'Reputation', value:clamp(person.happiness ?? person._rel ?? 50) };
   if (person.reputation !== undefined) return { label:'Reputation', value:clamp(person.reputation) };
   if (person.npcStats?.reputation !== undefined) return { label:'Reputation', value:clamp(person.npcStats.reputation) };
+  if (role === 'Manager' || role === 'Supervisor' || role === 'Coworker')
+    return { label:'Reputation', value:clamp(person.reputation ?? person.npcStats?.reputation ?? person._rel ?? 50) };
   if (role === 'Mother' || role === 'Father')
     return { label:'Reputation', value:clamp(Math.round(((person.npcStats?.warmth ?? 50) + (person.npcStats?.generosity ?? 50)) / 2)) };
   if (role === 'Brother' || role === 'Sister') {
@@ -1911,6 +1939,10 @@ function openPersonSheet(personId, role) {
       const resident = typeof getHouseholdResidentById === 'function' ? getHouseholdResidentById(personId) : null;
       if (resident?.friendProfile) person = { ...resident.friendProfile, _role:'Friend', _rel:resident.relationship ?? resident.friendProfile.relationship ?? 60 };
     }
+    if (!person) {
+      const workPerson = getWorkContactById(personId);
+      if (workPerson) person = { ...workPerson, _role:workPerson.role, _rel:workPerson.relationship ?? 50 };
+    }
     const teacher = STATE.school.teachers.find(t => t.id === personId);
     if (teacher) person = { ...teacher, _role:'Teacher', _rel:teacher.npcStats?.warmth ?? 50 };
     const pet = STATE.family.pets.find(p => p.id === personId);
@@ -1944,7 +1976,6 @@ function openPersonSheet(personId, role) {
           <div class="person-sheet-progress compact">
             <div class="person-sheet-progress-head">
               <span>${relLabel}</span>
-              <span>${person._rel}%</span>
             </div>
             <div class="person-sheet-progress-track"><div class="person-sheet-progress-fill" style="width:${person._rel}%;background:${relColor}"></div></div>
           </div>
@@ -1975,6 +2006,9 @@ function buildPersonSheetAvatar(person) {
 }
 
 function buildPersonSheetTraits(person, role) {
+  if (role === 'Manager' || role === 'Supervisor' || role === 'Coworker') {
+    return (person.workPersonality || person.traits || []).map(trait => `<span class="trait-pill">${titleCaseWorkTrait(trait)}</span>`).join('');
+  }
   if ((role === 'Friend' || role === 'classmate') && !canRevealClassmateTraits(person)) {
     return '';
   }
@@ -2035,6 +2069,15 @@ function npcStatConfigFor(role, person) {
       ['Smarts', 'smarts', person.npcStats?.smarts, '#8fbffa'],
       ['Warmth', 'warmth', person.npcStats?.warmth, '#ffd52a'],
       ['Strictness', 'generosity', person.npcStats?.strictness, '#ef6b63'],
+    ];
+  }
+  if (role === 'Manager' || role === 'Supervisor' || role === 'Coworker') {
+    return [
+      ['Looks', 'looks', person.npcStats?.looks, '#ff89db'],
+      ['Smarts', 'smarts', person.npcStats?.smarts, '#8fbffa'],
+      ['Reputation', 'reputation', person.reputation ?? person.npcStats?.reputation, '#4ecb71'],
+      ['Work Ethic', 'generosity', person.workEthic ?? person.npcStats?.workEthic, '#ef9f47'],
+      ['Sociability', 'warmth', person.sociability ?? person.npcStats?.sociability, '#9d87ff'],
     ];
   }
   return [];
@@ -2098,6 +2141,12 @@ function buildPersonSheetDetails(person, role) {
     rows.push(['Subject', buildSheetSymbolIcon('job', '#bc8f68'), person.subject || 'Unknown']);
     rows.push(['Title', buildSheetSymbolIcon('job', '#bc8f68'), person.title || 'Teacher']);
   }
+  if (role === 'Manager' || role === 'Supervisor' || role === 'Coworker') {
+    rows.push(['Age', buildSheetSymbolIcon('age', '#f2b48c'), `${person.age}`]);
+    rows.push(['Job', buildSheetSymbolIcon('job', '#bc8f68'), person.title || person.jobTitle || role]);
+    rows.push(['Company', buildSheetSymbolIcon('job', '#bc8f68'), person.companyName || STATE.career?.companyName || 'Company']);
+    rows.push(['Status', buildSheetSymbolIcon('single', '#ef98a5'), person.relationshipStatus || 'Single']);
+  }
   if (!person.isPet && role !== 'Teacher' && role !== 'Partner' && role !== 'Son' && role !== 'Daughter') rows.push(['Compatible', buildSheetSymbolIcon('compatibility', '#f0b14f'), `${compatibilityFor(person)}%`]);
   const compactRows = rows.slice(0, 4);
   while (compactRows.length < 4) compactRows.push(['', '', '']);
@@ -2127,6 +2176,11 @@ function buildPersonSheetLifeDetails(person, role) {
     rows.push(['Living Together', person.livingTogether ? 'Yes' : 'Not yet']);
   }
   if (role === 'Son' || role === 'Daughter') rows.push(['Family Role', role]);
+  if (role === 'Manager' || role === 'Supervisor' || role === 'Coworker') {
+    rows.push(['Work Role', role]);
+    if (person.companyName) rows.push(['Company', person.companyName]);
+    if (person.salary && person.salary > 0) rows.push(['Income', fmtMoney(person.salary)]);
+  }
   if (person.careerPath && person.jobTitle && person.jobTitle !== 'None') rows.push(['Career Path', person.careerPath]);
   if (!rows.length) return '';
   return `
@@ -2896,116 +2950,227 @@ function getCareerLevelForJob(job) {
   return 1;
 }
 
-function buildWorkPerson(role, genderHint) {
-  const gender = genderHint || (Math.random() > 0.5 ? 'male' : 'female');
-  return {
+const WORK_BOSS_PERSONALITIES = ['strict', 'supportive', 'manipulative', 'lazy', 'intimidating', 'workaholic', 'inappropriate', 'career-focused'];
+const WORK_FIELDS = {
+  legal: ['Trainee', 'Associate', 'Senior Associate', 'Partner'],
+  healthcare: ['Junior Clinician', 'Clinician', 'Senior Clinician', 'Department Lead'],
+  engineering: ['Junior Engineer', 'Engineer', 'Senior Engineer', 'Engineering Lead'],
+  technology: ['Junior Developer', 'Developer', 'Senior Developer', 'Engineering Manager'],
+  business: ['Assistant', 'Executive', 'Senior Executive', 'Director'],
+  creative: ['Junior Designer', 'Designer', 'Senior Designer', 'Creative Director'],
+  public_service: ['Officer', 'Senior Officer', 'Team Lead', 'Department Lead'],
+  general: ['Assistant', 'Coordinator', 'Senior Coordinator', 'Manager'],
+};
+
+function titleCaseWorkTrait(value) {
+  return String(value || '').split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+}
+
+function getWorkRosterPeople(work) {
+  return Array.isArray(work?.people) ? work.people : [];
+}
+
+function getWorkContactById(personId) {
+  return getWorkRosterPeople(STATE.career?.work).find(person => person.id === personId) || null;
+}
+
+function getWorkPeopleByRole(work, role) {
+  return getWorkRosterPeople(work).filter(person => person.role === role);
+}
+
+function getPrimaryWorkContact(work, role) {
+  return getWorkPeopleByRole(work, role)[0] || null;
+}
+
+function getWorkFieldFromCareer() {
+  const title = String(STATE.career?.job || '').toLowerCase();
+  const category = String(STATE.career?.category || '').toLowerCase();
+  if (/solicitor|barrister|paralegal|lawyer|legal|judge|partner/.test(title)) return 'legal';
+  if (/doctor|nurse|clinic|health|care/.test(title)) return 'healthcare';
+  if (/engineer|developer|software|analyst|technology|tech/.test(title)) return 'technology';
+  if (/designer|creative|content|brand/.test(title)) return 'creative';
+  if (/police|fire|officer|public/.test(title)) return 'public_service';
+  if (/business|finance|office|manager|assistant|executive|sales|recruitment|estate/.test(title) || ['office', 'corporate', 'sales'].includes(category)) return 'business';
+  return 'general';
+}
+
+function getWorkFieldTitles(field) {
+  return WORK_FIELDS[field] || WORK_FIELDS.general;
+}
+
+function getWorkLevelForTitle(title, titles) {
+  const normalized = String(title || '').toLowerCase();
+  const exact = titles.findIndex(item => item.toLowerCase() === normalized);
+  if (exact >= 0) return exact;
+  if (/partner|director|head|lead|principal|judge/.test(normalized)) return titles.length - 1;
+  if (/senior|supervisor|manager/.test(normalized)) return Math.max(1, titles.length - 2);
+  if (/associate|lawyer|engineer|developer|clinician|officer|designer|executive|coordinator/.test(normalized)) return Math.min(1, titles.length - 1);
+  return 0;
+}
+
+function getWorkAgeRangeForLevel(level, maxLevel) {
+  if (level >= maxLevel) return [38, 68];
+  if (level === maxLevel - 1) return [31, 56];
+  if (level === 1) return [24, 42];
+  return [21, 32];
+}
+
+function createWorkplaceNpc(config = {}) {
+  const gender = config.gender || (Math.random() > 0.5 ? 'male' : 'female');
+  const ageRange = config.ageRange || [24, 45];
+  const age = Math.floor(Math.random() * (ageRange[1] - ageRange[0] + 1)) + ageRange[0];
+  const person = {
     id: uid(),
-    role,
+    role: config.role || 'Coworker',
     firstName: pickRandom(NAMES_UK[gender]),
     surname: pickRandom(NAMES_UK.surnames),
+    gender,
+    age,
     appearance: generateAppearance(gender),
-    relationship: 44 + Math.floor(Math.random() * 28),
+    relationship: config.relationship ?? clamp(42 + Math.floor(Math.random() * 26)),
+    title: config.title || 'Coworker',
+    field: config.field || getWorkFieldFromCareer(),
+    jobTitle: config.title || 'Coworker',
+    workPosition: config.title || 'Coworker',
+    employmentStatus: 'Employed',
+    companyName: STATE.career?.companyName || 'Company',
+    relationshipStatus: Math.random() < 0.58 ? 'Single' : pickRandom(['Dating', 'Married', 'Divorced']),
+    salary: config.salary || 0,
+    workEthic: clamp(config.workEthic ?? randomStat(0, 100)),
+    sociability: clamp(config.sociability ?? randomStat(0, 100)),
+    stress: clamp(config.stress ?? randomStat(0, 100)),
+    happiness: clamp(config.happiness ?? randomStat(0, 100)),
+    reputation: clamp(config.reputation ?? randomStat(0, 100)),
+    workPersonality: config.workPersonality || [],
+    workRank: config.workRank ?? 0,
+    canReplaceBossLater: !!config.canReplaceBossLater,
+    lifeUpdates: Array.isArray(config.lifeUpdates) ? config.lifeUpdates : [],
+    traits: Array.isArray(config.workPersonality) ? [...config.workPersonality] : [],
   };
-}
-
-function getWorkPerson(work, role) {
-  return (work.people || []).find(person => person.role === role) || null;
-}
-
-function adjustWorkRelationship(work, role, amount) {
-  const person = getWorkPerson(work, role);
-  if (!person) return;
-  person.relationship = clamp((person.relationship || 50) + amount);
-}
-
-function maybeTriggerWorkplaceEvent(work, actionId, apply) {
-  if (Math.random() > 0.24) return;
-
-  const boss = getWorkPerson(work, 'Boss');
-  const coworker = getWorkPerson(work, 'Coworker');
-  const mentor = getWorkPerson(work, 'Mentor');
-  const rival = getWorkPerson(work, 'Office Rival');
-  const eventPools = {
-    work_hard: [
-      {
-        text: `${boss?.firstName || 'Your boss'} noticed how much effort you put in.`,
-        toast: 'Your effort got noticed.',
-        effects: { performance:+3, reputation:+5, satisfaction:+2, publicRep:+1 },
-      },
-      {
-        text: `${mentor?.firstName || 'Your mentor'} gave you advice that made your work sharper.`,
-        toast: 'Your mentor backed you.',
-        effects: { performance:+4, stress:-2, satisfaction:+3 },
-      },
-    ],
-    slack_off: [
-      {
-        text: `${rival?.firstName || 'A coworker'} noticed you coasting and mentioned it to the team.`,
-        toast: 'People noticed you checked out.',
-        effects: { reputation:-6, satisfaction:-1 },
-      },
-      {
-        text: `${boss?.firstName || 'Your boss'} caught you doing the bare minimum.`,
-        toast: 'Your boss is unimpressed.',
-        effects: { performance:-4, reputation:-5, stress:+3 },
-      },
-    ],
-    socialise: [
-      {
-        text: `${coworker?.firstName || 'A coworker'} invited you into the group chat after work.`,
-        toast: 'You feel more included at work.',
-        effects: { satisfaction:+5, relationships:+6, reputation:+3, happy:+2 },
-      },
-      {
-        text: `${mentor?.firstName || 'Your mentor'} started taking you more seriously.`,
-        toast: 'You made a useful connection.',
-        effects: { satisfaction:+3, reputation:+4, performance:+1 },
-      },
-    ],
-    ask_raise: [
-      {
-        text: `${boss?.firstName || 'Your boss'} respected how directly you made your case.`,
-        toast: 'You came across confidently.',
-        effects: { reputation:+3, satisfaction:+2 },
-      },
-      {
-        text: `${boss?.firstName || 'Your boss'} thought your timing was off.`,
-        toast: 'The conversation landed awkwardly.',
-        effects: { stress:+4, reputation:-3, satisfaction:-3 },
-      },
-    ],
-    stay_late: [
-      {
-        text: `${boss?.firstName || 'Your boss'} praised your commitment in front of the team.`,
-        toast: 'Staying late paid off.',
-        effects: { reputation:+5, performance:+2, satisfaction:+2 },
-      },
-      {
-        text: 'You pushed through, but by the end of the night you were running on fumes.',
-        toast: 'You are feeling drained.',
-        effects: { health:-2, energy:-6, stress:+4 },
-      },
-    ],
-    call_sick: [
-      {
-        text: `${coworker?.firstName || 'A coworker'} covered for you and kept things smooth.`,
-        toast: 'Someone had your back.',
-        effects: { stress:-4, health:+2, satisfaction:+2 },
-      },
-      {
-        text: `${boss?.firstName || 'Your boss'} sounded doubtful when you called in.`,
-        toast: 'Your boss seemed suspicious.',
-        effects: { reputation:-4, stress:+2 },
-      },
-    ],
+  person.npcStats = {
+    looks: clamp(randomStat(0, 100)),
+    smarts: clamp(randomStat(0, 100)),
+    reputation: person.reputation,
+    workEthic: person.workEthic,
+    sociability: person.sociability,
   };
+  if (typeof ensureNpcCoreFields === 'function') ensureNpcCoreFields(person, { role: 'friend', socialGroup: 'coworker' });
+  person.socialGroup = 'coworker';
+  person.job = person.jobTitle;
+  return person;
+}
 
-  const pool = eventPools[actionId];
-  if (!pool?.length) return;
-  const event = pickRandom(pool);
-  apply(event.effects || {});
-  logActivity(event.text, (event.effects?.reputation || 0) + (event.effects?.satisfaction || 0) > 0 ? 5 : -3);
-  if (event.toast) showToast(event.toast);
+function buildWorkplaceRoster(currentTitle) {
+  const field = getWorkFieldFromCareer();
+  const titles = getWorkFieldTitles(field);
+  const currentLevel = getWorkLevelForTitle(currentTitle, titles);
+  const maxLevel = titles.length - 1;
+  const managerLevel = Math.min(maxLevel, Math.max(currentLevel + 2, maxLevel));
+  const supervisorLevel = Math.min(maxLevel - 1, Math.max(currentLevel + 1, currentLevel));
+  const coworkerLevels = [
+    Math.max(0, currentLevel - 1),
+    currentLevel,
+    Math.min(maxLevel - 1, currentLevel + 1),
+  ];
+  const manager = createWorkplaceNpc({
+    role: 'Manager',
+    title: titles[managerLevel],
+    field,
+    ageRange: getWorkAgeRangeForLevel(managerLevel, maxLevel),
+    relationship: clamp(38 + Math.floor(Math.random() * 20)),
+    workPersonality: sampleN(WORK_BOSS_PERSONALITIES.map(id => ({ id })), 2).map(item => item.id),
+    workRank: managerLevel,
+    canReplaceBossLater: true,
+  });
+  const supervisor = createWorkplaceNpc({
+    role: 'Supervisor',
+    title: titles[supervisorLevel],
+    field,
+    ageRange: getWorkAgeRangeForLevel(supervisorLevel, maxLevel),
+    relationship: clamp(44 + Math.floor(Math.random() * 22)),
+    workPersonality: sampleN(WORK_BOSS_PERSONALITIES.map(id => ({ id })), 1).map(item => item.id),
+    workRank: supervisorLevel,
+    canReplaceBossLater: true,
+  });
+  const coworkers = coworkerLevels.map((level, index) => createWorkplaceNpc({
+    role: 'Coworker',
+    title: titles[level],
+    field,
+    ageRange: getWorkAgeRangeForLevel(level, maxLevel),
+    relationship: clamp(40 + Math.floor(Math.random() * 28)),
+    workRank: level,
+    canReplaceBossLater: index === 2,
+  }));
+  return [manager, supervisor, ...coworkers];
+}
+
+function getWorkInteractionDefinitions(role) {
+  if (role === 'Manager') {
+    return [
+      ['ask_feedback', 'Ask for Feedback'],
+      ['discuss_promotion', 'Discuss Promotion'],
+      ['request_raise', 'Request Raise'],
+      ['small_talk', 'Small Talk'],
+      ['flirt', 'Flirt'],
+      ['hook_up', 'Try to Hook Up'],
+      ['volunteer_project', 'Volunteer for Project'],
+      ['more_responsibility', 'Ask for More Responsibility'],
+    ];
+  }
+  if (role === 'Supervisor') {
+    return [
+      ['ask_help', 'Ask for Help'],
+      ['request_training', 'Request Training'],
+      ['discuss_assignment', 'Discuss Assignment'],
+      ['complain_coworker', 'Complain About Coworker'],
+      ['small_talk', 'Small Talk'],
+      ['flirt', 'Flirt'],
+      ['hook_up', 'Try to Hook Up'],
+      ['impress_supervisor', 'Impress Supervisor'],
+      ['avoid_supervisor', 'Avoid Supervisor'],
+      ['stay_late_together', 'Stay Late Together'],
+    ];
+  }
+  return [
+    ['grab_lunch', 'Grab Lunch'],
+    ['gossip', 'Gossip'],
+    ['help_task', 'Help With Task'],
+    ['ask_weekend', 'Ask About Weekend'],
+    ['work_late_together', 'Work Late Together'],
+    ['work_drinks', 'Attend Work Drinks'],
+    ['flirt', 'Flirt'],
+    ['hook_up', 'Hook Up'],
+    ['start_dating', 'Start Dating'],
+    ['secret_office_romance', 'Secret Office Romance'],
+    ['take_credit', 'Take Credit for Work'],
+    ['spread_rumour', 'Spread Rumour'],
+    ['workplace_rivalry', 'Workplace Rivalry'],
+  ];
+}
+
+function getWorkActionCategoryDefinitions() {
+  return [
+    { id:'performance', label:'Performance', subtitle:'Push output and manage workload', actions:['work_hard', 'stay_late', 'take_it_easy'] },
+    { id:'politics', label:'Career Moves', subtitle:'Raises, promotions, and office leverage', actions:['socialise', 'ask_raise', 'ask_promotion'] },
+    { id:'time_off', label:'Recovery', subtitle:'Reduce pressure before it spills over', actions:['slack_off', 'call_sick'] },
+    { id:'mobility', label:'Next Move', subtitle:'Search elsewhere or leave cleanly', actions:['search_jobs', 'quit_job'] },
+  ];
+}
+
+function getCareerActionDefinition(actionId) {
+  const defs = {
+    work_hard: { label:'Work Hard', subtitle:'Increase performance and reputation at a cost.', icon:'mdi:briefcase-check-outline' },
+    slack_off: { label:'Slack Off', subtitle:'Relieve pressure, but people may notice.', icon:'mdi:sofa-outline' },
+    socialise: { label:'Socialise', subtitle:'Build office relationships and job satisfaction.', icon:'mdi:account-group-outline' },
+    ask_raise: { label:'Ask for a Raise', subtitle:'Depends on performance, reputation, and your manager.', icon:'mdi:cash-plus' },
+    ask_promotion: { label:'Ask for a Promotion', subtitle:'Push for advancement or get a reality check.', icon:'mdi:stairs-up' },
+    stay_late: { label:'Stay Late', subtitle:'Trade energy and stress for output.', icon:'mdi:weather-night' },
+    take_it_easy: { label:'Take It Easy', subtitle:'Lower stress and protect happiness.', icon:'mdi:coffee-outline' },
+    call_sick: { label:'Call In Sick', subtitle:'Recover, but overuse damages trust.', icon:'mdi:thermometer' },
+    search_jobs: { label:'Search for Jobs', subtitle:'Go back to the applications page.', icon:'mdi:magnify' },
+    quit_job: { label:'Quit Job', subtitle:'Leave the role immediately.', icon:'mdi:exit-to-app' },
+  };
+  return defs[actionId] || { label:actionId, subtitle:'', icon:'mdi:briefcase-outline' };
 }
 
 function getCareerPathForJob(jobTitle) {
@@ -3055,18 +3220,22 @@ function ensureCareerState(job = null) {
       reputation: clamp(46 + Math.floor(Math.random() * 18)),
       satisfaction: clamp(48 + Math.floor(Math.random() * 20)),
       energy: clamp(62 + Math.floor(Math.random() * 16)),
-      people: [
-        buildWorkPerson('Boss', 'female'),
-        buildWorkPerson('Coworker'),
-        buildWorkPerson('Mentor'),
-        buildWorkPerson('Office Rival'),
-      ],
+      people: buildWorkplaceRoster(currentJob.title || STATE.career.job),
       progression: getCareerPathForJob(currentJob.title || STATE.career.job),
       category: currentJob.jobCategory || STATE.career.category || 'office',
       companyName: currentJob.companyName || STATE.career.companyName || 'Company',
       icon: currentJob.icon || 'mdi:briefcase-outline',
+      field: getWorkFieldFromCareer(),
+      callInSickCount: 0,
+      officeRomanceId: null,
+      lastAnnualPulseAge: STATE.age,
     };
   }
+  if (!Array.isArray(STATE.career.work.people) || !STATE.career.work.people.length) {
+    STATE.career.work.people = buildWorkplaceRoster(STATE.career.job);
+  }
+  STATE.career.work.field = STATE.career.work.field || getWorkFieldFromCareer();
+  STATE.career.work.companyName = STATE.career.work.companyName || STATE.career.companyName || 'Company';
   return STATE.career.work;
 }
 
@@ -3092,57 +3261,39 @@ function buildCareerStatCard(label, value, opts = {}) {
 }
 
 function buildCareerPeopleSection(work) {
+  const manager = getPrimaryWorkContact(work, 'Manager');
+  const supervisor = getPrimaryWorkContact(work, 'Supervisor');
+  const coworkers = getWorkPeopleByRole(work, 'Coworker');
   return `
-    <div class="career-people-grid">
-      ${work.people.map(person => `
-        <div class="career-person-card">
-          <div class="career-person-avatar">${getCharacterHTML(person.appearance, 33, 42, { showBg:false })}</div>
-          <div class="career-person-copy">
-            <div class="career-person-role">${person.role}</div>
-            <div class="career-person-name">${person.firstName} ${person.surname}</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="career-action-btn" onclick="openLearnScreen('workPeople')">
+        <div class="career-action-main">
+          <div class="career-action-icon"><iconify-icon icon="mdi:account-group-outline" style="font-size:18px"></iconify-icon></div>
+          <div class="career-action-text">
+            <div class="career-action-title">Coworkers</div>
+            <div class="career-action-sub">${[manager, supervisor, ...coworkers].filter(Boolean).length} people in your current workplace</div>
           </div>
         </div>
-      `).join('')}
+        <span class="choice-arrow">›</span>
+      </button>
     </div>`;
 }
 
 function buildCareerActionsSection() {
-  const actions = [
-    ['work_hard', 'mdi:briefcase-check-outline', 'Work Hard', 'Push for stronger performance'],
-    ['slack_off', 'mdi:sofa-outline', 'Slack Off', 'Take it easier for a while'],
-    ['socialise', 'mdi:account-group-outline', 'Socialise', 'Build workplace relationships'],
-    ['ask_raise', 'mdi:cash-plus', 'Ask for Raise', 'Test your leverage'],
-    ['stay_late', 'mdi:weather-night', 'Stay Late', 'Trade energy for momentum'],
-    ['call_sick', 'mdi:thermometer', 'Call in Sick', 'Protect your health'],
-    ['search_jobs', 'mdi:magnify', 'Search for Jobs', 'Look for a better move'],
-    ['quit_job', 'mdi:exit-to-app', 'Quit Job', 'Walk away from the role'],
-  ];
+  const categories = getWorkActionCategoryDefinitions();
   return `
     <div class="career-actions">
-      ${actions.map(([id, icon, title, sub]) => `
-        <button class="career-action-btn" onclick="runCareerAction('${id}')">
+      ${categories.map(category => `
+        <button class="career-action-btn" onclick="openLearnScreen('workActions:${category.id}')">
           <div class="career-action-main">
-            <div class="career-action-icon"><iconify-icon icon="${icon}" style="font-size:18px"></iconify-icon></div>
+            <div class="career-action-icon"><iconify-icon icon="mdi:briefcase-outline" style="font-size:18px"></iconify-icon></div>
             <div class="career-action-text">
-              <div class="career-action-title">${title}</div>
-              <div class="career-action-sub">${sub}</div>
+              <div class="career-action-title">${category.label}</div>
+              <div class="career-action-sub">${category.subtitle}</div>
             </div>
           </div>
           <span class="choice-arrow">›</span>
         </button>
-      `).join('')}
-    </div>`;
-}
-
-function buildCareerProgressionSection(work) {
-  if (isAnyLegalRole(STATE.career.job)) return buildLegalCareerProgressionSection(work);
-  const path = work.progression || getCareerPathForJob(STATE.career.job);
-  const currentIndex = getCareerPathIndex(path, STATE.career.job);
-  return `
-    <div class="career-path-card">
-      ${path.map((role, index) => `
-        ${index ? '<div class="career-path-arrow">↓</div>' : ''}
-        <div class="career-path-node ${index === currentIndex ? 'current' : index > currentIndex ? 'future' : ''}">${role}</div>
       `).join('')}
     </div>`;
 }
@@ -3226,22 +3377,125 @@ function buildEmployedCareerPage() {
         <div class="career-section-title">Work Stats</div>
         <div class="career-stats-grid" style="margin-top:10px">
           ${buildCareerStatCard('Performance', work.performance)}
-          ${buildCareerStatCard('Stress', work.stress, { invert:true })}
           ${buildCareerStatCard('Reputation', work.reputation)}
+          ${buildCareerStatCard('Stress', work.stress, { invert:true })}
           ${buildCareerStatCard('Job Satisfaction', work.satisfaction)}
         </div>
       </div>
       <div>
-        <div class="career-section-title">Important People</div>
+        <div class="career-section-title">Coworkers</div>
         <div style="margin-top:10px">${buildCareerPeopleSection(work)}</div>
       </div>
       <div>
         <div class="career-section-title">Work Actions</div>
         <div style="margin-top:10px">${buildCareerActionsSection()}</div>
       </div>
-      <div>
-        <div class="career-section-title">Career Progression</div>
-        <div style="margin-top:10px">${buildCareerProgressionSection(work)}</div>
+    </div>`;
+}
+
+function workScreenBackTarget() {
+  return STATE.career?.job && STATE.career.job !== 'None' ? 'main' : 'jobsBoard';
+}
+
+function buildWorkPeopleCard(person) {
+  const isExpanded = _expandedCardId === person.id;
+  const actions = getWorkInteractionDefinitions(person.role);
+  return `
+    <div class="person-card" style="flex-direction:column;align-items:stretch;gap:0">
+      <div style="display:flex;align-items:center;gap:14px">
+        ${buildPersonCardAvatar(person)}
+        <div style="flex:1;min-width:0">
+          <div style="font-size:17px;font-weight:800;letter-spacing:-.02em">${person.firstName} ${person.surname}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${String(person.role || 'Coworker').toLowerCase()} • Age ${person.age}</div>
+          ${!isExpanded ? `<div style="display:flex;align-items:center;gap:8px;margin-top:7px"><div style="flex:1;height:8px;background:#e8e2d8;border-radius:99px;overflow:hidden"><div style="width:${person.relationship}%;height:100%;background:#74b551;border-radius:99px"></div></div></div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          <button onclick="event.stopPropagation();togglePersonCard('${person.id}')"
+            style="width:38px;height:38px;border-radius:99px;background:#fff4dc;border:1px solid #e6d4b8;box-shadow:0 3px 10px rgba(26,24,20,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">${buildSpeechBubbleIcon('#8b7f73')}</button>
+          <button onclick="event.stopPropagation();openPersonSheet('${person.id}','${person.role}')"
+            style="width:38px;height:38px;border-radius:99px;background:#fff8ea;border:1px solid #e7d7bf;box-shadow:0 3px 10px rgba(26,24,20,.08);display:flex;align-items:center;justify-content:center;cursor:pointer">${buildDotsIcon()}</button>
+        </div>
+      </div>
+      ${isExpanded ? `
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-light)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px"><span style="font-size:12px;font-weight:600;color:var(--text-muted)">Relationship</span></div>
+          <div style="width:100%;height:8px;background:#e8e2d8;border-radius:99px;overflow:hidden;margin-bottom:14px"><div style="width:${person.relationship}%;height:100%;background:#74b551;border-radius:99px"></div></div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            ${actions.map(([id, label]) => `<button onclick="runWorkInteraction('${person.id}','${id}')" style="width:100%;padding:11px 14px;background:var(--surface-mid);border:1px solid var(--border);border-radius:11px;font-size:13px;font-weight:600;color:var(--text);text-align:left;cursor:pointer">${label}</button>`).join('')}
+          </div>
+        </div>` : ''}
+    </div>`;
+}
+
+function buildWorkPeoplePage() {
+  const work = ensureCareerState();
+  const manager = getPrimaryWorkContact(work, 'Manager');
+  const supervisor = getPrimaryWorkContact(work, 'Supervisor');
+  const coworkers = getWorkPeopleByRole(work, 'Coworker');
+  return `
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <button onclick="openLearnScreen('${workScreenBackTarget()}')" style="padding:0;background:none;border:none;font-size:13px;font-weight:700;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer"><span style="font-size:18px;line-height:1">‹</span><span>Back</span></button>
+        <div style="font-size:16px;font-weight:800;color:var(--text)">Coworkers</div>
+        <div style="width:36px"></div>
+      </div>
+      ${manager ? buildFamilyDivision('Manager') + buildWorkPeopleCard(manager) : ''}
+      ${supervisor ? buildFamilyDivision('Supervisor') + buildWorkPeopleCard(supervisor) : ''}
+      ${coworkers.length ? buildFamilyDivision('Coworkers') + coworkers.map(buildWorkPeopleCard).join('') : ''}
+    </div>`;
+}
+
+function buildCareerActionCategoryPage(categoryId) {
+  const category = getWorkActionCategoryDefinitions().find(item => item.id === categoryId) || getWorkActionCategoryDefinitions()[0];
+  return `
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <button onclick="openLearnScreen('${workScreenBackTarget()}')" style="padding:0;background:none;border:none;font-size:13px;font-weight:700;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer"><span style="font-size:18px;line-height:1">‹</span><span>Back</span></button>
+        <div style="font-size:16px;font-weight:800;color:var(--text)">${category.label}</div>
+        <div style="width:36px"></div>
+      </div>
+      <div style="font-size:13px;color:var(--text-muted)">${category.subtitle}</div>
+      <div class="career-actions">
+        ${category.actions.map(actionId => {
+          const action = getCareerActionDefinition(actionId);
+          return `
+            <button class="career-action-btn" onclick="runCareerAction('${actionId}')">
+              <div class="career-action-main">
+                <div class="career-action-icon"><iconify-icon icon="${action.icon}" style="font-size:18px"></iconify-icon></div>
+                <div class="career-action-text">
+                  <div class="career-action-title">${action.label}</div>
+                  <div class="career-action-sub">${action.subtitle}</div>
+                </div>
+              </div>
+              <span class="choice-arrow">›</span>
+            </button>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+function buildCareerActionsHomePage() {
+  const categories = getWorkActionCategoryDefinitions();
+  return `
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <button onclick="openLearnScreen('${workScreenBackTarget()}')" style="padding:0;background:none;border:none;font-size:13px;font-weight:700;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer"><span style="font-size:18px;line-height:1">‹</span><span>Back</span></button>
+        <div style="font-size:16px;font-weight:800;color:var(--text)">Work Actions</div>
+        <div style="width:36px"></div>
+      </div>
+      <div class="career-actions">
+        ${categories.map(category => `
+          <button class="career-action-btn" onclick="openLearnScreen('workActions:${category.id}')">
+            <div class="career-action-main">
+              <div class="career-action-icon"><iconify-icon icon="mdi:briefcase-outline" style="font-size:18px"></iconify-icon></div>
+              <div class="career-action-text">
+                <div class="career-action-title">${category.label}</div>
+                <div class="career-action-sub">${category.subtitle}</div>
+              </div>
+            </div>
+            <span class="choice-arrow">›</span>
+          </button>
+        `).join('')}
       </div>
     </div>`;
 }
@@ -3290,6 +3544,363 @@ function fireFromJob(reason) {
   showToast('You lost your job.');
 }
 
+function applyWorkStatBundle(work, effects = {}) {
+  work.performance = clamp(work.performance + (effects.performance || 0));
+  work.stress = clamp(work.stress + (effects.stress || 0));
+  work.reputation = clamp(work.reputation + (effects.reputation || 0));
+  work.satisfaction = clamp(work.satisfaction + (effects.satisfaction || 0));
+  work.energy = clamp((work.energy || 60) + (effects.energy || 0));
+  if (effects.money) STATE.finances.balance += effects.money;
+  applyEffects({
+    happy: effects.happy || 0,
+    health: effects.health || 0,
+    rel_friends: effects.relationships || 0,
+    rep: effects.publicRep || 0,
+  });
+}
+
+function adjustSpecificWorkRelationship(person, amount) {
+  if (!person) return;
+  person.relationship = clamp((person.relationship || 50) + amount);
+}
+
+function getManagerRelationship(work) {
+  return getPrimaryWorkContact(work, 'Manager')?.relationship || 50;
+}
+
+function promoteWorkContact(person, work, forcedTitle = null) {
+  if (!person) return;
+  const path = getWorkFieldTitles(work.field || getWorkFieldFromCareer());
+  const currentLevel = getWorkLevelForTitle(person.title, path);
+  const nextLevel = Math.min(path.length - 1, currentLevel + 1);
+  if (nextLevel === currentLevel && !forcedTitle) return;
+  person.title = forcedTitle || path[nextLevel];
+  person.jobTitle = person.title;
+  person.workPosition = person.title;
+  person.workRank = nextLevel;
+  person.age = Math.max(person.age || 24, 24 + (nextLevel * 4));
+  person.salary = Math.max(person.salary || 0, getGeneratedSalaryForRange(32000 + (nextLevel * 18000), 52000 + (nextLevel * 40000), 0.5));
+  person.reputation = clamp((person.reputation || 50) + 6);
+  person.workEthic = clamp((person.workEthic || 50) + 4);
+  if (!Array.isArray(person.lifeUpdates)) person.lifeUpdates = [];
+  person.lifeUpdates.unshift({ age: STATE.age, text:`Promoted to ${person.title}.` });
+}
+
+function replaceWorkContact(oldPerson, work, role = oldPerson?.role || 'Coworker') {
+  if (!oldPerson) return;
+  const titles = getWorkFieldTitles(work.field || getWorkFieldFromCareer());
+  const defaultLevel = role === 'Manager'
+    ? titles.length - 1
+    : role === 'Supervisor'
+      ? Math.max(1, titles.length - 2)
+      : Math.max(0, getWorkLevelForTitle(STATE.career?.job, titles));
+  const replacement = createWorkplaceNpc({
+    role,
+    title: titles[defaultLevel],
+    field: work.field || getWorkFieldFromCareer(),
+    ageRange: getWorkAgeRangeForLevel(defaultLevel, titles.length - 1),
+    relationship: clamp(36 + Math.floor(Math.random() * 24)),
+    workPersonality: role === 'Manager' ? sampleN(WORK_BOSS_PERSONALITIES.map(id => ({ id })), 2).map(item => item.id) : [],
+    workRank: defaultLevel,
+    canReplaceBossLater: true,
+  });
+  const index = work.people.findIndex(person => person.id === oldPerson.id);
+  if (index >= 0) work.people.splice(index, 1, replacement);
+}
+
+function syncWorkNpcStats(person) {
+  if (!person) return;
+  if (!person.npcStats || typeof person.npcStats !== 'object') person.npcStats = {};
+  person.npcStats.looks = clamp(person.npcStats.looks ?? randomStat(0, 100));
+  person.npcStats.smarts = clamp(person.npcStats.smarts ?? randomStat(0, 100));
+  person.npcStats.reputation = clamp(person.reputation ?? person.npcStats.reputation ?? 50);
+  person.npcStats.workEthic = clamp(person.workEthic ?? person.npcStats.workEthic ?? 50);
+  person.npcStats.sociability = clamp(person.sociability ?? person.npcStats.sociability ?? 50);
+}
+
+function addWorkLifeUpdate(person, text, priority = 1) {
+  if (!person || !text) return;
+  if (typeof recordNpcLifeUpdate === 'function' && STATE?.npc?.annualUpdates) {
+    recordNpcLifeUpdate(person, text, STATE.npc.annualUpdates, priority);
+    return;
+  }
+  if (!Array.isArray(person.lifeUpdates)) person.lifeUpdates = [];
+  person.lifeUpdates.unshift({ age: STATE.age, text, priority });
+}
+
+function setWorkRole(person, role, work, forcedLevel = null) {
+  if (!person || !work) return person;
+  const titles = getWorkFieldTitles(work.field || getWorkFieldFromCareer());
+  const maxLevel = titles.length - 1;
+  const targetLevel = forcedLevel == null
+    ? role === 'Manager'
+      ? maxLevel
+      : role === 'Supervisor'
+        ? Math.max(1, maxLevel - 1)
+        : Math.max(0, getWorkLevelForTitle(STATE.career?.job, titles))
+    : clamp(forcedLevel, 0, maxLevel);
+  person.role = role;
+  person.title = titles[targetLevel];
+  person.jobTitle = person.title;
+  person.workPosition = person.title;
+  person.workRank = targetLevel;
+  person.companyName = work.companyName || STATE.career?.companyName || 'Company';
+  person.age = Math.max(person.age || 24, 24 + (targetLevel * 4));
+  if (role === 'Manager') {
+    const personalities = Array.isArray(person.workPersonality) ? person.workPersonality.slice() : [];
+    while (personalities.length < 2) personalities.push(pickRandom(WORK_BOSS_PERSONALITIES));
+    person.workPersonality = personalities.slice(0, 2);
+    person.traits = [...person.workPersonality];
+  } else if (role === 'Supervisor') {
+    const personalities = Array.isArray(person.workPersonality) ? person.workPersonality.slice() : [];
+    if (!personalities.length) personalities.push(pickRandom(WORK_BOSS_PERSONALITIES));
+    person.workPersonality = personalities.slice(0, 1);
+    person.traits = [...person.workPersonality];
+  }
+  syncWorkNpcStats(person);
+  return person;
+}
+
+function ensureWorkRosterShape(work) {
+  if (!work) return;
+  if (!Array.isArray(work.people)) work.people = [];
+  let manager = getPrimaryWorkContact(work, 'Manager');
+  let supervisor = getPrimaryWorkContact(work, 'Supervisor');
+  let coworkers = getWorkPeopleByRole(work, 'Coworker');
+
+  if (!manager) {
+    if (supervisor) {
+      setWorkRole(supervisor, 'Manager', work);
+      addWorkLifeUpdate(supervisor, 'Became your manager.', 2);
+      manager = supervisor;
+      supervisor = null;
+    } else if (coworkers.length) {
+      const promoted = coworkers.sort((a, b) => (b.workRank || 0) - (a.workRank || 0))[0];
+      setWorkRole(promoted, 'Manager', work);
+      addWorkLifeUpdate(promoted, 'Became your manager.', 2);
+      manager = promoted;
+      coworkers = getWorkPeopleByRole(work, 'Coworker');
+    } else {
+      work.people.push(createWorkplaceNpc({
+        role: 'Manager',
+        title: getWorkFieldTitles(work.field || getWorkFieldFromCareer()).slice(-1)[0],
+        field: work.field || getWorkFieldFromCareer(),
+        ageRange: getWorkAgeRangeForLevel(getWorkFieldTitles(work.field || getWorkFieldFromCareer()).length - 1, getWorkFieldTitles(work.field || getWorkFieldFromCareer()).length - 1),
+        relationship: clamp(42 + Math.floor(Math.random() * 18)),
+        workPersonality: sampleN(WORK_BOSS_PERSONALITIES.map(id => ({ id })), 2).map(item => item.id),
+        workRank: getWorkFieldTitles(work.field || getWorkFieldFromCareer()).length - 1,
+        canReplaceBossLater: true,
+      }));
+      manager = getPrimaryWorkContact(work, 'Manager');
+    }
+  }
+
+  if (!supervisor) {
+    coworkers = getWorkPeopleByRole(work, 'Coworker');
+    if (coworkers.length) {
+      const promoted = coworkers.sort((a, b) => (b.workRank || 0) - (a.workRank || 0))[0];
+      setWorkRole(promoted, 'Supervisor', work);
+      addWorkLifeUpdate(promoted, 'Became your supervisor.', 2);
+    } else {
+      work.people.push(createWorkplaceNpc({
+        role: 'Supervisor',
+        title: getWorkFieldTitles(work.field || getWorkFieldFromCareer())[Math.max(1, getWorkFieldTitles(work.field || getWorkFieldFromCareer()).length - 2)],
+        field: work.field || getWorkFieldFromCareer(),
+        ageRange: getWorkAgeRangeForLevel(Math.max(1, getWorkFieldTitles(work.field || getWorkFieldFromCareer()).length - 2), getWorkFieldTitles(work.field || getWorkFieldFromCareer()).length - 1),
+        relationship: clamp(44 + Math.floor(Math.random() * 18)),
+        workPersonality: sampleN(WORK_BOSS_PERSONALITIES.map(id => ({ id })), 1).map(item => item.id),
+        workRank: Math.max(1, getWorkFieldTitles(work.field || getWorkFieldFromCareer()).length - 2),
+        canReplaceBossLater: true,
+      }));
+    }
+  }
+
+  while (getWorkPeopleByRole(work, 'Coworker').length < 3) {
+    work.people.push(createWorkplaceNpc({
+      role: 'Coworker',
+      title: STATE.career?.job || getWorkFieldTitles(work.field || getWorkFieldFromCareer())[0],
+      field: work.field || getWorkFieldFromCareer(),
+      ageRange: getWorkAgeRangeForLevel(getWorkLevelForTitle(STATE.career?.job, getWorkFieldTitles(work.field || getWorkFieldFromCareer())), getWorkFieldTitles(work.field || getWorkFieldFromCareer()).length - 1),
+      relationship: clamp(38 + Math.floor(Math.random() * 24)),
+      workRank: getWorkLevelForTitle(STATE.career?.job, getWorkFieldTitles(work.field || getWorkFieldFromCareer())),
+      canReplaceBossLater: true,
+    }));
+  }
+}
+
+function advanceWorkplaceOneYear() {
+  const work = ensureCareerState();
+  if (!work || work.lastAnnualPulseAge === STATE.age) return;
+  ensureWorkRosterShape(work);
+  const people = getWorkRosterPeople(work);
+  const departures = [];
+
+  people.forEach(person => {
+    if (typeof ageNpcOneYear === 'function') ageNpcOneYear(person, { role: 'friend', socialGroup: 'coworker' });
+    person.companyName = work.companyName || STATE.career?.companyName || 'Company';
+    person.reputation = clamp((person.reputation || 50) + Math.floor(Math.random() * 7) - 3);
+    person.workEthic = clamp((person.workEthic || 50) + Math.floor(Math.random() * 7) - 3);
+    person.sociability = clamp((person.sociability || 50) + Math.floor(Math.random() * 7) - 3);
+    syncWorkNpcStats(person);
+
+    if (person.relationshipStatus === 'Married' && Math.random() < 0.04) {
+      person.relationshipStatus = 'Divorced';
+      addWorkLifeUpdate(person, 'Got divorced.', 2);
+    } else if (person.relationshipStatus === 'Single' && Math.random() < 0.06) {
+      person.relationshipStatus = pickRandom(['Dating', 'Seeing someone', 'In a relationship']);
+      addWorkLifeUpdate(person, `Started ${person.relationshipStatus.toLowerCase()}.`, 1);
+    }
+
+    if (Math.random() < 0.02) {
+      person.money = clamp((person.money || 60) + 10);
+      addWorkLifeUpdate(person, 'Became noticeably wealthier.', 1);
+    }
+
+    if (person.role === 'Coworker' && /trainee|assistant|junior/i.test(person.title) && Math.random() < 0.42) {
+      promoteWorkContact(person, work);
+    } else if (person.role === 'Coworker' && Math.random() < 0.12) {
+      promoteWorkContact(person, work);
+    }
+
+    if (person.role === 'Coworker' && Math.random() < 0.03) {
+      departures.push({ person, reason: `${person.firstName} left for a competitor.` });
+    } else if (person.role === 'Coworker' && Math.random() < 0.02) {
+      departures.push({ person, reason: `${person.firstName} started their own company.` });
+    } else if (person.role === 'Coworker' && Math.random() < 0.015) {
+      departures.push({ person, reason: `${person.firstName} got fired.` });
+    } else if (person.role === 'Supervisor' && Math.random() < 0.025) {
+      departures.push({ person, reason: `${person.firstName} left for another role.` });
+    } else if (person.role === 'Manager' && Math.random() < 0.02) {
+      departures.push({ person, reason: `${person.firstName} moved on from the company.` });
+    }
+  });
+
+  departures.forEach(({ person, reason }) => {
+    addWorkLifeUpdate(person, reason.replace(`${person.firstName} `, ''), 2);
+    const leavingIndex = work.people.findIndex(entry => entry.id === person.id);
+    if (leavingIndex >= 0) work.people.splice(leavingIndex, 1);
+    if (work.officeRomanceId === person.id) work.officeRomanceId = null;
+    logActivity(reason, 0);
+  });
+
+  ensureWorkRosterShape(work);
+  getWorkRosterPeople(work).forEach(syncWorkNpcStats);
+  work.lastAnnualPulseAge = STATE.age;
+}
+
+function runWorkInteraction(personId, actionId) {
+  const work = ensureCareerState();
+  const person = getWorkContactById(personId);
+  if (!person) return;
+  const manager = getPrimaryWorkContact(work, 'Manager');
+  let relationshipDelta = 0;
+  let logText = `${actionId} with ${person.firstName}.`;
+  let toast = `${person.firstName} interaction complete.`;
+
+  if (actionId === 'ask_feedback') {
+    const good = (person.workPersonality || []).includes('supportive') || Math.random() < 0.58;
+    applyWorkStatBundle(work, good ? { performance:+2, reputation:+1 } : { stress:+1, satisfaction:-1 });
+    relationshipDelta += good ? 4 : -1;
+    logText = good ? `${person.firstName} gave you useful feedback.` : `${person.firstName} gave you blunt feedback that stung.`;
+  } else if (actionId === 'discuss_promotion') {
+    const good = work.performance >= 65 && work.reputation >= 58 && Math.random() < 0.55;
+    applyWorkStatBundle(work, good ? { reputation:+2, satisfaction:+2 } : { stress:+2, satisfaction:-1 });
+    relationshipDelta += good ? 3 : -2;
+    logText = good ? `${person.firstName} said you are on a promotion track.` : `${person.firstName} said you are not there yet for promotion.`;
+  } else if (actionId === 'request_raise') {
+    const good = work.performance >= 68 && work.reputation >= 60 && person.relationship >= 55 && Math.random() < 0.48;
+    if (good) {
+      const raise = Math.max(600, Math.round(STATE.finances.income * 0.05));
+      STATE.finances.income += raise;
+      STATE.career.salary = STATE.finances.income;
+      applyWorkStatBundle(work, { satisfaction:+4, reputation:+1 });
+      logText = `${person.firstName} approved a raise worth ${fmtMoney(raise)} a year.`;
+    } else {
+      applyWorkStatBundle(work, { stress:+3, satisfaction:-2 });
+      relationshipDelta -= 3;
+      logText = `${person.firstName} turned down your raise request.`;
+    }
+  } else if (actionId === 'small_talk' || actionId === 'ask_weekend') {
+    applyWorkStatBundle(work, { satisfaction:+1, stress:-1 });
+    relationshipDelta += 3 + Math.floor(Math.random() * 5);
+    logText = `You had an easy conversation with ${person.firstName}.`;
+  } else if (actionId === 'flirt') {
+    const success = (person.sociability || 50) >= 48 && Math.random() < 0.46;
+    applyWorkStatBundle(work, success ? { satisfaction:+2, happy:+1 } : { stress:+2, reputation:-1 });
+    relationshipDelta += success ? 6 : -4;
+    logText = success ? `Flirting with ${person.firstName} went surprisingly well.` : `Flirting with ${person.firstName} made things awkward.`;
+  } else if (actionId === 'hook_up' || actionId === 'try_to_hook_up') {
+    const success = person.relationship >= 62 && Math.random() < 0.34;
+    applyWorkStatBundle(work, success ? { satisfaction:+3, happy:+2, stress:-1 } : { stress:+3, reputation:-2, satisfaction:-2 });
+    relationshipDelta += success ? 8 : -8;
+    if (success) work.officeRomanceId = person.id;
+    logText = success ? `You hooked up with ${person.firstName}.` : `Trying to hook up with ${person.firstName} backfired.`;
+  } else if (actionId === 'volunteer_project' || actionId === 'more_responsibility' || actionId === 'impress_supervisor') {
+    applyWorkStatBundle(work, { performance:+3, reputation:+2, stress:+2, satisfaction:-1 });
+    relationshipDelta += 4;
+    logText = `${person.firstName} noticed you pushing for more responsibility.`;
+  } else if (actionId === 'ask_help' || actionId === 'request_training' || actionId === 'discuss_assignment') {
+    applyWorkStatBundle(work, { performance:+2, stress:-1, satisfaction:+1 });
+    relationshipDelta += 4;
+    logText = `${person.firstName} helped you with the work.`;
+  } else if (actionId === 'complain_coworker') {
+    applyWorkStatBundle(work, { stress:-1, reputation:-1 });
+    relationshipDelta -= 2;
+    logText = `Complaining to ${person.firstName} created a bit of tension.`;
+  } else if (actionId === 'avoid_supervisor') {
+    applyWorkStatBundle(work, { stress:-2, performance:-1, reputation:-2 });
+    relationshipDelta -= 4;
+    logText = `Avoiding ${person.firstName} bought you breathing room but looked bad.`;
+  } else if (actionId === 'stay_late_together' || actionId === 'work_late_together') {
+    applyWorkStatBundle(work, { performance:+2, reputation:+1, stress:+2, satisfaction:+1 });
+    relationshipDelta += 5;
+    logText = `You stayed late with ${person.firstName} and got through a lot.`;
+  } else if (actionId === 'grab_lunch' || actionId === 'work_drinks') {
+    applyWorkStatBundle(work, { satisfaction:+3, stress:-1, relationships:+1 });
+    relationshipDelta += 6;
+    logText = `You spent informal time with ${person.firstName}.`;
+  } else if (actionId === 'gossip') {
+    const repSwing = Math.floor(Math.random() * 7) - 3;
+    applyWorkStatBundle(work, { satisfaction:+2, reputation:repSwing });
+    relationshipDelta += repSwing >= 0 ? 4 : -3;
+    logText = `You gossiped with ${person.firstName}.`;
+  } else if (actionId === 'help_task') {
+    applyWorkStatBundle(work, { performance:+1, reputation:+2, satisfaction:+1 });
+    relationshipDelta += 5;
+    logText = `You helped ${person.firstName} with a task.`;
+  } else if (actionId === 'start_dating' || actionId === 'secret_office_romance') {
+    const success = person.relationship >= 68 && Math.random() < 0.4;
+    applyWorkStatBundle(work, success ? { satisfaction:+4, happy:+3 } : { stress:+3, reputation:-2 });
+    relationshipDelta += success ? 10 : -5;
+    if (success) {
+      work.officeRomanceId = person.id;
+      person.relationshipStatus = 'Dating';
+    }
+    logText = success ? `You and ${person.firstName} started seeing each other.` : `Trying to turn things romantic with ${person.firstName} did not land well.`;
+  } else if (actionId === 'take_credit') {
+    applyWorkStatBundle(work, { reputation:-4, performance:+2, satisfaction:+1 });
+    relationshipDelta -= 8;
+    logText = `You took credit for work around ${person.firstName}.`;
+  } else if (actionId === 'spread_rumour') {
+    applyWorkStatBundle(work, { reputation:-5, stress:+1 });
+    relationshipDelta -= 9;
+    logText = `A rumour involving ${person.firstName} started circling the office.`;
+  } else if (actionId === 'workplace_rivalry') {
+    applyWorkStatBundle(work, { performance:+2, stress:+2, satisfaction:-1 });
+    relationshipDelta -= 6;
+    logText = `A rivalry with ${person.firstName} intensified.`;
+  }
+
+  adjustSpecificWorkRelationship(person, relationshipDelta);
+  if (manager && person.role !== 'Manager' && ['take_credit', 'spread_rumour', 'workplace_rivalry'].includes(actionId)) {
+    adjustSpecificWorkRelationship(manager, -2);
+  }
+  logActivity(logText, relationshipDelta >= 0 ? 4 : -4);
+  if (toast) showToast(toast);
+  saveGame();
+  updateAllUI();
+}
+
 function runCareerAction(actionId) {
   const work = ensureCareerState();
   if (actionId === 'search_jobs') {
@@ -3302,71 +3913,141 @@ function runCareerAction(actionId) {
     updateAllUI();
     return;
   }
-  const apply = effects => {
-    work.performance = clamp(work.performance + (effects.performance || 0));
-    work.stress = clamp(work.stress + (effects.stress || 0));
-    work.reputation = clamp(work.reputation + (effects.reputation || 0));
-    work.satisfaction = clamp(work.satisfaction + (effects.satisfaction || 0));
-    work.energy = clamp((work.energy || 60) + (effects.energy || 0));
-    if (effects.money) STATE.finances.balance += effects.money;
-    applyEffects({
-      happy: effects.happy || 0,
-      health: effects.health || 0,
-      rel_friends: effects.relationships || 0,
-      rep: effects.publicRep || 0,
-    });
-  };
+  const manager = getPrimaryWorkContact(work, 'Manager');
+  const supervisor = getPrimaryWorkContact(work, 'Supervisor');
+  const coworkers = getWorkPeopleByRole(work, 'Coworker');
+  const rival = coworkers.slice().sort((a, b) => (a.relationship || 50) - (b.relationship || 50))[0] || null;
 
   if (actionId === 'work_hard') {
-    apply({ performance:+8, stress:+7, satisfaction:-2, energy:-8, happy:-1 });
-    adjustWorkRelationship(work, 'Boss', +4);
-    adjustWorkRelationship(work, 'Mentor', +3);
-    logActivity('Worked especially hard this week.', 5);
-    maybePromoteCareer(work);
+    applyWorkStatBundle(work, {
+      performance: Math.floor(Math.random() * 7) + 1,
+      reputation: Math.floor(Math.random() * 7) + 1,
+      stress: Math.floor(Math.random() * 5) + 1,
+      satisfaction: -(Math.floor(Math.random() * 6)),
+      happy: -Math.floor(Math.random() * 4),
+      energy: -(Math.floor(Math.random() * 6) + 3),
+    });
+    adjustSpecificWorkRelationship(manager, 3);
+    logActivity('Worked hard and pushed your output up.', 5);
   } else if (actionId === 'slack_off') {
-    apply({ performance:-8, stress:-6, satisfaction:+3, energy:+4, reputation:-4, happy:+1 });
-    adjustWorkRelationship(work, 'Boss', -5);
-    adjustWorkRelationship(work, 'Office Rival', -2);
-    logActivity('Took your foot off the gas at work.', -4);
+    applyWorkStatBundle(work, {
+      stress: -(Math.floor(Math.random() * 4) + 1),
+      satisfaction: Math.floor(Math.random() * 3) + 1,
+      performance: -(Math.floor(Math.random() * 6) + 1),
+      reputation: -(Math.floor(Math.random() * 5) + 1),
+      happy: Math.floor(Math.random() * 2) + 1,
+    });
+    adjustSpecificWorkRelationship(manager, -3);
+    logActivity('Slacked off at work.', -4);
   } else if (actionId === 'socialise') {
-    apply({ reputation:+6, satisfaction:+5, performance:-2, relationships:+4, happy:+3 });
-    adjustWorkRelationship(work, 'Coworker', +7);
-    adjustWorkRelationship(work, 'Mentor', +2);
-    logActivity('Spent time building relationships at work.', 6);
+    const repSwing = Math.floor(Math.random() * 7) - 3;
+    const targets = coworkers.slice().sort(() => Math.random() - 0.5).slice(0, Math.floor(Math.random() * 5) + 1);
+    applyWorkStatBundle(work, {
+      satisfaction: Math.floor(Math.random() * 5) + 1,
+      reputation: repSwing,
+      happy: 1 + Math.floor(Math.random() * 2),
+    });
+    targets.forEach(person => adjustSpecificWorkRelationship(person, Math.floor(Math.random() * 16)));
+    logActivity('Socialised around the office.', repSwing >= 0 ? 4 : -2);
   } else if (actionId === 'ask_raise') {
-    const success = work.performance >= 68 && work.reputation >= 58 && Math.random() < 0.45;
-    if (success) {
-      const raise = Math.max(900, Math.round(STATE.finances.income * 0.08));
+    const score = work.performance + work.reputation + getManagerRelationship(work);
+    if (score >= 215 && Math.random() < 0.46) {
+      const raise = Math.max(1000, Math.round(STATE.finances.income * 0.09));
       STATE.finances.income += raise;
       STATE.career.salary = STATE.finances.income;
-      apply({ satisfaction:+6, stress:+3 });
-      adjustWorkRelationship(work, 'Boss', +2);
-      logActivity(`Negotiated a raise worth ${fmtMoney(raise)} a year.`, 8);
-      showToast('Your raise was approved.');
+      applyWorkStatBundle(work, { satisfaction:+4, reputation:+2 });
+      adjustSpecificWorkRelationship(manager, 3);
+      logActivity(`Your raise request was accepted. +${fmtMoney(raise)} a year.`, 8);
+      showToast('Raise accepted.');
+    } else if (score >= 190 && Math.random() < 0.5) {
+      const raise = Math.max(500, Math.round(STATE.finances.income * 0.04));
+      STATE.finances.income += raise;
+      STATE.career.salary = STATE.finances.income;
+      applyWorkStatBundle(work, { satisfaction:+2 });
+      logActivity(`You got a partial raise worth ${fmtMoney(raise)} a year.`, 5);
+      showToast('Partial raise.');
+    } else if (work.performance < 60) {
+      applyWorkStatBundle(work, { stress:+2, satisfaction:-2 });
+      adjustSpecificWorkRelationship(manager, -2);
+      logActivity('You were told to improve your performance before asking for a raise.', -3);
+      showToast('Told to improve performance.');
     } else {
-      apply({ stress:+5, satisfaction:-5, reputation:-2 });
-      adjustWorkRelationship(work, 'Boss', -4);
-      logActivity('Asked for a raise and got turned down.', -4);
-      showToast('The raise did not happen.');
+      applyWorkStatBundle(work, { stress:+4, satisfaction:-3, reputation:-2 });
+      adjustSpecificWorkRelationship(manager, -4);
+      logActivity('Your manager got annoyed when you pushed for a raise.', -4);
+      showToast('Manager annoyed.');
+    }
+  } else if (actionId === 'ask_promotion') {
+    const standing = typeof getUniversityStanding === 'function' ? getUniversityStanding() : 0;
+    const score = work.performance + work.reputation + getManagerRelationship(work) + (getCurrentJobYears() <= 3 ? standing * 8 : 0);
+    if (score >= 220 && maybePromoteCareer(work)) {
+      showToast('Promotion approved.');
+    } else if (score >= 195) {
+      applyWorkStatBundle(work, { satisfaction:+1, stress:+1 });
+      logActivity('You had a serious discussion about the promotion path ahead.', 3);
+      showToast('Promotion pathway discussion.');
+    } else if (rival && Math.random() < 0.22) {
+      promoteWorkContact(rival, work);
+      applyWorkStatBundle(work, { satisfaction:-5, stress:+4, reputation:-1 });
+      logActivity(`${rival.firstName} was promoted before you.`, -6);
+      showToast('A rival coworker was promoted instead.');
+    } else {
+      applyWorkStatBundle(work, { satisfaction:-3, stress:+3 });
+      adjustSpecificWorkRelationship(manager, -2);
+      logActivity('Your promotion request was rejected.', -4);
+      showToast('Promotion rejected.');
     }
   } else if (actionId === 'stay_late') {
-    apply({ performance:+6, stress:+8, satisfaction:-1, energy:-10, health:-1 });
-    adjustWorkRelationship(work, 'Boss', +3);
-    adjustWorkRelationship(work, 'Office Rival', -2);
+    applyWorkStatBundle(work, {
+      performance: Math.floor(Math.random() * 5) + 1,
+      reputation: Math.floor(Math.random() * 4) + 1,
+      stress: Math.floor(Math.random() * 5) + 2,
+      happy: -(Math.floor(Math.random() * 4) + 1),
+      energy: -(Math.floor(Math.random() * 5) + 4),
+    });
+    adjustSpecificWorkRelationship(supervisor || manager, 2);
     logActivity('Stayed late to get extra work done.', 4);
-    maybePromoteCareer(work);
+  } else if (actionId === 'take_it_easy') {
+    applyWorkStatBundle(work, {
+      stress: -(Math.floor(Math.random() * 4) + 2),
+      happy: Math.floor(Math.random() * 4) + 1,
+      performance: -(Math.floor(Math.random() * 3) + 1),
+      satisfaction: 1 + Math.floor(Math.random() * 2),
+    });
+    logActivity('Took it easy at work.', 2);
   } else if (actionId === 'call_sick') {
-    apply({ stress:-10, satisfaction:+2, energy:+10, health:+4, performance:-4, reputation:-3, happy:+1 });
-    adjustWorkRelationship(work, 'Coworker', +1);
-    adjustWorkRelationship(work, 'Boss', -2);
-    logActivity('Took a sick day to recover.', 1);
+    work.callInSickCount = (work.callInSickCount || 0) + 1;
+    if (work.stress >= 70 && Math.random() < 0.6) {
+      applyWorkStatBundle(work, { stress:-(Math.floor(Math.random() * 5) + 1), happy:Math.floor(Math.random() * 3) + 1, health:+3 });
+      logActivity('Called in sick and genuinely recovered from the stress.', 3);
+      showToast('Genuine recovery.');
+    } else if (work.callInSickCount >= 3 && Math.random() < 0.45) {
+      applyWorkStatBundle(work, { stress:-(Math.floor(Math.random() * 4) + 1), happy:+1, reputation:-4 });
+      adjustSpecificWorkRelationship(manager, -4);
+      logActivity('Frequent sick calls damaged your reputation at work.', -4);
+      showToast('Reputation took a hit.');
+    } else if (Math.random() < 0.3) {
+      applyWorkStatBundle(work, { stress:-(Math.floor(Math.random() * 4) + 1), happy:+1, reputation:-2 });
+      adjustSpecificWorkRelationship(manager, -2);
+      logActivity('Your manager sounded suspicious when you called in sick.', -2);
+      showToast('Manager suspicious.');
+    } else if (Math.random() < 0.22) {
+      applyWorkStatBundle(work, { stress:-(Math.floor(Math.random() * 4) + 1), happy:+1, satisfaction:-1 });
+      adjustSpecificWorkRelationship(rival, -3);
+      logActivity('A coworker resented having to cover your work.', -2);
+      showToast('Coworker resentment.');
+    } else {
+      applyWorkStatBundle(work, { stress:-(Math.floor(Math.random() * 5) + 1), happy:Math.floor(Math.random() * 3) + 1 });
+      logActivity('Called in sick with no real consequences.', 1);
+      showToast('No consequences this time.');
+    }
   }
 
-  maybeTriggerWorkplaceEvent(work, actionId, apply);
-
   if (work.stress >= 90) {
-    applyEffects({ health:-4, happy:-5 });
-    work.satisfaction = clamp(work.satisfaction - 6);
+    work.performance = clamp(work.performance - Math.floor(Math.random() * 11));
+    work.reputation = clamp(work.reputation - Math.floor(Math.random() * 11));
+    applyEffects({ health:-(Math.floor(Math.random() * 4) + 2), happy:-5 });
+    work.satisfaction = clamp(work.satisfaction - 5);
     showToast('You feel close to burnout.');
   }
   if (work.performance <= 18 || work.reputation <= 16) {
@@ -4019,7 +4700,6 @@ function buildParentFundingOffer() {
   if (traitList.includes('strict')) generosityFactor -= 0.04;
   if (traitList.includes('overbearing')) generosityFactor -= 0.08;
   if (traitList.includes('distant')) generosityFactor -= 0.14;
-  if (traitList.includes('absent')) generosityFactor -= 0.2;
   const amount = Math.round((minAmount + (maxAmount - minAmount) * Math.max(0, Math.min(1, 0.5 + generosityFactor))) / 100) * 100;
 
   const terms = [];
@@ -6005,7 +6685,6 @@ function runLearnSchoolActionEffect(action) {
       if (traits.includes('ambitious')) chance += 0.08;
       if (traits.includes('kind')) chance += 0.04;
       if (traits.includes('distant')) chance -= 0.12;
-      if (traits.includes('absent')) chance -= 0.18;
       if (traits.includes('overbearing')) chance += 0.03;
       if ((parent.npcStats?.generosity || 0) >= 70) chance += 0.08;
       if (isHighPayingParentJob(parent.job)) chance += 0.08;
@@ -6338,7 +7017,10 @@ function renderLearnTab() {
     gradeBlockWrap.style.display = 'none';
     rosterToggleWrap.style.display = 'none';
     learnActions.style.display = '';
-    learnActions.innerHTML = buildEmployedCareerPage();
+    if (_learnScreen === 'workPeople') learnActions.innerHTML = buildWorkPeoplePage();
+    else if (_learnScreen === 'workActions') learnActions.innerHTML = buildCareerActionsHomePage();
+    else if (_learnScreen.startsWith('workActions:')) learnActions.innerHTML = buildCareerActionCategoryPage(_learnScreen.split(':')[1]);
+    else learnActions.innerHTML = buildEmployedCareerPage();
     return;
   }
 

@@ -50,14 +50,10 @@ const ACTIONS = {
 };
 
 const FAMILY_ACTIONS = [
-  { id:'fam_dinner',    icon:'🍽️', name:'Family dinner',              desc:'Simple, but it matters.',                        cost:0,     effects:{ happy:+4, rel_family:+8 },  cooldown:0, minAge:0, maxAge:17 },
-  { id:'talk_mum',      icon:'👩', name:'Talk to your mum',           desc:'She worries. Let her in.',                        cost:0,     effects:{ happy:+4, rel_family:+6 },  cooldown:0, minAge:5  },
-  { id:'talk_dad',      icon:'👨', name:'Talk to your dad',           desc:'Not always easy. Worth doing.',                  cost:0,     effects:{ happy:+3, rel_family:+5 },  cooldown:0, minAge:5  },
-  { id:'call_family',   icon:'📞', name:'Call the family',            desc:'You don\'t do it enough.',                       cost:0,     effects:{ happy:+5, rel_family:+8 },  cooldown:0, minAge:18 },
-  { id:'visit_family',  icon:'🏡', name:'Visit home',                 desc:'Some things only exist there.',                  cost:-50,   effects:{ happy:+8, rel_family:+12 }, cooldown:1, minAge:18 },
-  { id:'meet_friends',  icon:'👥', name:'Meet up with friends',       desc:'Connection is everything.',                      cost:-40,   effects:{ happy:+8, rel_friends:+10 },cooldown:0, minAge:10 },
-  { id:'make_friends',  icon:'👋', name:'Put yourself out there',     desc:'New people, new possibilities.',                 cost:0,     effects:{ rel_friends:+8, happy:+3 }, cooldown:1, minAge:5  },
-  { id:'date_action',   icon:'💑', name:'Go on a date',               desc:'See where it goes.',                             cost:-80,   effects:{ happy:+8, rel_partner:+12 },cooldown:1, minAge:16 },
+  { id:'family_dinner', icon:'🍽️', name:'Family dinner',        desc:'Spend proper time together.',         cost:0, cooldown:0, minAge:0, customType:'quick_contact_family' },
+  { id:'call_family',   icon:'📞', name:'Call the family',      desc:'Check in and stay close.',            cost:0, cooldown:0, minAge:0, customType:'quick_contact_family' },
+  { id:'visit_family',  icon:'🏡', name:'Visit home',           desc:'Go back and spend time there.',       cost:0, cooldown:0, minAge:0, customType:'quick_contact_family' },
+  { id:'meet_friends',  icon:'👥', name:'Meet up with friends', desc:'Keep your friendships warm.',         cost:0, cooldown:0, minAge:0, customType:'quick_contact_friends' },
 ];
 
 const PARENT_RELATIONSHIP_ACTIONS = [
@@ -429,6 +425,9 @@ function rollStudyGain(baseGain) {
 }
 
 function doAction(action, petId) {
+  if (typeof runQuickContactAction === 'function' && action.customType && action.customType.startsWith('quick_contact_')) {
+    return runQuickContactAction(action);
+  }
   const isStudy = !!action.isStudy;
 
   // Build modified effects
@@ -466,6 +465,7 @@ function doAction(action, petId) {
 
   const delta = Object.values(effects).reduce((s, v) => s + v, 0);
   logActivity(action.name, delta);
+  return { ok:true };
 }
 
 function buildActionHTML(action, extraClass='') {
@@ -480,7 +480,7 @@ function buildActionHTML(action, extraClass='') {
         <div class="action-name">${action.name}</div>
         <div class="action-desc">${locked ? check.reason : action.desc}</div>
       </div>
-      <div class="action-cost ${costClass}">${costLabel}</div>
+      ${extraClass.includes('hide-cost') ? '' : `<div class="action-cost ${costClass}">${costLabel}</div>`}
     </div>`;
 }
 
@@ -492,8 +492,12 @@ function wireActions(containerEl, actionList, onDone, petId) {
     el.onclick = () => {
       const check = isActionAvailable(action);
       if (!check.ok) { showToast(check.reason); return; }
-      doAction(action, petId);
-      showToast(`${action.name} ✓`);
+      const result = doAction(action, petId) || { ok:true };
+      if (result.ok === false) {
+        if (result.toast) showToast(result.toast);
+        return;
+      }
+      if (!result.skipToast) showToast(result.toast || `${action.name} ✓`);
       if (onDone) onDone();
     };
   });
