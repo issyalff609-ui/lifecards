@@ -19,6 +19,7 @@ function continueGame() {
     const { state, birthData } = JSON.parse(raw);
     STATE = state;
     _birthData = birthData;
+    if (typeof ensureEducationState === 'function') ensureEducationState();
     if (typeof ensureNpcSystemState === 'function') ensureNpcSystemState();
     document.getElementById('screen-birth').classList.remove('active');
     document.getElementById('screen-game').classList.add('active');
@@ -462,6 +463,11 @@ function switchTab(tab, el) {
     _learnScreen = 'main';
     _learnClassmateId = null;
   }
+  if (tab === 'activities') {
+    window._playSubTab = null;
+    window._homeView = null;
+    window._datingView = null;
+  }
   ['life','family','learn','activities'].forEach(t => {
     const tabEl = document.getElementById(`tab-${t}`);
     tabEl.style.display = t === tab ? (t === 'life' ? 'flex' : 'flex') : 'none';
@@ -735,9 +741,12 @@ function getChildrenEntries() {
 }
 function getFriendEntries() {
   ensurePersistentFriendState();
-  const liveFriends = STATE.school.classmates.filter(c => c.status === 'friend');
+  const activePartnerId = STATE.romance?.partner?.id || null;
+  const liveFriends = STATE.school.classmates.filter(c => c.status === 'friend' && c.id !== activePartnerId);
   liveFriends.forEach(upsertPersistentFriend);
-  const merged = STATE.social.friends.map(savedFriend => {
+  const merged = STATE.social.friends
+    .filter(savedFriend => savedFriend.id !== activePartnerId)
+    .map(savedFriend => {
     const liveFriend = STATE.school.classmates.find(c => c.id === savedFriend.id);
     if (!liveFriend) return savedFriend;
     const stableRelationship = typeof getStableFriendRelationship === 'function'
@@ -1033,6 +1042,9 @@ function buildPersonCardRelBar(rel) {
 }
 
 function buildPersonCardTraits(person, traitPool) {
+  if ((person._roleCard === 'Friend' || person._roleCard === 'classmate') && !canRevealClassmateTraits(person)) {
+    return '';
+  }
   return (person.traits || []).slice(0, 2).map(tid => {
     const t = traitPool.find(x => x.id === tid);
     if (!t) return '';
@@ -1063,7 +1075,8 @@ function buildDotsIcon(color = '#5f5145') {
 }
 function buildPersonCardExpandedBody(person, role, rel, traitPool) {
   const traits = buildPersonCardTraits(person, traitPool);
-  const actions = getAvailableActions(role, STATE.age, person);
+  const interactionRole = role === 'Roommate' ? 'Friend' : role;
+  const actions = getAvailableActions(interactionRole, STATE.age, person);
   const actionLabel = action => {
     if (action.id === 'move_out_young_adult') {
       const currentHome = typeof getCurrentHome === 'function' ? getCurrentHome() : null;
@@ -1073,7 +1086,7 @@ function buildPersonCardExpandedBody(person, role, rel, traitPool) {
     return action.name;
   };
   const actionButtons = actions.map(action => `
-    <button onclick="triggerAction('${action.id}', '${person.id}', '${role}')"
+    <button onclick="triggerAction('${action.id}', '${person.id}', '${interactionRole}')"
       style="width:100%;padding:11px 14px;background:var(--surface-mid);border:1px solid var(--border);border-radius:11px;font-size:13px;font-weight:600;color:var(--text);text-align:left;cursor:pointer">
       ${actionLabel(action)}
     </button>
@@ -1222,6 +1235,10 @@ function wireRelationshipReorder(listId, listKey) {
 
 function togglePersonCard(personId) {
   _expandedCardId = _expandedCardId === personId ? null : personId;
+  if (window._playSubTab === 'home') {
+    renderActivitiesTab();
+    return;
+  }
   renderFamilyTab();
 }
 function buildEmptyState(emoji, title, subtitle) {
@@ -1483,7 +1500,13 @@ function buildHomeHouseholdRoute() {
   const entries = home?.source === 'family'
     ? getFamilyPeopleEntries().filter(entry => entry.role !== 'Pet')
     : getCurrentHomeResidents(home).map(resident => ({
-        person: resident.friendProfile || resident,
+        person: resident.refType === 'partner'
+          ? ((typeof getCurrentPartner === 'function' ? getCurrentPartner() : null) || resident.friendProfile || resident)
+          : resident.refType === 'friend'
+            ? ((typeof getPersistentFriendById === 'function' ? getPersistentFriendById(resident.refId) : null) || resident.friendProfile || resident)
+            : resident.refType === 'sibling'
+              ? ((typeof getSiblingById === 'function' ? getSiblingById(resident.refId) : null) || resident)
+              : (resident.friendProfile || resident),
         role: resident.refType === 'partner'
           ? 'Partner'
           : resident.refType === 'roommate'
@@ -1867,6 +1890,19 @@ function openPersonSheet(personId, role) {
         _rel:(typeof getStableFriendRelationship === 'function' ? getStableFriendRelationship(cm, 60) : (cm.relationship ?? 60)),
       };
     }
+    if (!person && STATE.school?.uniProfile?.people?.length) {
+      const uniPerson = STATE.school.uniProfile.people.find(p => p.id === personId);
+      if (uniPerson) {
+        const resolvedRole = uniPerson.label === 'Lecturer'
+          ? 'Teacher'
+          : ((role === 'Friend' || uniPerson.status === 'friend') ? 'Friend' : 'classmate');
+        person = {
+          ...uniPerson,
+          _role: resolvedRole,
+          _rel:(typeof getStableFriendRelationship === 'function' ? getStableFriendRelationship(uniPerson, 60) : (uniPerson.relationship ?? 60)),
+        };
+      }
+    }
     if (!person && role === 'Friend') {
       const savedFriend = getPersistentFriendById(personId);
       if (savedFriend) person = { ...savedFriend, _role:'Friend', _rel:(typeof getStableFriendRelationship === 'function' ? getStableFriendRelationship(savedFriend, 60) : (savedFriend.relationship ?? 60)) };
@@ -1939,6 +1975,9 @@ function buildPersonSheetAvatar(person) {
 }
 
 function buildPersonSheetTraits(person, role) {
+  if ((role === 'Friend' || role === 'classmate') && !canRevealClassmateTraits(person)) {
+    return '';
+  }
   return (person.traits || []).map(tid => {
     const pool = person.isPet ? []
       : role === 'Mother' || role === 'Father' ? PARENT_TRAITS_POOL : CLASSMATE_TRAITS_POOL;
@@ -2237,7 +2276,9 @@ function interactClassmate(cmId, action) {
 
 let _learnClassmateId = null;
 let _uniApplyDraft = null;
-const UNI_PREVIEW_IMAGE = 'data/uni_preview.png';
+let _uniParentFundingOffer = null;
+let _uniUniversityChoiceSlot = 'primary';
+const UNI_PREVIEW_IMAGE = 'data/state_primary.png';
 
 const UNI_COURSES = [
   { id:'Law', icon:'mdi:scale-balance', blurb:'Become a laywer.', perks:[['High salary potential', '#53a35d'], ['High stress', '#d45b55']] },
@@ -2257,20 +2298,25 @@ const UNI_TYPES = [
   { id:'Local Universities', icon:'mdi:home-city', tag:'Close to Home', tagBg:'#fff1e3', tagColor:'#9a5f2c', bullets:['Lowest living costs', 'Less pressure', 'Low competition'], stress:1, cardBg:'#ffffff', cardText:'#1a1814', accent:'#c07b2d' },
 ];
 const UNI_FUNDING = [
-  { id:'Student loan', icon:'mdi:bank-outline', blurb:'Take out a loan and repay after graduation.', tag:'Most Common', tagBg:'#eee7ff', tagColor:'#6753b3', accent:'#7d67d9' },
-  { id:'Ask parents', icon:'mdi:account-group', blurb:'They might help, or expect something in return.', tag:'If you\'re lucky', tagBg:'#ffe9e9', tagColor:'#ca5f5d', accent:'#ef7b78' },
-  { id:'Self fund', icon:'mdi:briefcase', blurb:'Work hard, study hard. No debt, but little rest.', tag:'Harder Path', tagBg:'#e8f5e7', tagColor:'#4f8850', accent:'#5ca55f' },
+  { id:'student_loan', label:'Student Loan', icon:'mdi:bank-outline', blurb:'Tuition covered. You’ll receive £6,500 a year for living costs.', effect:'Debt saved for later', tag:'Most Common', tagBg:'#eee7ff', tagColor:'#6753b3', accent:'#7d67d9' },
+  { id:'ask_parents', label:'Ask Parents', icon:'mdi:account-group', blurb:'See if your parents will help pay for university.', effect:'Depends on family', tag:'Family Help', tagBg:'#ffe9e9', tagColor:'#ca5f5d', accent:'#ef7b78' },
+  { id:'self_fund', label:'Self Fund', icon:'mdi:briefcase', blurb:'Pay the fees yourself.', effect:'Costs £9,000/year', tag:'Pay Yourself', tagBg:'#e8f5e7', tagColor:'#4f8850', accent:'#5ca55f' },
+  { id:'scholarship', label:'Scholarship', icon:'mdi:school-outline', blurb:'Apply for financial support.', effect:'Coming soon', tag:'Placeholder', tagBg:'#fff3d8', tagColor:'#9a6a21', accent:'#d39b36' },
 ];
 
 const UNI_TYPE_PREVIEW = {
-  'Elite Universities': { fee:'£9,250 / year', studentLife:[['Debt', 'High', '#d48b2b', 82], ['Stress', 'High', '#d45b55', 85], ['Social Life', 'Medium', '#e08e2d', 56], ['Career Prospects', 'Very High', '#4f9a57', 92]], blurb:'Elite universities open the strongest doors, but they ask the most from you.' },
-  'Top Universities': { fee:'£9,250 / year', studentLife:[['Debt', 'Medium', '#d48b2b', 64], ['Stress', 'High', '#d45b55', 76], ['Social Life', 'Medium', '#e08e2d', 58], ['Career Prospects', 'High', '#4f9a57', 81]], blurb:'Top universities balance strong outcomes with a slightly more reachable path.' },
-  'Standard Universities': { fee:'£9,250 / year', studentLife:[['Debt', 'Medium', '#d48b2b', 58], ['Stress', 'Medium', '#e08e2d', 52], ['Social Life', 'Good', '#e08e2d', 64], ['Career Prospects', 'Solid', '#4f9a57', 67]], blurb:'A practical route with good campus life and a less punishing admissions path.' },
-  'Local Universities': { fee:'£9,250 / year', studentLife:[['Debt', 'Low', '#d48b2b', 36], ['Stress', 'Low', '#e08e2d', 38], ['Social Life', 'Steady', '#e08e2d', 47], ['Career Prospects', 'Fair', '#4f9a57', 55]], blurb:'Staying local keeps costs lower and family closer while you find your footing.' },
+  'Elite Universities': { fee:'£9,000 / year', studentLife:[['Debt', 'High', '#d48b2b', 82], ['Stress', 'High', '#d45b55', 85], ['Social Life', 'Medium', '#e08e2d', 56], ['Career Prospects', 'Very High', '#4f9a57', 92]], blurb:'Elite universities open the strongest doors, but they ask the most from you.' },
+  'Top Universities': { fee:'£9,000 / year', studentLife:[['Debt', 'Medium', '#d48b2b', 64], ['Stress', 'High', '#d45b55', 76], ['Social Life', 'Medium', '#e08e2d', 58], ['Career Prospects', 'High', '#4f9a57', 81]], blurb:'Top universities balance strong outcomes with a slightly more reachable path.' },
+  'Standard Universities': { fee:'£9,000 / year', studentLife:[['Debt', 'Medium', '#d48b2b', 58], ['Stress', 'Medium', '#e08e2d', 52], ['Social Life', 'Good', '#e08e2d', 64], ['Career Prospects', 'Solid', '#4f9a57', 67]], blurb:'A practical route with good campus life and a less punishing admissions path.' },
+  'Local Universities': { fee:'£9,000 / year', studentLife:[['Debt', 'Low', '#d48b2b', 36], ['Stress', 'Low', '#e08e2d', 38], ['Social Life', 'Steady', '#e08e2d', 47], ['Career Prospects', 'Fair', '#4f9a57', 55]], blurb:'Staying local keeps costs lower and family closer while you find your footing.' },
 };
 
 function ensurePostSchoolState() {
   if (!STATE.school.postSchool) STATE.school.postSchool = { schoolFinishedShown:false, uniApplication:null };
+  if (typeof ensureEducationState === 'function') ensureEducationState();
+  if (STATE.school.postSchool.uniApplication && typeof syncUniversityApplicationState === 'function') {
+    syncUniversityApplicationState(STATE.school.postSchool.uniApplication);
+  }
   if (!STATE.school.postSchool.furtherEducation) {
     STATE.school.postSchool.furtherEducation = { current:null, completed:[], applications:[] };
   }
@@ -2397,11 +2443,12 @@ function getLegalJobRequirements(job) {
 }
 
 function openUniApplication() {
-  _learnScreen = 'uniApplyBasics';
+  _learnScreen = 'uniApplyCourse';
   const postSchool = ensurePostSchoolState();
+  _uniParentFundingOffer = null;
   _uniApplyDraft = postSchool.uniApplication?.status === 'draft'
-    ? { ...postSchool.uniApplication }
-    : { course:null, uniType:null, funding:null, status:'draft' };
+    ? createUniversityApplicationState(postSchool.uniApplication)
+    : createUniversityApplicationState();
   renderLearnTab();
   const tab = document.getElementById('tab-learn');
   if (tab) tab.scrollTop = 0;
@@ -2410,6 +2457,7 @@ function openUniApplication() {
 function closeUniApplication() {
   _learnScreen = 'main';
   _uniApplyDraft = null;
+  _uniParentFundingOffer = null;
   renderLearnTab();
 }
 
@@ -2836,11 +2884,12 @@ function calculateInterviewOutcome(job, applicationScore, metrics, interviewEven
 
 function getJobAnnualIncome(job) {
   if (job.type === 'Part-Time') return Math.round((job.rate || 0) * 18 * 52);
+  if (job.salaryMin && job.salaryMax) return getGeneratedSalaryForRange(job.salaryMin, job.salaryMax, 0.5);
   return parseSalaryValue(job.salary);
 }
 
 function getCareerLevelForJob(job) {
-  const pay = getJobAnnualIncome(job);
+  const pay = job.salaryMax || getJobAnnualIncome(job);
   if (pay >= 34000) return 4;
   if (pay >= 28000) return 3;
   if (pay >= 23000) return 2;
@@ -3233,9 +3282,11 @@ function fireFromJob(reason) {
   STATE.career.salary = 0;
   STATE.career.startedAge = null;
   STATE.career.category = null;
+  STATE.career.jobType = null;
   STATE.career.work = null;
   STATE.finances.income = 0;
   STATE.finances.job = 'None';
+  STATE.finances.jobType = null;
   showToast('You lost your job.');
 }
 
@@ -3694,7 +3745,13 @@ function acceptJobOffer() {
     : 0;
   STATE.career.experience = (STATE.career.experience || 0) + currentYears;
   STATE.career.job = job.title;
-  const legalSalary = job.legalProfile
+  const legalSalary = job.salaryMin && job.salaryMax
+    ? getGeneratedSalaryForRange(
+        job.salaryMin,
+        job.salaryMax,
+        clamp(((_jobFlowState.applicationScore || 55) - 25), 0, 100) / 100
+      )
+    : job.legalProfile
     ? getGeneratedSalaryForRange(
         job.legalProfile.salaryMin,
         job.legalProfile.salaryMax,
@@ -3705,10 +3762,12 @@ function acceptJobOffer() {
   STATE.career.level = Math.max(STATE.career.level || 0, getCareerLevelForJob(job));
   STATE.career.startedAge = STATE.age;
   STATE.career.category = job.jobCategory;
+  STATE.career.jobType = job.type || null;
   STATE.career.companyName = job.companyName;
   STATE.career.work = null;
   STATE.finances.income = legalSalary;
   STATE.finances.job = job.title;
+  STATE.finances.jobType = job.type || null;
   if (job.title.startsWith('Year 1 Trainee Solicitor')) legalState.pathwaysTried.push('solicitor');
   if (job.title === 'Pupil Barrister') legalState.pathwaysTried.push('barrister');
   ensureCareerState(job);
@@ -3727,10 +3786,10 @@ function declineJobOffer() {
 }
 
 function previousUniApplicationStep() {
-  if (_learnScreen === 'uniApplyPreview') {
-    _learnScreen = 'uniApplyType';
-  } else if (_learnScreen === 'uniApplyType') {
-    _learnScreen = 'uniApplyBasics';
+  if (_learnScreen === 'uniApplyType') {
+    _learnScreen = 'uniApplyFinances';
+  } else if (_learnScreen === 'uniApplyFinances') {
+    _learnScreen = 'uniApplyCourse';
   } else {
     closeUniApplication();
     return;
@@ -3741,19 +3800,29 @@ function previousUniApplicationStep() {
 }
 
 function nextUniApplicationStep() {
-  if (!_uniApplyDraft) _uniApplyDraft = { course:null, uniType:null, funding:null, status:'draft' };
-  if (_learnScreen === 'uniApplyBasics') {
-    if (!_uniApplyDraft.course || !_uniApplyDraft.funding) {
-      showToast('Choose a course and funding.');
+  _uniApplyDraft = getUniversityApplicationDraft();
+  if (_learnScreen === 'uniApplyCourse') {
+    if (!_uniApplyDraft.course) {
+      showToast('Choose a course first.');
       return;
     }
+    saveUniversityDraft();
+    _learnScreen = 'uniApplyFinances';
+  } else if (_learnScreen === 'uniApplyFinances') {
+    if (!_uniApplyDraft.fundingChoice) {
+      showToast('Choose how you will fund university.');
+      return;
+    }
+    const result = prepareUniversityFundingSelection();
+    if (!result.ok) return;
     _learnScreen = 'uniApplyType';
   } else if (_learnScreen === 'uniApplyType') {
     if (!_uniApplyDraft.uniType) {
       showToast('Choose a university type.');
       return;
     }
-    _learnScreen = 'uniApplyPreview';
+    submitUniApplication();
+    return;
   }
   renderLearnTab();
   const tab = document.getElementById('tab-learn');
@@ -3761,8 +3830,22 @@ function nextUniApplicationStep() {
 }
 
 function selectUniApplicationField(field, value) {
-  if (!_uniApplyDraft) _uniApplyDraft = { course:null, uniType:null, funding:null, status:'draft' };
-  _uniApplyDraft[field] = value;
+  _uniApplyDraft = getUniversityApplicationDraft();
+  if (field === 'fundingChoice') {
+    _uniApplyDraft.fundingChoice = value;
+    _uniApplyDraft.funding = value;
+    if (value === 'scholarship') _uniApplyDraft.scholarshipStatus = 'not_available_yet';
+    if (value !== 'ask_parents') {
+      _uniApplyDraft.parentalFundingAccepted = false;
+      _uniApplyDraft.parentalFundingRejected = false;
+    }
+  } else if (field === 'uniType') {
+    _uniApplyDraft.uniType = value;
+    _uniApplyDraft.universityType = value;
+  } else {
+    _uniApplyDraft[field] = value;
+  }
+  saveUniversityDraft();
   renderLearnTab();
 }
 
@@ -3810,20 +3893,23 @@ function isEligibleForUniType(uniType, score) {
 }
 
 function submitUniApplication() {
-  if (!_uniApplyDraft?.course || !_uniApplyDraft?.uniType || !_uniApplyDraft?.funding) {
-    showToast('Choose a course, university type, and funding.');
+  _uniApplyDraft = getUniversityApplicationDraft();
+  if (!_uniApplyDraft?.course || !_uniApplyDraft?.uniType || !_uniApplyDraft?.fundingChoice) {
+    showToast('Finish your university choices first.');
     return;
   }
   const postSchool = ensurePostSchoolState();
-  postSchool.uniApplication = {
+  postSchool.uniApplication = createUniversityApplicationState({
     ..._uniApplyDraft,
     submittedAge: STATE.age,
     status: 'pending',
     result: null,
-  };
+  });
+  if (typeof syncUniversityApplicationState === 'function') syncUniversityApplicationState(postSchool.uniApplication);
   saveGame();
   _learnScreen = 'main';
   _uniApplyDraft = null;
+  _uniParentFundingOffer = null;
   renderLearnTab();
   showToast('Application sent. Age up to get results.');
 }
@@ -3864,15 +3950,252 @@ function getUniFundingConfig(id) {
   return UNI_FUNDING.find(item => item.id === id) || UNI_FUNDING[0];
 }
 
+function getUniversityApplicationDraft(overrides = {}) {
+  const existing = _uniApplyDraft || {};
+  return createUniversityApplicationState({ ...existing, ...overrides });
+}
+
+function saveUniversityDraft() {
+  const postSchool = ensurePostSchoolState();
+  const draft = getUniversityApplicationDraft();
+  _uniApplyDraft = draft;
+  if (typeof syncUniversityApplicationState === 'function' && draft.status === 'draft') {
+    syncUniversityApplicationState(draft);
+  } else {
+    postSchool.uniApplication = draft;
+  }
+  saveGame();
+}
+
+function getUniversityFundingParents() {
+  return [STATE.family?.mum, STATE.family?.dad].filter(Boolean).filter(parent => parent.alive !== false);
+}
+
+function getUniversityFundingWealthBand() {
+  const parents = getUniversityFundingParents();
+  const highPayingCount = parents.filter(parent => isHighPayingParentJob(parent.job)).length;
+  if (STATE.socialClass === 'elite' || highPayingCount >= 2) return 'wealthy';
+  if (STATE.socialClass === 'upper_middle' || highPayingCount === 1) return 'comfortable';
+  if (STATE.socialClass === 'middle') return 'average';
+  return 'low';
+}
+
+function getParentFundingAmountRange() {
+  return {
+    low: [0, 2000],
+    average: [1000, 6000],
+    comfortable: [5000, 12000],
+    wealthy: [10000, 20000],
+  }[getUniversityFundingWealthBand()] || [0, 4000];
+}
+
+function getParentFundingGradeRequirement() {
+  const gradeScore = STATE.school.gradeScore || 0;
+  if (gradeScore >= 90) return 'A+';
+  if (gradeScore >= 80) return 'A';
+  return 'B';
+}
+
+function buildParentFundingOffer() {
+  if ((_uniApplyDraft?.parentalFundingAmountPerYear || _uniApplyDraft?.parentalFundingAmount) && Array.isArray(_uniApplyDraft?.parentalFundingTerms)) {
+    return {
+      amount: _uniApplyDraft.parentalFundingAmountPerYear || _uniApplyDraft.parentalFundingAmount,
+      terms: _uniApplyDraft.parentalFundingTerms,
+    };
+  }
+  const parents = getUniversityFundingParents();
+  const [minAmount, maxAmount] = getParentFundingAmountRange();
+  const generosity = parents.length
+    ? Math.round(parents.reduce((sum, parent) => sum + (parent.npcStats?.generosity ?? 50), 0) / parents.length)
+    : 0;
+  const warmth = parents.length
+    ? Math.round(parents.reduce((sum, parent) => sum + (parent.npcStats?.warmth ?? 50), 0) / parents.length)
+    : 0;
+  const traitList = parents.flatMap(parent => parent.traits || []);
+  let generosityFactor = ((generosity - 50) / 50) * 0.24 + ((warmth - 50) / 50) * 0.12;
+  if (traitList.includes('supportive')) generosityFactor += 0.16;
+  if (traitList.includes('kind')) generosityFactor += 0.12;
+  if (traitList.includes('ambitious')) generosityFactor += 0.05;
+  if (traitList.includes('strict')) generosityFactor -= 0.04;
+  if (traitList.includes('overbearing')) generosityFactor -= 0.08;
+  if (traitList.includes('distant')) generosityFactor -= 0.14;
+  if (traitList.includes('absent')) generosityFactor -= 0.2;
+  const amount = Math.round((minAmount + (maxAmount - minAmount) * Math.max(0, Math.min(1, 0.5 + generosityFactor))) / 100) * 100;
+
+  const terms = [];
+  const selectedCourse = _uniApplyDraft?.course || 'your course';
+  const wantsCreativeRestriction = isCreativeUniversityCourse(selectedCourse) && (traitList.includes('strict') || traitList.includes('ambitious') || traitList.includes('overbearing'));
+
+  if (wantsCreativeRestriction) {
+    terms.push({ type:'no_creative_degree', label:'You must not study a creative degree' });
+  }
+  if (traitList.includes('strict') || traitList.includes('overbearing')) {
+    terms.push({ type:'min_grade', value:getParentFundingGradeRequirement(), label:`You must keep your grades at ${getParentFundingGradeRequirement()}` });
+  }
+  if (traitList.includes('ambitious')) {
+    terms.push({ type:'specific_course', value:selectedCourse, label:`You must study ${selectedCourse}` });
+  }
+  if ((traitList.includes('strict') || traitList.includes('hardworking')) && Math.random() < 0.45) {
+    terms.push({ type:'part_time_job', label:'You must get a part-time job' });
+  }
+  if ((traitList.includes('strict') || traitList.includes('distant') || traitList.includes('overbearing')) && Math.random() < 0.5) {
+    terms.push({ type:'pay_back_later', label:'You must pay them back once you start working' });
+  }
+
+  const uniqueTerms = terms.filter((term, index, list) => list.findIndex(item => item.type === term.type) === index);
+  return { amount:Math.max(0, Math.min(20000, amount)), terms:uniqueTerms };
+}
+
+function renderParentFundingOfferPopup() {
+  const offer = _uniParentFundingOffer;
+  if (!offer) return;
+  _pendingAfterMilestone = null;
+  const bodyLine = offer.status === 'full'
+    ? 'Your parents are willing to cover your full tuition fees.'
+    : offer.status === 'housing_only'
+      ? `Your parents will not pay tuition, but they will cover ${fmtMoney(offer.housingPerYear || 0)} per year of housing costs.`
+      : `Your parents are willing to give you ${fmtMoney(offer.amount)} per year.`;
+  document.getElementById('milestone-inner').innerHTML = `
+    <div class="milestone-emoji">💌</div>
+    <div class="milestone-title">Your parents have made an offer</div>
+    <div class="milestone-body">
+      ${bodyLine}
+      <br><br>
+      <strong>Conditions</strong>
+      <br>
+      ${offer.terms.length ? offer.terms.map(term => `• ${term.label}`).join('<br>') : 'No conditions'}
+    </div>
+    <button class="continue-btn" onclick="acceptParentFundingOffer()">Accept offer</button>
+    <button class="birth-btn secondary" onclick="rejectParentFundingOffer()">Reject offer</button>`;
+  document.getElementById('milestone-overlay').classList.add('open');
+}
+
+function acceptParentFundingOffer() {
+  if (!_uniParentFundingOffer) return;
+  const selected = new Set((getUniversityApplicationDraft().selectedFundingSources || []).filter(Boolean));
+  selected.add('parents');
+  _uniApplyDraft = getUniversityApplicationDraft({
+    selectedFundingSources: [...selected],
+    parentalFundingAmount: _uniParentFundingOffer.amount,
+    parentalFundingAmountPerYear: _uniParentFundingOffer.amount,
+    parentFundingType: _uniParentFundingOffer.status || 'partial',
+    parentHousingSupportPerYear: _uniParentFundingOffer.housingPerYear || 0,
+    parentalFundingTerms: _uniParentFundingOffer.terms,
+    parentalFundingAccepted: true,
+    parentalFundingRejected: false,
+    parentalFundingStopped: false,
+    parentWarningIssued: false,
+  });
+  _uniParentFundingOffer = null;
+  saveUniversityDraft();
+  document.getElementById('milestone-overlay').classList.remove('open');
+  _learnScreen = 'uniApplyFinances';
+  renderLearnTab();
+}
+
+function rejectParentFundingOffer() {
+  const selected = new Set((getUniversityApplicationDraft().selectedFundingSources || []).filter(Boolean));
+  selected.delete('parents');
+  _uniApplyDraft = getUniversityApplicationDraft({
+    selectedFundingSources: [...selected],
+    parentalFundingAccepted: false,
+    parentalFundingRejected: true,
+    parentFundingType: null,
+    parentalFundingAmount: 0,
+    parentalFundingAmountPerYear: 0,
+    parentHousingSupportPerYear: 0,
+    parentalFundingTerms: [],
+  });
+  _uniParentFundingOffer = null;
+  saveUniversityDraft();
+  document.getElementById('milestone-overlay').classList.remove('open');
+  _learnScreen = 'uniApplyFinances';
+  renderLearnTab();
+}
+
+function prepareUniversityFundingSelection() {
+  const draft = getUniversityApplicationDraft();
+  if (draft.fundingChoice === 'student_loan') {
+    _uniApplyDraft = getUniversityApplicationDraft({
+      yearlyTuitionFundingSource: 'student_loan',
+      yearlyMaintenanceFundingSource: 'student_loan',
+      tuitionDebtPerYear: UNIVERSITY_TUITION_FEE_PER_YEAR,
+      maintenanceDebtPerYear: UNIVERSITY_MAINTENANCE_LOAN_PER_YEAR,
+      maintenanceSupportPerYear: UNIVERSITY_MAINTENANCE_LOAN_PER_YEAR,
+      parentalFundingAccepted: false,
+      parentalFundingRejected: false,
+      parentalFundingAmount: 0,
+      parentalFundingAmountPerYear: 0,
+      parentalFundingTerms: [],
+      selfFundingEnabled: false,
+      scholarshipStatus: null,
+    });
+    saveUniversityDraft();
+    return { ok:true };
+  }
+  if (draft.fundingChoice === 'self_fund') {
+    if ((STATE.finances?.balance || 0) < UNIVERSITY_TUITION_FEE_PER_YEAR) {
+      const confirmed = window.confirm(`You have less than ${fmtMoney(UNIVERSITY_TUITION_FEE_PER_YEAR)} in the bank. Continuing will push you into debt. Are you sure?`);
+      if (!confirmed) return { ok:false };
+    }
+    _uniApplyDraft = getUniversityApplicationDraft({
+      yearlyTuitionFundingSource: 'self_fund',
+      yearlyMaintenanceFundingSource: 'self_fund',
+      selfFundingEnabled: true,
+      parentalFundingAccepted: false,
+      parentalFundingRejected: false,
+      parentalFundingAmount: 0,
+      parentalFundingAmountPerYear: 0,
+      parentalFundingTerms: [],
+      scholarshipStatus: null,
+    });
+    saveUniversityDraft();
+    return { ok:true };
+  }
+  if (draft.fundingChoice === 'scholarship') {
+    _uniApplyDraft = getUniversityApplicationDraft({
+      scholarshipStatus: 'not_available_yet',
+      parentalFundingAccepted: false,
+      parentalFundingRejected: false,
+      parentalFundingAmount: 0,
+      parentalFundingAmountPerYear: 0,
+      parentalFundingTerms: [],
+    });
+    saveUniversityDraft();
+    showToast('Scholarship applications are not available yet.');
+    return { ok:false };
+  }
+  if (draft.fundingChoice === 'ask_parents') {
+    _uniParentFundingOffer = buildParentFundingOffer();
+    _uniApplyDraft = getUniversityApplicationDraft({
+      scholarshipStatus: null,
+      parentalFundingAccepted: false,
+      parentalFundingRejected: false,
+      parentalFundingAmount: _uniParentFundingOffer.amount,
+      parentalFundingAmountPerYear: _uniParentFundingOffer.amount,
+      parentalFundingTerms: _uniParentFundingOffer.terms,
+    });
+    saveUniversityDraft();
+    renderParentFundingOfferPopup();
+    return { ok:false, pending:true };
+  }
+  return { ok:false };
+}
+
 function acceptUniversityOffer(type) {
   const postSchool = ensurePostSchoolState();
   if (!postSchool.uniApplication) return;
+  postSchool.uniApplication = createUniversityApplicationState(postSchool.uniApplication);
   postSchool.uniApplication.status = 'accepted_offer';
   postSchool.uniApplication.acceptedType = type;
+  postSchool.uniApplication.uniType = type;
+  postSchool.uniApplication.universityType = type;
   postSchool.uniApplication.startedAge = STATE.age;
   STATE.school.level = 'uni';
   STATE.school.current = formatUniversityType(type);
   logActivity(`Accepted a place to study ${postSchool.uniApplication.course} at ${formatUniversityType(type)}.`, null);
+  if (typeof syncUniversityApplicationState === 'function') syncUniversityApplicationState(postSchool.uniApplication);
+  if (typeof applyUniversityFundingForCurrentYear === 'function') applyUniversityFundingForCurrentYear();
   if (typeof getCurrentHome === 'function' && getCurrentHome()?.source === 'family' && typeof makeRentalHome === 'function' && typeof addHomeToHistory === 'function' && typeof setCurrentHome === 'function') {
     const studentHome = addHomeToHistory(makeRentalHome('rental_student_house'));
     setCurrentHome(studentHome, 'Moved out for university and into a shared student house.');
@@ -3887,7 +4210,10 @@ function acceptUniversityOffer(type) {
 
 function rejectUniversityOffer() {
   const postSchool = ensurePostSchoolState();
-  if (postSchool.uniApplication) postSchool.uniApplication.status = 'declined';
+  if (postSchool.uniApplication) {
+    postSchool.uniApplication.status = 'declined';
+    if (typeof syncUniversityApplicationState === 'function') syncUniversityApplicationState(postSchool.uniApplication);
+  }
   logActivity('Turned down the university offer.', null);
   saveGame();
   closeMilestone();
@@ -3908,7 +4234,7 @@ function buildUniSectionTitle(step, title, sideText='') {
 function buildUniPageHeader(title, subtitle='') {
   const backAction = _learnScreen === 'furtherEducation'
     ? 'closeFurtherEducation()'
-    : (_learnScreen === 'uniApplyBasics' ? 'closeUniApplication()' : 'previousUniApplicationStep()');
+    : (_learnScreen === 'uniApplyCourse' ? 'closeUniApplication()' : 'previousUniApplicationStep()');
   return `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
       <button onclick="${backAction}"
@@ -3982,19 +4308,20 @@ function buildUniTypeCards() {
 }
 
 function buildUniFundingCards() {
-  const selected = _uniApplyDraft?.funding;
+  const selected = _uniApplyDraft?.fundingChoice;
   return `
-    <div style="display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:10px">
+    <div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:12px">
       ${UNI_FUNDING.map(item => {
         const active = selected === item.id;
         return `
-          <button onclick="selectUniApplicationField('funding', '${item.id}')"
-            style="position:relative;padding:14px 12px 12px;border-radius:20px;border:1.5px solid ${active ? item.accent : 'rgba(220,212,203,.9)'};background:${active ? '#fefcff' : '#fff'};box-shadow:${active ? '0 12px 28px rgba(109,86,201,.12)' : '0 8px 20px rgba(72,48,26,.05)'};text-align:left;cursor:pointer;min-height:164px">
+          <button onclick="selectUniApplicationField('fundingChoice', '${item.id}')"
+            style="position:relative;padding:16px 14px 14px;border-radius:22px;border:1.5px solid ${active ? item.accent : 'rgba(220,212,203,.9)'};background:${active ? '#fefcff' : '#fff'};box-shadow:${active ? '0 12px 28px rgba(109,86,201,.12)' : '0 8px 20px rgba(72,48,26,.05)'};text-align:left;cursor:pointer;min-height:176px">
             <div style="position:absolute;top:10px;right:10px;width:24px;height:24px;border-radius:50%;border:1.5px solid ${active ? item.accent : '#b8b0a8'};background:${active ? item.accent : '#fff'};display:flex;align-items:center;justify-content:center;color:${active ? '#fff' : 'transparent'};font-size:15px">✓</div>
             <div style="font-size:31px;color:${item.accent};line-height:1;margin-bottom:10px"><iconify-icon icon="${item.icon}"></iconify-icon></div>
-            <div style="font-size:14px;font-weight:800;line-height:1.12;color:#171510;margin-bottom:8px">${item.id}</div>
-            <div style="font-size:11px;line-height:1.45;color:#5f564e;min-height:50px">${item.blurb}</div>
-            <div style="margin-top:12px;display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:${item.tagBg};color:${item.tagColor};font-size:11px;font-weight:700">${item.tag}</div>
+            <div style="font-size:15px;font-weight:800;line-height:1.12;color:#171510;margin-bottom:8px">${item.label}</div>
+            <div style="font-size:11px;line-height:1.45;color:#5f564e;min-height:48px">${item.blurb}</div>
+            <div style="margin-top:12px;font-size:11px;font-weight:800;color:${item.accent}">Effect: ${item.effect}</div>
+            <div style="margin-top:10px;display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:${item.tagBg};color:${item.tagColor};font-size:11px;font-weight:700">${item.tag}</div>
           </button>`;
       }).join('')}
     </div>`;
@@ -4003,7 +4330,7 @@ function buildUniFundingCards() {
 function buildUniPreviewCard() {
   const course = getUniCourseConfig(_uniApplyDraft?.course || 'Law');
   const uniType = getUniTypeConfig(_uniApplyDraft?.uniType || 'Top Universities');
-  const funding = getUniFundingConfig(_uniApplyDraft?.funding || 'Student loan');
+  const funding = getUniFundingConfig(_uniApplyDraft?.fundingChoice || _uniApplyDraft?.funding || 'student_loan');
   const preview = UNI_TYPE_PREVIEW[uniType.id] || UNI_TYPE_PREVIEW['Top Universities'];
   const playerGrade = gradeFromScore(STATE.school.gradeScore || 0);
   const eligible = isEligibleForUniType(uniType.id, STATE.school.gradeScore);
@@ -4011,7 +4338,7 @@ function buildUniPreviewCard() {
   const chance = universityAcceptanceChance({
     course: _uniApplyDraft?.course || course.id,
     uniType: _uniApplyDraft?.uniType || uniType.id,
-    funding: _uniApplyDraft?.funding || funding.id,
+    funding: _uniApplyDraft?.fundingChoice || _uniApplyDraft?.funding || funding.id,
   });
   return `
     <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin:2px 0 12px">
@@ -4048,7 +4375,7 @@ function buildUniPreviewCard() {
                 <iconify-icon icon="${funding.icon}" style="font-size:20px;color:${funding.accent}"></iconify-icon>
                 <span>Funding</span>
               </div>
-              <div style="font-size:18px;font-weight:800;color:#191611;line-height:1.15;margin-top:8px">${funding.id}</div>
+              <div style="font-size:18px;font-weight:800;color:#191611;line-height:1.15;margin-top:8px">${funding.label}</div>
             </div>
           </div>
         </div>
@@ -4079,54 +4406,69 @@ function buildUniPreviewCard() {
 }
 
 function buildUniApplicationScreen() {
-  if (!_uniApplyDraft) _uniApplyDraft = { course:null, uniType:null, funding:null, status:'draft' };
-  const basicsReady = _uniApplyDraft.course && _uniApplyDraft.funding;
+  _uniApplyDraft = getUniversityApplicationDraft();
+  const courseReady = !!_uniApplyDraft.course;
+  const fundingReady = !!_uniApplyDraft.fundingChoice;
   const typeReady = !!_uniApplyDraft.uniType;
-  const previewReady = basicsReady && typeReady;
-  if (_learnScreen === 'uniApplyBasics') {
+  if (_learnScreen === 'uniApplyCourse') {
     return `
       <div style="display:flex;flex-direction:column;gap:16px;padding-bottom:10px">
-        ${buildUniPageHeader('Apply to University', 'Choose your course and how you plan to fund it first.')}
+        ${buildUniPageHeader('Choose Course', 'Pick the degree you want to study first.')}
         <div>
-          ${buildUniSectionTitle(1, 'Choose Your Course', 'Swipe to explore')}
+          ${buildUniSectionTitle(1, 'Choose Course', 'Swipe to explore')}
           ${buildUniCourseCards()}
         </div>
-        <div>
-          ${buildUniSectionTitle(2, 'How Will You Fund Your Studies?')}
-          ${buildUniFundingCards()}
-        </div>
         <button onclick="nextUniApplicationStep()"
-          style="width:100%;padding:18px 18px;border-radius:24px;border:1px solid ${basicsReady ? '#6d56c9' : '#d9d0c5'};background:${basicsReady ? 'linear-gradient(90deg, #6d56c9, #846be6)' : '#ebe5dd'};color:${basicsReady ? '#fff' : '#a0968c'};box-shadow:${basicsReady ? '0 18px 36px rgba(109,86,201,.22)' : 'none'};display:flex;align-items:center;justify-content:center;gap:12px;cursor:pointer">
-          <span style="font-size:15px;font-weight:800">Next: University Type</span>
+          style="width:100%;padding:18px 18px;border-radius:24px;border:1px solid ${courseReady ? '#6d56c9' : '#d9d0c5'};background:${courseReady ? 'linear-gradient(90deg, #6d56c9, #846be6)' : '#ebe5dd'};color:${courseReady ? '#fff' : '#a0968c'};box-shadow:${courseReady ? '0 18px 36px rgba(109,86,201,.22)' : 'none'};display:flex;align-items:center;justify-content:center;gap:12px;cursor:pointer">
+          <span style="font-size:15px;font-weight:800">Next: Plan Finances</span>
           <span style="font-size:20px;line-height:1">›</span>
         </button>
       </div>`;
   }
-  if (_learnScreen === 'uniApplyType') {
+  if (_learnScreen === 'uniApplyFinances') {
     return `
       <div style="display:flex;flex-direction:column;gap:16px;padding-bottom:10px">
-        ${buildUniPageHeader('Choose University Type', 'Pick the level you want to apply for. Your grade requirement updates on the next page.')}
+        ${buildUniPageHeader('Plan Finances', 'Choose how you will pay for tuition and living costs.')}
         <div>
-          ${buildUniSectionTitle(3, 'Choose University Type')}
-          ${buildUniTypeCards()}
+          ${buildUniSectionTitle(2, 'Plan Finances')}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+            <div style="padding:14px;border-radius:18px;background:#fff;border:1px solid #ede4d8">
+              <div style="font-size:11px;font-weight:800;color:#7b7268;letter-spacing:.04em;text-transform:uppercase">Tuition Fees</div>
+              <div style="font-size:23px;font-weight:900;color:#191611;margin-top:6px">£9,000</div>
+              <div style="font-size:12px;line-height:1.45;color:#675f57;margin-top:6px">Per year for the degree itself.</div>
+            </div>
+            <div style="padding:14px;border-radius:18px;background:#fff;border:1px solid #ede4d8">
+              <div style="font-size:11px;font-weight:800;color:#7b7268;letter-spacing:.04em;text-transform:uppercase">Maintenance</div>
+              <div style="font-size:23px;font-weight:900;color:#191611;margin-top:6px">£6,500</div>
+              <div style="font-size:12px;line-height:1.45;color:#675f57;margin-top:6px">Student loan support for rent and living costs.</div>
+            </div>
+          </div>
+          ${buildUniFundingCards()}
         </div>
         <button onclick="nextUniApplicationStep()"
-          style="width:100%;padding:18px 18px;border-radius:24px;border:1px solid ${typeReady ? '#6d56c9' : '#d9d0c5'};background:${typeReady ? 'linear-gradient(90deg, #6d56c9, #846be6)' : '#ebe5dd'};color:${typeReady ? '#fff' : '#a0968c'};box-shadow:${typeReady ? '0 18px 36px rgba(109,86,201,.22)' : 'none'};display:flex;align-items:center;justify-content:center;gap:12px;cursor:pointer">
-          <span style="font-size:15px;font-weight:800">Next: Application Preview</span>
+          style="width:100%;padding:18px 18px;border-radius:24px;border:1px solid ${fundingReady ? '#6d56c9' : '#d9d0c5'};background:${fundingReady ? 'linear-gradient(90deg, #6d56c9, #846be6)' : '#ebe5dd'};color:${fundingReady ? '#fff' : '#a0968c'};box-shadow:${fundingReady ? '0 18px 36px rgba(109,86,201,.22)' : 'none'};display:flex;align-items:center;justify-content:center;gap:12px;cursor:pointer">
+          <span style="font-size:15px;font-weight:800">Next: University Type</span>
           <span style="font-size:20px;line-height:1">›</span>
         </button>
       </div>`;
   }
   return `
     <div style="display:flex;flex-direction:column;gap:16px;padding-bottom:10px">
-      ${buildUniPageHeader('Application Preview', 'Review your choices before sending your UCAS application.')}
-      ${buildUniPreviewCard()}
-      <button onclick="submitUniApplication()"
-        style="width:100%;padding:18px 18px;border-radius:24px;border:1px solid ${previewReady ? '#6d56c9' : '#d9d0c5'};background:${previewReady ? 'linear-gradient(90deg, #6d56c9, #846be6)' : '#ebe5dd'};color:${previewReady ? '#fff' : '#a0968c'};box-shadow:${previewReady ? '0 18px 36px rgba(109,86,201,.22)' : 'none'};display:flex;align-items:center;justify-content:center;gap:12px;cursor:pointer">
+      ${buildUniPageHeader('Choose University Type', 'Pick the level you want to apply for.')}
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <div style="display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;background:#fff;border:1px solid #ece4da;font-size:11px;font-weight:700;color:#4f4741"><iconify-icon icon="mdi:book-open-variant" style="font-size:15px"></iconify-icon>${_uniApplyDraft.course || 'Course'}</div>
+        <div style="display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;background:#fff;border:1px solid #ece4da;font-size:11px;font-weight:700;color:#4f4741"><iconify-icon icon="${getUniFundingConfig(_uniApplyDraft.fundingChoice || 'student_loan').icon}" style="font-size:15px"></iconify-icon>${getUniFundingConfig(_uniApplyDraft.fundingChoice || 'student_loan').label}</div>
+      </div>
+      <div>
+        ${buildUniSectionTitle(3, 'Choose University Type')}
+        ${buildUniTypeCards()}
+      </div>
+      <button onclick="nextUniApplicationStep()"
+        style="width:100%;padding:18px 18px;border-radius:24px;border:1px solid ${typeReady ? '#6d56c9' : '#d9d0c5'};background:${typeReady ? 'linear-gradient(90deg, #6d56c9, #846be6)' : '#ebe5dd'};color:${typeReady ? '#fff' : '#a0968c'};box-shadow:${typeReady ? '0 18px 36px rgba(109,86,201,.22)' : 'none'};display:flex;align-items:center;justify-content:center;gap:12px;cursor:pointer">
         <iconify-icon icon="mdi:email-outline" style="font-size:24px"></iconify-icon>
         <div style="text-align:left">
           <div style="font-size:15px;font-weight:800;line-height:1.05">Submit UCAS Application</div>
-          <div style="font-size:12px;font-weight:600;opacity:.86;margin-top:4px">${previewReady ? 'Results will arrive when you age up.' : 'Finish your application choices first.'}</div>
+          <div style="font-size:12px;font-weight:600;opacity:.86;margin-top:4px">${typeReady ? 'Results will arrive when you age up.' : 'Choose a university type first.'}</div>
         </div>
       </button>
     </div>`;
@@ -4188,7 +4530,7 @@ function openLearnClassmateDetail(classmateId) {
 }
 
 function closeLearnClassmateDetail() {
-  _learnScreen = 'classmates';
+  _learnScreen = STATE.school?.level === 'uni' ? 'uniPeople' : 'classmates';
   _learnClassmateId = null;
   renderLearnTab();
   const tab = document.getElementById('tab-learn');
@@ -4314,14 +4656,63 @@ function getUniversityReputation(type) {
 
 function ensureUniversityState() {
   const postSchool = ensurePostSchoolState();
-  if (!STATE.school.uniProfile) {
+  const course = postSchool.uniApplication?.course || 'University';
+  const existingPeople = STATE.school.uniProfile?.people || [];
+  const existingCoursemates = existingPeople.filter(person => person.label !== 'Lecturer');
+  const existingLecturers = existingPeople.filter(person => person.label === 'Lecturer');
+  const needsRefresh = !STATE.school.uniProfile
+    || existingCoursemates.length !== 10
+    || existingLecturers.length !== 2
+    || existingCoursemates.some(person => person.degreeCourse !== course)
+    || existingLecturers.some(person => person.degreeCourse !== course);
+
+  if (needsRefresh) {
+    const baseAge = Math.max(18, STATE.age);
+    const coursemates = Array.from({ length: 10 }, (_, index) => {
+      const gender = Math.random() > 0.5 ? 'male' : 'female';
+      const classmate = {
+        id: `uni-coursemate-${index}-${uid()}`,
+        label: 'Coursemate',
+        role: 'Friend',
+        firstName: pickRandom(NAMES_UK[gender]),
+        surname: pickRandom(NAMES_UK.surnames),
+        age: clamp(baseAge + Math.floor(Math.random() * 3) - 1, 18, 26),
+        appearance: generateAppearance(gender),
+        degreeCourse: course,
+        status: 'classmate',
+        relationship: Math.floor(Math.random() * 31) + 35,
+        educationLevel: 'University',
+        currentEducation: course,
+        relationshipStatus: Math.random() < 0.82 ? 'Single' : 'Talking to someone',
+        socialGroup: 'Coursemate',
+        traits: typeof sampleN === 'function' ? sampleN(CLASSMATE_TRAITS_POOL, 2).map(trait => trait.id) : [],
+      };
+      if (typeof ensureNpcCoreFields === 'function') {
+        ensureNpcCoreFields(classmate, { role: 'classmate', socialGroup: 'university friend' });
+      }
+      return classmate;
+    });
+    const lecturers = Array.from({ length: 2 }, (_, index) => {
+      const gender = Math.random() > 0.45 ? 'male' : 'female';
+      const lecturer = {
+        id: `uni-lecturer-${index}-${uid()}`,
+        label: 'Lecturer',
+        role: 'Teacher',
+        title: Math.random() < 0.75 ? 'Dr' : 'Professor',
+        firstName: pickRandom(NAMES_UK[gender]),
+        surname: pickRandom(NAMES_UK.surnames),
+        age: 35 + Math.floor(Math.random() * 33),
+        appearance: generateAppearance(gender),
+        degreeCourse: course,
+        subject: course,
+      };
+      if (typeof ensureNpcCoreFields === 'function') {
+        ensureNpcCoreFields(lecturer, { role: 'teacher' });
+      }
+      return lecturer;
+    });
     STATE.school.uniProfile = {
-      people: [
-        { id:'uni-flatmate', label:'Flatmate', role:'Friend', firstName:'Maya', surname:'Collins', age:18, appearance: generateAppearance('female') },
-        { id:'uni-lecturer', label:'Lecturer', role:'Teacher', title:'Dr', firstName:'Harris', surname:'', age:42, appearance: generateAppearance('male') },
-        { id:'uni-rival', label:'Course Rival', role:'Friend', firstName:'Oliver', surname:'Reed', age:18, appearance: generateAppearance('male') },
-        { id:'uni-friend', label:'Friend', role:'Friend', firstName:'Zara', surname:'Ahmed', age:18, appearance: generateAppearance('female') },
-      ],
+      people: [...coursemates, ...lecturers],
     };
   }
   if (!postSchool.uniApplication?.startedAge) {
@@ -4340,89 +4731,34 @@ function getUniversityYearMeta() {
 }
 
 function buildUniversityHeroCard() {
-  const application = STATE.school.postSchool?.uniApplication || {};
   const uniType = STATE.school.current || 'University';
   const { course, totalYears, currentYear } = getUniversityYearMeta();
-  const stars = Array.from({ length: 5 }, (_, i) =>
-    `<span style="color:${i < getUniversityReputation(uniType) ? '#f4b239' : '#e6ddd2'};font-size:19px;letter-spacing:.02em">★</span>`
-  ).join('');
+  const grade = gradeFromScore(STATE.school.gradeScore || 0);
+  const gradeTone = {
+    background: 'linear-gradient(180deg, #f2ebff 0%, #ece3ff 100%)',
+    color: '#7458d5',
+  };
   return `
-    <div style="display:flex;flex-direction:column;min-height:208px">
-      <div style="position:relative;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;min-height:150px">
-        <div style="display:flex;flex-direction:column;flex:1;min-width:0;max-width:55%;position:relative;z-index:2">
-          <div style="display:inline-flex;align-items:center;width:fit-content;background:#ece7f6;border-radius:999px;padding:6px 12px;font-size:11px;font-weight:800;color:#6558a8;text-transform:uppercase;letter-spacing:.07em">University</div>
-          <div style="font-size:30px;font-weight:800;letter-spacing:-.045em;line-height:1.02;color:#172039;margin-top:12px">${uniType}</div>
-          <div style="font-size:13px;font-weight:700;color:#6d6587;margin-top:10px">Year ${currentYear} of ${totalYears}</div>
+    <div class="learn-school-hero" style="background:linear-gradient(180deg, #fffefe 0%, #faf7ff 100%);border:1px solid rgba(224,212,242,0.95)">
+      <div class="learn-school-hero-inner">
+        <div class="learn-school-hero-copy">
+          <div style="display:inline-flex;align-items:center;width:fit-content;background:#ede4ff;border-radius:999px;padding:7px 14px;font-size:11px;font-weight:800;color:#6957c3;text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px">University</div>
+          <div class="learn-school-name" style="color:#172039">${uniType}</div>
+          <div class="learn-school-yearline" style="color:#6d6587">${course} • Year ${currentYear} of ${totalYears}</div>
         </div>
-        <img src="${UNI_PREVIEW_IMAGE}" alt="University illustration" style="position:absolute;right:-8px;top:-30px;width:210px;height:210px;object-fit:contain;display:block;pointer-events:none;z-index:1" />
-      </div>
-      <div style="margin-top:auto;padding-top:12px;border-top:1px solid rgba(50,40,86,.12);display:grid;grid-template-columns:1fr 1fr;gap:14px">
-        <div style="display:flex;align-items:flex-start;gap:10px">
-          <iconify-icon icon="mdi:school-outline" style="font-size:20px;color:#6d56c9;flex-shrink:0;margin-top:1px"></iconify-icon>
-          <div>
-            <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8e83aa">Course</div>
-            <div style="font-size:14px;font-weight:800;color:#1a1814;margin-top:4px;line-height:1.1">${course}</div>
+        <div class="learn-school-hero-side">
+          <div class="learn-school-grade" style="background:${gradeTone.background}">
+            <div class="learn-school-grade-label">Grade</div>
+            <div class="learn-school-grade-value" style="color:${gradeTone.color}">${grade}</div>
           </div>
-        </div>
-        <div style="display:flex;align-items:flex-start;gap:10px">
-          <iconify-icon icon="mdi:star-outline" style="font-size:20px;color:#f0b43f;flex-shrink:0;margin-top:1px"></iconify-icon>
-          <div>
-            <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8e83aa">University Reputation</div>
-            <div style="display:flex;align-items:center;gap:2px;margin-top:5px;line-height:1">${stars}</div>
-          </div>
+          <img src="${UNI_PREVIEW_IMAGE}" alt="University illustration" class="learn-school-illustration" />
         </div>
       </div>
     </div>`;
 }
 
 function buildUniversityPerformanceSection() {
-  const application = STATE.school.postSchool?.uniApplication || {};
-  const grade = gradeFromScore(STATE.school.gradeScore || 0);
-  const stress = clamp(Math.round(((100 - (STATE.stats.happy || 0)) * 0.72) + ((100 - (STATE.stats.health || 0)) * 0.28)));
-  const social = clamp(Math.round(((STATE.stats.popularity || 0) * 0.7) + ((STATE.relationships.friends || 0) * 0.3)));
-  const networking = clamp(Math.round(((STATE.stats.smarts || 0) * 0.35) + ((STATE.stats.popularity || 0) * 0.35) + ((STATE.relationships.friends || 0) * 0.3)));
-  const cards = [
-    {
-      iconHTML: `<iconify-icon icon="material-symbols:assignment-rounded" style="font-size:24px;color:#8f73df"></iconify-icon>`,
-      value: grade,
-      label: 'Grade',
-      percent: clamp(STATE.school.gradeScore || scoreFromGrade(grade)),
-      barColor: '#8f73df',
-      track: '#efe7fb',
-      valueSize: '20px',
-    },
-    {
-      iconHTML: `<iconify-icon icon="material-symbols:neurology-rounded" style="font-size:24px;color:#d47a57"></iconify-icon>`,
-      value: stress,
-      label: 'Stress',
-      percent: stress,
-      barColor: '#d47a57',
-      track: '#f4e3d8',
-    },
-    {
-      iconHTML: `<iconify-icon icon="material-symbols:groups-rounded" style="font-size:24px;color:#5c8fd8"></iconify-icon>`,
-      value: social,
-      label: 'Social Life',
-      percent: social,
-      barColor: '#5c8fd8',
-      track: '#e7eefb',
-    },
-    {
-      iconHTML: `<iconify-icon icon="mdi:handshake-outline" style="font-size:24px;color:#56a56f"></iconify-icon>`,
-      value: networking,
-      label: 'Networking',
-      percent: networking,
-      barColor: '#56a56f',
-      track: '#e4f1e7',
-    },
-  ];
-  return `
-    <div style="margin-top:8px">
-      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#7c748d;margin-bottom:10px">Your Student Life</div>
-      <div style="display:flex;gap:10px">
-        ${cards.map(card => buildLearnPerformanceCard(card)).join('')}
-      </div>
-    </div>`;
+  return '';
 }
 
 function buildUniversityImportantPersonCard(person) {
@@ -4440,14 +4776,7 @@ function buildUniversityImportantPersonCard(person) {
 }
 
 function buildUniversityImportantPeopleSection() {
-  const uni = ensureUniversityState();
-  return `
-    <div style="margin-top:18px">
-      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#7c748d;margin-bottom:10px">Important People</div>
-      <div style="display:flex;gap:10px">
-        ${uni.people.map(person => buildUniversityImportantPersonCard(person)).join('')}
-      </div>
-    </div>`;
+  return '';
 }
 
 function buildUniversityLifeActionRow(icon, title) {
@@ -4465,24 +4794,519 @@ function buildUniversityLifeActionRow(icon, title) {
 }
 
 function buildUniversityLifeSection() {
-  const rows = [
-    ['mdi:book-open-page-variant-outline', 'Attend Lecture'],
-    ['mdi:library-shelves', 'Study in Library'],
-    ['mdi:account-group-outline', 'Join Society'],
-    ['mdi:glass-cocktail', 'Go Clubbing'],
-    ['mdi:briefcase-outline', 'Apply for Internship'],
-    ['mdi:weather-night', 'Pull All-Nighter'],
-  ];
+  return buildUniversityHomeScreen();
+}
+
+function ensureUniversityCommitmentState() {
+  if (!STATE.education) STATE.education = {};
+  if (!STATE.volunteering) STATE.volunteering = { currentRole:null };
+  if (!('currentInternship' in STATE.education)) STATE.education.currentInternship = null;
+  if (!('currentPlacement' in STATE.education)) STATE.education.currentPlacement = null;
+  if (!('isCourseRep' in STATE.education)) STATE.education.isCourseRep = false;
+  if (!('courseRepTitle' in STATE.education)) STATE.education.courseRepTitle = null;
+  return STATE.education;
+}
+
+function getUniversityCoursemates() {
+  const uni = ensureUniversityState();
+  return (uni.people || []).filter(person => person.label !== 'Lecturer');
+}
+
+function getUniversityLecturers() {
+  const uni = ensureUniversityState();
+  return (uni.people || []).filter(person => person.label === 'Lecturer');
+}
+
+function getUniversityPersonById(personId) {
+  const uni = ensureUniversityState();
+  return (uni.people || []).find(person => person.id === personId) || null;
+}
+
+function getUniversityCoursemateById(personId) {
+  return getUniversityCoursemates().find(person => person.id === personId) || null;
+}
+
+function getUniversityCurrentCommitment() {
+  ensureUniversityCommitmentState();
+  if (STATE.education.currentInternship) return { type:'internship', title:STATE.education.currentInternship.title, subtitle:STATE.education.currentInternship.subtitle || 'Current internship' };
+  if (STATE.education.currentPlacement) return { type:'placement', title:STATE.education.currentPlacement.title, subtitle:STATE.education.currentPlacement.subtitle || 'Current placement' };
+  if (STATE.education.isCourseRep) return { type:'course_rep', title:STATE.education.courseRepTitle || 'Course Representative', subtitle:'Represent your course and students' };
+  if (STATE.volunteering?.currentRole) return { type:'volunteering', title:STATE.volunteering.currentRole.title, subtitle:STATE.volunteering.currentRole.subtitle || 'Current volunteering role' };
+  if (STATE.career?.job && STATE.career.job !== 'None') return { type:'job', title:`Part-Time Job at ${STATE.career.companyName || 'Campus Workplace'}`, subtitle:'Earn money alongside your studies' };
+  return null;
+}
+
+function isUniversityFinalTwoYears() {
+  const { totalYears, currentYear } = getUniversityYearMeta();
+  return currentYear >= Math.max(1, totalYears - 1);
+}
+
+function buildUniversityMainSectionList() {
   return `
-    <div class="actions-section" style="margin-top:18px">
-      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#7c748d;margin-bottom:10px">University Life</div>
-      <div style="background:var(--surface);border:1px solid rgba(225,214,202,0.9);border-radius:20px;box-shadow:0 12px 24px rgba(64,42,22,0.06);overflow:hidden">
-        ${rows.map((row, index) => `
-          <div style="${index ? 'border-top:1px solid rgba(226,216,205,0.9);' : ''}">
-            ${buildUniversityLifeActionRow(row[0], row[1])}
-          </div>`).join('')}
+    <div class="learn-school-actions">
+      ${buildLearnSchoolNavCard({
+        screen: 'uniActions',
+        icon: 'action',
+        iconColor: '#8d67da',
+        tileColor: '#efe5ff',
+        title: 'Actions',
+        subtitle: 'Attend lectures and manage your course',
+      })}
+      ${buildLearnSchoolNavCard({
+        screen: 'uniSocial',
+        icon: 'social',
+        iconColor: '#87c469',
+        tileColor: '#d9efce',
+        title: 'Social',
+        subtitle: 'Friends, nights out, societies and clubs',
+      })}
+      ${buildLearnSchoolNavCard({
+        screen: 'uniPeople',
+        icon: 'classmates',
+        iconColor: '#a887d9',
+        tileColor: '#e6daf7',
+        title: 'Coursemates and Lecturers',
+        subtitle: 'See the people on your degree',
+      })}
+      ${buildLearnSchoolNavCard({
+        screen: 'uniCareers',
+        icon: 'careers',
+        iconColor: '#6098e4',
+        tileColor: '#d8e8fb',
+        title: 'Careers',
+        subtitle: 'Internships, networking and volunteering',
+      })}
+    </div>`;
+}
+
+function buildUniversityCommitmentCard() {
+  const commitment = getUniversityCurrentCommitment();
+  if (!commitment) {
+    return `
+      <button onclick="openJobBoard('part-time')"
+        style="width:100%;margin-top:18px;padding:18px 16px;border-radius:24px;background:#fff;border:1px solid rgba(231,221,209,0.95);box-shadow:0 12px 28px rgba(64,42,22,0.05);display:flex;align-items:center;justify-content:space-between;gap:14px;cursor:pointer;text-align:left">
+        <div style="display:flex;align-items:center;gap:14px;min-width:0">
+          <div style="width:54px;height:54px;border-radius:18px;background:#fce9d9;display:flex;align-items:center;justify-content:center;color:#ec9c42;flex-shrink:0">
+            <iconify-icon icon="mdi:briefcase-outline" style="font-size:25px"></iconify-icon>
+          </div>
+          <div style="min-width:0">
+            <div style="font-size:11px;font-weight:800;color:#d78e36;letter-spacing:.08em;text-transform:uppercase">Work</div>
+            <div style="font-size:15px;font-weight:800;color:#171510;line-height:1.15;margin-top:4px">Apply for a Part-Time Job</div>
+            <div style="font-size:12px;color:#6f665f;line-height:1.35;margin-top:5px">Earn money alongside your studies</div>
+          </div>
+        </div>
+        <span style="font-size:24px;line-height:1;color:#9a9087;flex-shrink:0">›</span>
+      </button>`;
+  }
+  return `
+    <button onclick="openLearnScreen('uniCommitment')"
+      style="width:100%;margin-top:18px;padding:18px 16px;border-radius:24px;background:#fff;border:1px solid rgba(231,221,209,0.95);box-shadow:0 12px 28px rgba(64,42,22,0.05);display:flex;align-items:center;justify-content:space-between;gap:14px;cursor:pointer;text-align:left">
+      <div style="display:flex;align-items:center;gap:14px;min-width:0">
+        <div style="width:54px;height:54px;border-radius:18px;background:#fce9d9;display:flex;align-items:center;justify-content:center;color:#ec9c42;flex-shrink:0">
+          <iconify-icon icon="mdi:briefcase-outline" style="font-size:25px"></iconify-icon>
+        </div>
+        <div style="min-width:0">
+          <div style="font-size:11px;font-weight:800;color:#d78e36;letter-spacing:.08em;text-transform:uppercase">Current Commitment</div>
+          <div style="font-size:15px;font-weight:800;color:#171510;line-height:1.15;margin-top:4px">${commitment.title}</div>
+          <div style="font-size:12px;color:#6f665f;line-height:1.35;margin-top:5px">${commitment.subtitle}</div>
+        </div>
+      </div>
+      <span style="font-size:24px;line-height:1;color:#9a9087;flex-shrink:0">›</span>
+    </button>`;
+}
+
+function buildUniversityHomeScreen() {
+  return `
+    <div style="display:flex;flex-direction:column;gap:0">
+      ${buildUniversityMainSectionList()}
+      ${buildUniversityCommitmentCard()}
+    </div>`;
+}
+
+const UNIVERSITY_ACTION_ITEMS = [
+  ['attend_lecture', 'Attend Lecture', 'Stay on top of your course'],
+  ['skip_lecture', 'Skip Lecture', 'Trade discipline for free time'],
+  ['study_library', 'Study in Library', 'Quiet revision time'],
+  ['revise_exams', 'Revise for Exams', 'Push your grades up'],
+  ['pull_all_nighter', 'Pull All-Nighter', 'Short-term gains, rough morning'],
+  ['use_ai_assignment_uni', 'Use AI for Assignment', 'Risky shortcut'],
+  ['plagiarise_assignment_uni', 'Plagiarise Assignment', 'High risk, high consequence'],
+];
+
+const UNIVERSITY_SOCIAL_ITEMS = [
+  ['go_clubbing', 'Go Clubbing', 'Blow off steam'],
+  ['attend_house_party', 'Attend House Party', 'Meet more students'],
+  ['throw_house_party', 'Throw House Party', 'Host the night'],
+  ['host_pre_drinks', 'Host Pre-Drinks', 'Warm up before going out'],
+  ['make_new_friends_uni', 'Make New Friends', 'Grow your circle'],
+  ['ask_someone_out_uni', 'Ask Someone Out', 'See where it goes'],
+  ['join_society', 'Join a Society', 'Browse university societies'],
+  ['join_club', 'Join a Club', 'Browse university clubs'],
+];
+
+const UNIVERSITY_CAREER_ITEMS = [
+  ['apply_summer_internship', 'Apply for Summer Internship', 'Build experience early'],
+  ['apply_graduate_scheme', 'Apply for Graduate Scheme', 'Only in your final two years', { finalTwoYearsOnly:true }],
+  ['go_careers_fair', 'Go to Careers Fair', 'See future options'],
+  ['attend_networking_event', 'Attend Networking Event', 'Meet useful people'],
+  ['get_career_advice', 'Get Career Advice', 'Ask for guidance'],
+  ['become_course_rep', 'Become Course Representative', 'Stand up for your course'],
+  ['start_volunteering', 'Volunteer', 'Boost your CV and help out'],
+];
+
+const UNIVERSITY_SOCIETIES = ['Law Society', 'Medicine Society', 'Finance Society', 'Dance Society', 'Gaming Society', 'Fashion Society', 'Film Society', 'Psychology Society'];
+const UNIVERSITY_CLUBS = ['Chess Club', 'Debate Club', 'Football Club', 'Rugby Club', 'Tennis Club', 'Swimming Club', 'Drama Club', 'Music Club', 'Boxing Club'];
+
+function buildUniversitySubPageHeader(title, subtitle) {
+  const backAction = (_learnScreen === 'uniSocietyList' || _learnScreen === 'uniClubList')
+    ? `openLearnScreen('uniSocial')`
+    : 'closeLearnSubscreen()';
+  return `
+    <div class="learn-school-page-head">
+      <button class="learn-school-back" onclick="${backAction}"><span style="font-size:20px;line-height:1">‹</span></button>
+      <div>
+        <div class="learn-school-page-title">${title}</div>
+        <div class="learn-school-page-sub">${subtitle}</div>
       </div>
     </div>`;
+}
+
+function buildUniversityListRow(title, subtitle, onclick, tag = '') {
+  return `
+    <button class="learn-school-placeholder-card" onclick="${onclick}">
+      <div class="learn-school-placeholder-copy">
+        <div class="learn-school-placeholder-title">${title}</div>
+        <div class="learn-school-placeholder-sub">${subtitle}</div>
+      </div>
+      <div class="learn-school-pill">${tag || '›'}</div>
+    </button>`;
+}
+
+function openLearnUniversityCoursemateDetail(personId) {
+  openLearnClassmateDetail(personId);
+}
+
+function closeLearnUniversityCoursemateDetail() {
+  _learnScreen = 'uniPeople';
+  renderLearnTab();
+  const tab = document.getElementById('tab-learn');
+  if (tab) tab.scrollTop = 0;
+}
+
+function buildUniversityPeopleSummary() {
+  const coursemates = getUniversityCoursemates();
+  const friendsCount = coursemates.filter(c => c.status === 'friend').length;
+  const averageRelationship = coursemates.length
+    ? Math.round(coursemates.reduce((sum, person) => sum + (person.relationship || 0), 0) / coursemates.length)
+    : 0;
+  const lecturerCount = getUniversityLecturers().length;
+  return `
+    <div class="learn-classmates-summary">
+      <div class="learn-classmates-metric">
+        <div class="learn-classmates-metric-icon" style="color:#68b649">
+          ${buildLearnSchoolNavIcon('classmates')}
+        </div>
+        <div class="learn-classmates-metric-label">Friends</div>
+        <div class="learn-classmates-metric-value">${friendsCount}</div>
+      </div>
+      <div class="learn-classmates-metric">
+        <div class="learn-classmates-metric-icon" style="color:#8d67da">
+          ${buildLearnSchoolNavIcon('classmates')}
+        </div>
+        <div class="learn-classmates-metric-label">Average Bond</div>
+        <div class="learn-classmates-metric-value">${averageRelationship}%</div>
+      </div>
+      <div class="learn-classmates-metric">
+        <div class="learn-classmates-metric-icon" style="color:#6098e4">
+          ${buildLearnSchoolNavIcon('teachers')}
+        </div>
+        <div class="learn-classmates-metric-label">Lecturers</div>
+        <div class="learn-classmates-metric-value">${lecturerCount}</div>
+      </div>
+    </div>`;
+}
+
+function buildUniversityLecturerCard(person) {
+  return `
+    <button class="learn-school-teacher-card" onclick="openPersonSheet('${person.id}','Teacher')">
+      <div class="learn-school-teacher-avatar">
+        ${getCharacterHTML(person.appearance, person.age || 50, 52, { showBg: false })}
+      </div>
+      <div class="learn-school-teacher-copy">
+        <div class="learn-school-teacher-title">${person.title} ${person.firstName} ${person.surname}</div>
+        <div class="learn-school-teacher-sub">${person.degreeCourse} lecturer • Age ${person.age}</div>
+      </div>
+    </button>`;
+}
+
+function buildUniversityCoursematesScreen() {
+  const coursemates = getUniversityCoursemates();
+  return `
+    <div class="learn-classmates-page">
+      <div class="learn-classmates-header">
+        <button class="learn-classmates-back" onclick="closeLearnSubscreen()"><span style="font-size:20px;line-height:1">‹</span><span>Back</span></button>
+        <div class="learn-classmates-heading">Coursemates (${coursemates.length})</div>
+        <div></div>
+      </div>
+      ${buildUniversityPeopleSummary()}
+      <div class="learn-classmates-list">
+        ${coursemates.map(c => {
+          return buildLearnClassmateRow(c).replace(
+            `openLearnClassmateDetail('${c.id}')`,
+            `openLearnUniversityCoursemateDetail('${c.id}')`
+          );
+        }).join('')}
+      </div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8c8175;margin:18px 0 10px">Lecturers</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${getUniversityLecturers().map(person => buildUniversityLecturerCard(person)).join('')}
+      </div>
+    </div>`;
+}
+
+function buildUniversityActionPage() {
+  return `
+    <div class="learn-school-page">
+      ${buildUniversitySubPageHeader('Actions', 'Simple academic choices while you study.')}
+      <div style="margin-top:18px">
+        ${UNIVERSITY_ACTION_ITEMS.map(([id, title, subtitle]) => buildUniversityListRow(title, subtitle, `runUniversityAction('${id}')`, 'Action')).join('')}
+      </div>
+    </div>`;
+}
+
+function buildUniversitySocialPage() {
+  return `
+    <div class="learn-school-page">
+      ${buildUniversitySubPageHeader('Social', 'Nights out, friendships and campus life.')}
+      <div style="margin-top:18px">
+        ${UNIVERSITY_SOCIAL_ITEMS.map(([id, title, subtitle]) => buildUniversityListRow(title, subtitle, `runUniversityAction('${id}')`, id === 'join_society' ? 'Society' : id === 'join_club' ? 'Club' : 'Social')).join('')}
+      </div>
+    </div>`;
+}
+
+function buildUniversitySocietyListPage() {
+  return `
+    <div class="learn-school-page">
+      ${buildUniversitySubPageHeader('Societies', 'Browse student societies.')}
+      <div style="margin-top:18px">
+        ${UNIVERSITY_SOCIETIES.map(name => buildUniversityListRow(name, 'Join and get involved', `showToast('${name} coming soon.')`, 'Society')).join('')}
+      </div>
+    </div>`;
+}
+
+function buildUniversityClubListPage() {
+  return `
+    <div class="learn-school-page">
+      ${buildUniversitySubPageHeader('Clubs', 'Browse student clubs.')}
+      <div style="margin-top:18px">
+        ${UNIVERSITY_CLUBS.map(name => buildUniversityListRow(name, 'Join and get involved', `showToast('${name} coming soon.')`, 'Club')).join('')}
+      </div>
+    </div>`;
+}
+
+function buildUniversityPeoplePage() {
+  return buildUniversityCoursematesScreen();
+}
+
+function buildUniversityCareersPage() {
+  const items = UNIVERSITY_CAREER_ITEMS.filter(item => !item[3]?.finalTwoYearsOnly || isUniversityFinalTwoYears());
+  return `
+    <div class="learn-school-page">
+      ${buildUniversitySubPageHeader('Careers', 'Plan your future while you study.')}
+      ${items.map(([id, title, subtitle]) => buildUniversityListRow(title, subtitle, `runUniversityAction('${id}')`, 'Career')).join('')}
+    </div>`;
+}
+
+function buildUniversityCommitmentPage() {
+  const commitment = getUniversityCurrentCommitment();
+  if (!commitment) {
+    return `
+      <div class="learn-school-page">
+        ${buildUniversitySubPageHeader('Current Commitment', 'No current commitment yet.')}
+        ${buildUniversityListRow('Apply for a Part-Time Job', 'Earn money alongside your studies', `openJobBoard('part-time')`, 'Work')}
+      </div>`;
+  }
+  const rowsByType = {
+    job: [
+      ['uni_commitment_work_harder', 'Work Harder', 'Push for a stronger impression'],
+      ['uni_commitment_slack_off', 'Slack Off', 'Take it easier for a while'],
+      ['uni_commitment_more_shifts', 'Ask for More Shifts', 'Try to earn more'],
+      ['uni_commitment_quit', 'Quit Job', 'Walk away from the role'],
+    ],
+    internship: [
+      ['uni_commitment_network', 'Network', 'Meet useful people'],
+      ['uni_commitment_work_harder', 'Work Harder', 'Push for a stronger impression'],
+      ['uni_commitment_slack_off', 'Slack Off', 'Risk a weaker impression'],
+      ['uni_commitment_coffee_chat', 'Have a Coffee Chat', 'Build a connection'],
+      ['uni_commitment_impress', 'Impress', 'Try to stand out'],
+    ],
+    placement: [
+      ['uni_commitment_network', 'Network', 'Meet useful people'],
+      ['uni_commitment_work_harder', 'Work Harder', 'Push for a stronger impression'],
+      ['uni_commitment_slack_off', 'Slack Off', 'Risk a weaker impression'],
+    ],
+    course_rep: [
+      ['uni_commitment_impress', 'Represent Your Course', 'Speak up for students'],
+      ['uni_commitment_network', 'Meet Staff', 'Build your contacts'],
+    ],
+    volunteering: [
+      ['uni_commitment_work_harder', 'Show Up Early', 'Be dependable'],
+      ['uni_commitment_network', 'Meet People', 'Grow your circle'],
+    ],
+  };
+  return `
+    <div class="learn-school-page">
+      ${buildUniversitySubPageHeader('Current Commitment', commitment.subtitle)}
+      <div class="learn-school-note-card">
+        <div class="learn-school-note-label">Current Commitment</div>
+        <div class="learn-school-note-copy">${commitment.title}</div>
+      </div>
+      ${(rowsByType[commitment.type] || rowsByType.job).map(([id, title, subtitle]) => buildUniversityListRow(title, subtitle, `runUniversityAction('${id}')`, 'Action')).join('')}
+    </div>`;
+}
+
+function runUniversityAction(actionId) {
+  ensureUniversityCommitmentState();
+  const coursemates = getUniversityCoursemates();
+  const randomCoursemate = coursemates[Math.floor(Math.random() * coursemates.length)] || null;
+  const logAndRefresh = (log, toast) => {
+    if (log) logActivity(log, null);
+    saveGame();
+    renderLearnTab();
+    if (toast) showToast(toast);
+  };
+
+  if (actionId === 'attend_lecture') {
+    applyEffects({ smarts:+3, gradeScore:+4 });
+    return logAndRefresh('Attended your lectures and stayed on top of the material.', 'You kept up with the course.');
+  }
+  if (actionId === 'skip_lecture') {
+    applyEffects({ happy:+2, gradeScore:-3 });
+    return logAndRefresh('Skipped a lecture and bought yourself some free time.', 'You skipped class.');
+  }
+  if (actionId === 'study_library') {
+    applyEffects({ smarts:+4, gradeScore:+5, happy:-1 });
+    return logAndRefresh('Put in a quiet study session in the library.', 'Library session done.');
+  }
+  if (actionId === 'revise_exams') {
+    applyEffects({ gradeScore:+6, smarts:+2, happy:-2 });
+    return logAndRefresh('Revised hard for your exams.', 'Revision helped.');
+  }
+  if (actionId === 'pull_all_nighter') {
+    applyEffects({ gradeScore:+4, health:-3, happy:-3 });
+    return logAndRefresh('Pulled an all-nighter to get through your workload.', 'You are exhausted.');
+  }
+  if (actionId === 'use_ai_assignment_uni') {
+    applyEffects({ gradeScore:+4 });
+    if (Math.random() < 0.32) {
+      applyEffects({ rep:-4, gradeScore:-6 });
+      return logAndRefresh('You were questioned about using AI on an assignment.', 'You got away with less than you hoped.');
+    }
+    return logAndRefresh('Used AI to speed up an assignment and it seemed to work.', 'Nobody called it out.');
+  }
+  if (actionId === 'plagiarise_assignment_uni') {
+    if (Math.random() < 0.58) {
+      applyEffects({ rep:-8, gradeScore:-10 });
+      return logAndRefresh('You were caught plagiarising an assignment.', 'Plagiarism backfired.');
+    }
+    applyEffects({ gradeScore:+5 });
+    return logAndRefresh('You plagiarised an assignment and got away with it.', 'You were not caught.');
+  }
+  if (actionId === 'go_clubbing' || actionId === 'attend_house_party' || actionId === 'throw_house_party' || actionId === 'host_pre_drinks') {
+    applyEffects({ happy:+4, rel_friends:+3 });
+    if (randomCoursemate) randomCoursemate.relationship = clamp((randomCoursemate.relationship || 50) + 8);
+    return logAndRefresh('You leaned into the social side of university.', 'Your social life picked up.');
+  }
+  if (actionId === 'join_society') {
+    openLearnScreen('uniSocietyList');
+    return;
+  }
+  if (actionId === 'join_club') {
+    openLearnScreen('uniClubList');
+    return;
+  }
+  if (actionId === 'make_new_friends_uni') {
+    if (randomCoursemate) randomCoursemate.relationship = clamp((randomCoursemate.relationship || 50) + 14);
+    applyEffects({ rel_friends:+5, happy:+2 });
+    return logAndRefresh(`You made more of an effort with people on your course${randomCoursemate ? `, especially ${randomCoursemate.firstName}` : ''}.`, 'You met more people.');
+  }
+  if (actionId === 'ask_someone_out_uni') {
+    applyEffects({ happy:+2 });
+    return logAndRefresh('You asked someone out from your university circle.', 'You put yourself out there.');
+  }
+  if (actionId === 'apply_summer_internship') {
+    if (!STATE.education.currentInternship) {
+      STATE.education.currentInternship = { title:'Summer Internship at Green & Co', subtitle:'Current summer internship' };
+      return logAndRefresh('You landed a summer internship at Green & Co.', 'Internship secured.');
+    }
+    return logAndRefresh('You already have an internship lined up.', 'You already have one.');
+  }
+  if (actionId === 'apply_graduate_scheme') {
+    return logAndRefresh('You started applying for graduate schemes.', 'Applications sent.');
+  }
+  if (actionId === 'go_careers_fair') {
+    applyEffects({ rep:+2, rel_friends:+1 });
+    return logAndRefresh('You spent time at the careers fair and scoped out future options.', 'You explored your options.');
+  }
+  if (actionId === 'attend_networking_event') {
+    applyEffects({ rep:+3, rel_friends:+2 });
+    return logAndRefresh('You attended a networking event and made useful contacts.', 'You met useful people.');
+  }
+  if (actionId === 'get_career_advice') {
+    applyEffects({ smarts:+1, happy:+1 });
+    return logAndRefresh('You asked for career advice and got a clearer view of what comes next.', 'You got some useful advice.');
+  }
+  if (actionId === 'become_course_rep') {
+    STATE.education.isCourseRep = true;
+    STATE.education.courseRepTitle = 'Course Representative';
+    return logAndRefresh('You became the course representative.', 'You are now course rep.');
+  }
+  if (actionId === 'start_volunteering') {
+    STATE.volunteering.currentRole = { title:'Volunteer Role at Community Hub', subtitle:'Current volunteering role' };
+    return logAndRefresh('You started volunteering alongside university.', 'You started volunteering.');
+  }
+  if (actionId === 'uni_commitment_work_harder') {
+    if (getUniversityCurrentCommitment()?.type === 'job') return runCareerAction('work_hard');
+    applyEffects({ rep:+2, happy:-1 });
+    return logAndRefresh('You put more effort into your current commitment.', 'You pushed harder.');
+  }
+  if (actionId === 'uni_commitment_slack_off') {
+    if (getUniversityCurrentCommitment()?.type === 'job') return runCareerAction('slack_off');
+    applyEffects({ happy:+1, rep:-2 });
+    return logAndRefresh('You coasted a little in your current commitment.', 'You took it easier.');
+  }
+  if (actionId === 'uni_commitment_more_shifts') {
+    STATE.finances.balance += 250;
+    return logAndRefresh('You asked for more shifts and earned a bit more money.', 'More shifts picked up.');
+  }
+  if (actionId === 'uni_commitment_quit') {
+    if (getUniversityCurrentCommitment()?.type === 'job') {
+      fireFromJob('You quit your part-time role.');
+    } else if (STATE.education.currentInternship) {
+      STATE.education.currentInternship = null;
+    } else if (STATE.education.currentPlacement) {
+      STATE.education.currentPlacement = null;
+    } else if (STATE.education.isCourseRep) {
+      STATE.education.isCourseRep = false;
+      STATE.education.courseRepTitle = null;
+    } else if (STATE.volunteering?.currentRole) {
+      STATE.volunteering.currentRole = null;
+    }
+    return logAndRefresh('You stepped away from your current commitment.', 'Commitment ended.');
+  }
+  if (actionId === 'uni_commitment_network') {
+    applyEffects({ rep:+3, rel_friends:+2 });
+    return logAndRefresh('You used your commitment to meet more people.', 'You built connections.');
+  }
+  if (actionId === 'uni_commitment_coffee_chat') {
+    applyEffects({ happy:+2, rel_friends:+2 });
+    return logAndRefresh('You had a coffee chat that could help later.', 'Good conversation.');
+  }
+  if (actionId === 'uni_commitment_impress') {
+    applyEffects({ rep:+4 });
+    return logAndRefresh('You made a strong impression in your current commitment.', 'You stood out.');
+  }
+  showToast('Coming soon.');
 }
 
 function buildLearnHeroStat(label, value) {
@@ -4751,7 +5575,7 @@ function buildWorkHomeActions() {
   const application = STATE.school.postSchool?.uniApplication;
   const pending = application?.status === 'pending';
   const graduated = isGraduate();
-  const showFurtherEducation = graduated;
+  const showFurtherEducation = graduated && canAccessFurtherEducation();
   const lawMastersDone = hasFurtherEducation('Law Masters');
   const lawMastersCurrent = ensureFurtherEducationState().current?.id === 'Law Masters';
   return `
@@ -4774,12 +5598,12 @@ function buildWorkHomeActions() {
 }
 
 function buildLearnClassmateRow(c) {
-  const traits = (c.traits || []).slice(0, 1).map(tid => {
+  const traits = canRevealClassmateTraits(c) ? (c.traits || []).slice(0, 1).map(tid => {
     const t = CLASSMATE_TRAITS_POOL.find(x => x.id === tid);
     if (!t) return '';
     const cls = t.positive === false ? 'negative' : t.positive === true ? 'positive' : '';
     return `<span class="trait-pill ${cls}" style="font-size:10px;padding:3px 8px">${t.label}</span>`;
-  }).join('');
+  }).join('') : '';
   const role = c.status === 'friend' ? 'Friend' : 'Classmate';
   return `
     <button class="learn-classmates-card" onclick="openLearnClassmateDetail('${c.id}')">
@@ -4858,12 +5682,12 @@ function buildClassmateVipButton(c) {
 function buildLearnClassmateDetailScreen(c) {
   const resolvedRole = c.status === 'friend' ? 'Friend' : 'classmate';
   const sectionLabel = c.status === 'friend' ? 'Friend' : 'Classmate';
-  const traits = (c.traits || []).slice(0, 3).map(tid => {
+  const traits = canRevealClassmateTraits(c) ? (c.traits || []).slice(0, 3).map(tid => {
     const t = CLASSMATE_TRAITS_POOL.find(x => x.id === tid);
     if (!t) return '';
     const cls = t.positive === false ? 'negative' : t.positive === true ? 'positive' : '';
     return `<span class="trait-pill ${cls}" style="font-size:10px;padding:3px 8px">${t.label}</span>`;
-  }).join('');
+  }).join('') : '';
   return `
     <div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -4905,8 +5729,8 @@ function buildLearnTeacherRow(t) {
         ${getCharacterHTML(t.appearance, 35, 52, { showBg: false })}
       </div>
       <div class="learn-school-teacher-copy">
-        <div class="learn-school-teacher-title">${t.title} ${t.surname}</div>
-        <div class="learn-school-teacher-sub">${t.subject} teacher</div>
+        <div class="learn-school-teacher-title">${t.title} ${t.firstName ? `${t.firstName} ` : ''}${t.surname}</div>
+        <div class="learn-school-teacher-sub">${t.subject} ${t.isTutor ? 'tutor' : 'teacher'}</div>
       </div>
     </div>`;
 }
@@ -4917,6 +5741,8 @@ function buildLearnSchoolNavIcon(icon) {
     clubs: `<svg viewBox="0 0 48 48"><path fill="currentColor" fill-rule="evenodd" d="M5.447 2.501C7.614 2.022 11.65 1.5 19 1.5s11.386.522 13.553 1.001c2.048.453 3.204 2.173 3.414 3.985c.116.997.246 2.308.349 3.85a134 134 0 0 0-4.01-1.138C25.09 7.265 20.825 6.67 18.31 6.558c-3.636-.16-6.212 2.238-7.25 4.857a85 85 0 0 0-3.035 9.188a24.7 24.7 0 0 0-.577 10.053C3.636 26.759 1.5 21.395 1.5 15.8c0-3.938.297-7.28.533-9.314C2.243 4.674 3.4 2.954 5.447 2.5m26.081 9.596c-7.1-1.903-11.133-2.443-13.35-2.54c-2.096-.093-3.657 1.269-4.329 2.964a82 82 0 0 0-2.926 8.859c-2.003 7.476.056 15.583 5.853 20.845c1.788 1.624 3.836 3.181 5.694 3.679s4.41.173 6.77-.34c7.651-1.658 13.488-7.65 15.49-15.125a82 82 0 0 0 1.897-9.135c.266-1.804-.405-3.765-2.267-4.732c-1.968-1.024-5.731-2.573-12.832-4.475m.952 12.62c-.754.4-1.62.614-2.242-.202c-.522-.683-.337-1.665.346-2.15a4 4 0 0 1 .488-.298a5.6 5.6 0 0 1 1.292-.492c1.115-.274 2.633-.282 4.258.656s2.377 2.257 2.696 3.359c.156.538.208 1.016.22 1.366c.01.264-.003.461-.014.57c-.078.835-.836 1.486-1.689 1.376c-1.017-.132-1.265-.988-1.295-1.841a2.6 2.6 0 0 0-.103-.636c-.14-.482-.466-1.106-1.315-1.596c-.85-.49-1.553-.461-2.04-.341a2.6 2.6 0 0 0-.602.228m-5.266-3.254c.348.76.018 1.704-.776 2.035c-.947.395-1.59-.223-2.042-.947a2.7 2.7 0 0 0-.407-.498c-.362-.348-.956-.725-1.937-.725s-1.575.377-1.938.725a2.7 2.7 0 0 0-.406.498a2 2 0 0 0-.09.16a1.5 1.5 0 0 1-1.953.787c-.794-.33-1.124-1.274-.775-2.035q.023-.051.06-.125a5.7 5.7 0 0 1 1.087-1.45c.828-.794 2.139-1.56 4.015-1.56s3.187.766 4.015 1.56c.404.388.687.776.873 1.073c.14.224.228.402.273.502m-7.97 7.139a1.5 1.5 0 0 1 1.703 1.266c.202 1.377.812 2.91 1.642 4.162c.862 1.297 1.784 2.03 2.47 2.214s1.852.01 3.247-.683c1.345-.668 2.64-1.691 3.504-2.783a1.5 1.5 0 0 1 2.352 1.862c-1.164 1.471-2.82 2.763-4.521 3.608c-1.651.82-3.63 1.357-5.358.894s-3.173-1.917-4.193-3.453c-1.05-1.582-1.838-3.529-2.111-5.385a1.5 1.5 0 0 1 1.266-1.702" clip-rule="evenodd"/></svg>`,
     classmates: `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 5.5A3.5 3.5 0 0 1 15.5 9a3.5 3.5 0 0 1-3.5 3.5A3.5 3.5 0 0 1 8.5 9A3.5 3.5 0 0 1 12 5.5M5 8c.56 0 1.08.15 1.53.42c-.15 1.43.27 2.85 1.13 3.96C7.16 13.34 6.16 14 5 14a3 3 0 0 1-3-3a3 3 0 0 1 3-3m14 0a3 3 0 0 1 3 3a3 3 0 0 1-3 3c-1.16 0-2.16-.66-2.66-1.62a5.54 5.54 0 0 0 1.13-3.96c.45-.27.97-.42 1.53-.42M5.5 18.25c0-2.07 2.91-3.75 6.5-3.75s6.5 1.68 6.5 3.75V20h-13zM0 20v-1.5c0-1.39 1.89-2.56 4.45-2.9c-.59.68-.95 1.62-.95 2.65V20zm24 0h-3.5v-1.75c0-1.03-.36-1.97-.95-2.65c2.56.34 4.45 1.51 4.45 2.9z" stroke="currentColor" stroke-width="0.2"/></svg>`,
     teachers: `<svg viewBox="0 0 48 48"><path fill="currentColor" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="m15 36l6-23h6l6 23l-9 8zm6-32h6l3 2l-3 7h-6l-3-7z"/></svg>`,
+    social: `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3s1.34 3 3 3m-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5S5 6.34 5 8s1.34 3 3 3m0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5C15 14.17 10.33 13 8 13m8 0c-.29 0-.62.02-.97.05c1.16.84 1.97 1.98 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5"/></svg>`,
+    careers: `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 3L1 9l11 6l9-4.91V17h2V9z"/><path fill="currentColor" d="M5 12.18V17l7 4l7-4v-4.82l-7 3.82z"/></svg>`,
   };
   return icons[icon] || icons.action;
 }
@@ -4938,6 +5764,7 @@ function buildLearnSchoolNavCard({ screen, icon, iconColor, tileColor, title, su
 }
 
 function buildLearnSchoolMainScreen(edu) {
+  const hasTutor = !!(edu.tutors || []).length;
   return `
     <div class="learn-school-actions">
       ${buildLearnSchoolNavCard({
@@ -4969,8 +5796,8 @@ function buildLearnSchoolMainScreen(edu) {
         icon: 'teachers',
         iconColor: '#6098e4',
         tileColor: '#d8e8fb',
-        title: 'Teachers',
-        subtitle: 'View your teachers',
+        title: hasTutor ? 'Teachers and Tutors' : 'Teachers',
+        subtitle: hasTutor ? 'View your teachers and tutor' : 'View your teachers',
       })}
     </div>`;
 }
@@ -4997,33 +5824,115 @@ function buildLearnPlaceholderItems(items) {
     </div>`).join('');
 }
 
+function ensureSchoolTutorState() {
+  if (!Array.isArray(STATE.school.tutors)) STATE.school.tutors = [];
+  return STATE.school.tutors;
+}
+
+function canRevealClassmateTraits(person) {
+  return (person?.relationship || 0) >= 10;
+}
+
+function adjustTeacherRelationships(amount, includeTutors = true) {
+  (STATE.school.teachers || []).forEach(teacher => {
+    if (!teacher.npcStats) teacher.npcStats = {};
+    teacher.npcStats.warmth = clamp((teacher.npcStats.warmth ?? 50) + amount);
+  });
+  if (includeTutors) {
+    ensureSchoolTutorState().forEach(tutor => {
+      if (!tutor.npcStats) tutor.npcStats = {};
+      tutor.npcStats.warmth = clamp((tutor.npcStats.warmth ?? 50) + amount);
+    });
+  }
+}
+
+function shiftSchoolGradeLevel(direction) {
+  const currentGrade = gradeFromScore(STATE.school.gradeScore || 0);
+  const index = GRADES.indexOf(currentGrade);
+  if (index < 0) return currentGrade;
+  const nextIndex = clamp(index - direction, 0, GRADES.length - 1);
+  const nextGrade = GRADES[nextIndex];
+  STATE.school.gradeScore = scoreFromGrade(nextGrade);
+  return nextGrade;
+}
+
+function createTutorNpc() {
+  const titles = ['Mr', 'Mrs', 'Miss', 'Ms', 'Dr'];
+  const title = pickRandom(titles);
+  const gender = title === 'Mr' ? 'male' : (Math.random() > 0.5 ? 'female' : 'male');
+  const subject = pickRandom(['English', 'Maths', 'Science', 'History']);
+  const tutor = {
+    id: uid(),
+    title,
+    gender,
+    firstName: pickRandom(NAMES_UK[gender]),
+    surname: pickRandom(NAMES_UK.surnames),
+    subject,
+    emoji: pickRandom(APPEARANCE_EMOJIS),
+    appearance: generateAppearance(gender),
+    isTutor: true,
+  };
+  tutor.npcStats = buildTeacherNpcStats({ ...tutor, strictness: Math.floor(Math.random() * 50) + 25 });
+  tutor.npcStats.warmth = clamp((tutor.npcStats.warmth || 50) + 6);
+  return tutor;
+}
+
 const LEARN_SCHOOL_ACTIONS = [
   {
     id: 'study_harder',
     title: 'Study harder',
-    subtitle: 'Spend more time on homework and revision.',
+    subtitle: 'Push your revision harder and trade happiness for better results.',
     tag: 'Action',
-    effects: { smarts: +2, gradeScore: +6, happy: -2 },
-    toast: 'You studied harder. Your grade improved.',
-    log: 'Studied harder at school.',
+    minAge: 11,
   },
   {
-    id: 'ask_extra_help',
-    title: 'Ask for extra help',
-    subtitle: 'Get support from a teacher after class.',
+    id: 'ask_private_tutor',
+    title: 'Ask parents for a private tutor',
+    subtitle: 'This depends on their money, generosity, and parenting style.',
     tag: 'Action',
-    effects: { smarts: +1, gradeScore: +4 },
-    toast: 'Extra help gave you a clearer handle on the work.',
-    log: 'Asked for extra help after class.',
+    minAge: 11,
   },
   {
-    id: 'revise_for_test',
-    title: 'Revise for a test',
-    subtitle: 'Prepare early and protect your grade.',
+    id: 'make_friends_classmates',
+    title: 'Make friends with classmates',
+    subtitle: 'Build up your social circle around school.',
     tag: 'Action',
-    effects: { smarts: +1, gradeScore: +5, happy: -1 },
-    toast: 'Revision paid off.',
-    log: 'Revised properly for a test.',
+    minAge: 11,
+  },
+  {
+    id: 'go_to_party',
+    title: 'Go to a party',
+    subtitle: 'Boost your social standing with the popular crowd.',
+    tag: 'Action',
+    minAge: 11,
+  },
+  {
+    id: 'use_ai_assignment',
+    title: 'Use AI for an assignment',
+    subtitle: 'A risky shortcut that can help or backfire.',
+    tag: 'Risk',
+    minAge: 11,
+  },
+  {
+    id: 'plagiarise_essay',
+    title: 'Plagiarise essay',
+    subtitle: 'Higher upside than effort, but much bigger risk.',
+    tag: 'Risk',
+    minAge: 11,
+  },
+  {
+    id: 'cheat_exam',
+    title: 'Cheat in exam',
+    subtitle: 'Maximum stakes. Maximum consequences.',
+    tag: 'Risk',
+    minAge: 11,
+  },
+  {
+    id: 'skip_class',
+    title: 'Skip class',
+    subtitle: 'A quick thrill that can still come back to bite.',
+    tag: 'Risk',
+    minAge: 11,
   },
 ];
 
@@ -5032,27 +5941,206 @@ function ensureLearnSchoolActionState() {
   if (!STATE.school.actions || typeof STATE.school.actions !== 'object') {
     STATE.school.actions = {};
   }
-  if (!STATE.school.actions.usedByAge || typeof STATE.school.actions.usedByAge !== 'object') {
+  if (!STATE.school.actions.usedByAge || typeof STATE.school.actions.usedByAge !== 'object' || Array.isArray(STATE.school.actions.usedByAge)) {
     STATE.school.actions.usedByAge = {};
   }
   const ageKey = String(STATE.age);
-  if (!Array.isArray(STATE.school.actions.usedByAge[ageKey])) {
-    STATE.school.actions.usedByAge[ageKey] = [];
+  if (Array.isArray(STATE.school.actions.usedByAge[ageKey])) {
+    STATE.school.actions.usedByAge[ageKey] = Object.fromEntries(
+      STATE.school.actions.usedByAge[ageKey].map(actionId => [actionId, 1])
+    );
+  } else if (!STATE.school.actions.usedByAge[ageKey] || typeof STATE.school.actions.usedByAge[ageKey] !== 'object') {
+    STATE.school.actions.usedByAge[ageKey] = {};
   }
   return STATE.school.actions;
 }
 
-function hasUsedLearnSchoolActionThisYear(actionId) {
+function getLearnSchoolActionUseCount(actionId) {
   const actionState = ensureLearnSchoolActionState();
-  const used = actionState.usedByAge?.[String(STATE.age)] || [];
-  return used.includes(actionId);
+  return actionState.usedByAge?.[String(STATE.age)]?.[actionId] || 0;
 }
 
 function markLearnSchoolActionUsed(actionId) {
   const actionState = ensureLearnSchoolActionState();
   const ageKey = String(STATE.age);
   const used = actionState.usedByAge[ageKey];
-  if (!used.includes(actionId)) used.push(actionId);
+  used[actionId] = (used[actionId] || 0) + 1;
+}
+
+function runCappedSchoolDiaryOnly(action) {
+  logActivity(`${action.title}: you pushed it again this year, but it did not really change anything.`, 0);
+  saveGame();
+  renderLearnTab();
+  showToast('No real effect this time.');
+}
+
+function applyClassmateRelationshipGain(classmate, minGain, maxGain) {
+  if (!classmate) return;
+  classmate.relationship = clamp((classmate.relationship || 0) + (Math.floor(Math.random() * (maxGain - minGain + 1)) + minGain));
+}
+
+function runLearnSchoolActionEffect(action) {
+  if (action.id === 'study_harder') {
+    const happyLoss = -(Math.floor(Math.random() * 6));
+    const gradeGain = Math.floor(Math.random() * 11);
+    const smartsGain = Math.floor(Math.random() * 5) + 1;
+    applyEffects({ happy: happyLoss, gradeScore: gradeGain, smarts: smartsGain });
+    return {
+      log: `Studied harder and pushed through the pressure. (${gradeGain} grade points)`,
+      toast: 'The extra studying paid off.',
+    };
+  }
+
+  if (action.id === 'ask_private_tutor') {
+    const tutors = ensureSchoolTutorState();
+    const existingTutor = tutors[0] || null;
+    const parents = [STATE.family?.mum, STATE.family?.dad].filter(Boolean).filter(parent => parent.alive !== false);
+    let chance = 0.38;
+    if (['upper_middle', 'elite'].includes(STATE.socialClass)) chance += 0.3;
+    else if (STATE.socialClass === 'middle') chance += 0.14;
+    parents.forEach(parent => {
+      const traits = parent.traits || [];
+      if (traits.includes('supportive')) chance += 0.14;
+      if (traits.includes('strict')) chance += 0.12;
+      if (traits.includes('ambitious')) chance += 0.08;
+      if (traits.includes('kind')) chance += 0.04;
+      if (traits.includes('distant')) chance -= 0.12;
+      if (traits.includes('absent')) chance -= 0.18;
+      if (traits.includes('overbearing')) chance += 0.03;
+      if ((parent.npcStats?.generosity || 0) >= 70) chance += 0.08;
+      if (isHighPayingParentJob(parent.job)) chance += 0.08;
+    });
+    if (existingTutor) chance += 0.16;
+    const approved = Math.random() < Math.max(0.08, Math.min(0.92, chance));
+    if (approved) {
+      if (!existingTutor) tutors.push(createTutorNpc());
+      applyEffects({
+        smarts: Math.floor(Math.random() * 4) + 2,
+        gradeScore: Math.floor(Math.random() * 5) + 4,
+      });
+      return {
+        log: existingTutor ? 'Your parents kept paying for your private tutor.' : 'Your parents agreed to a private tutor.',
+        toast: existingTutor ? 'You kept your tutor.' : 'Your parents said yes to a tutor.',
+      };
+    }
+    applyEffects({ happy: -(Math.floor(Math.random() * 3)) });
+    return {
+      log: 'You asked for a private tutor, but your parents said no.',
+      toast: 'They said no.',
+    };
+  }
+
+  if (action.id === 'make_friends_classmates') {
+    const popularityGain = Math.floor(Math.random() * 9);
+    const classmates = [...(STATE.school.classmates || [])].sort(() => Math.random() - 0.5);
+    const count = Math.min(classmates.length, Math.floor(Math.random() * 11));
+    classmates.slice(0, count).forEach(classmate => applyClassmateRelationshipGain(classmate, 10, 20));
+    applyEffects({ popularity: popularityGain });
+    if (STATE.school.classmates?.length) STATE.school.rosterSnapshot = buildRosterSnapshot();
+    return {
+      log: `Put yourself out there and built momentum socially with ${count} classmates.`,
+      toast: 'Your social circle grew.',
+    };
+  }
+
+  if (action.id === 'go_to_party') {
+    const popularityGain = 10 + Math.floor(Math.random() * 6);
+    const popularClassmates = [...(STATE.school.classmates || [])]
+      .sort((a, b) => (b.socialStanding || 0) - (a.socialStanding || 0))
+      .slice(0, 5);
+    popularClassmates.forEach(classmate => applyClassmateRelationshipGain(classmate, 10, 20));
+    applyEffects({ popularity: popularityGain, happy: 2 + Math.floor(Math.random() * 4) });
+    return {
+      log: 'Went to a party and got noticed by the popular crowd.',
+      toast: 'That party raised your profile.',
+    };
+  }
+
+  if (action.id === 'use_ai_assignment') {
+    const smartsDelta = Math.random() < 0.5 ? -(Math.floor(Math.random() * 4)) : Math.floor(Math.random() * 4);
+    applyEffects({ smarts: smartsDelta });
+    const caught = Math.random() < 0.35;
+    if (caught) {
+      const lostGrade = shiftSchoolGradeLevel(-1);
+      const repLoss = -(Math.floor(Math.random() * 6));
+      applyEffects({ rep: repLoss });
+      adjustTeacherRelationships(-(Math.floor(Math.random() * 6)));
+      return {
+        log: `You got caught using AI on an assignment and dropped to ${lostGrade}.`,
+        toast: 'You got caught.',
+      };
+    }
+    const gradeGain = 5 + Math.floor(Math.random() * 6);
+    applyEffects({ gradeScore: gradeGain });
+    return {
+      log: `You used AI on an assignment and got away with it. (+${gradeGain} grade points)`,
+      toast: 'You were not caught.',
+    };
+  }
+
+  if (action.id === 'plagiarise_essay') {
+    const smartsLoss = -(Math.floor(Math.random() * 4));
+    if (Math.random() < 0.8) applyEffects({ smarts: smartsLoss });
+    const caught = Math.random() < 0.65;
+    if (caught) {
+      const lostGrade = shiftSchoolGradeLevel(-1);
+      const repLoss = -(5 + Math.floor(Math.random() * 6));
+      const teacherLoss = -(5 + Math.floor(Math.random() * 6));
+      applyEffects({ rep: repLoss });
+      adjustTeacherRelationships(teacherLoss);
+      return {
+        log: `You were caught plagiarising an essay and dropped to ${lostGrade}.`,
+        toast: 'Plagiarism backfired.',
+      };
+    }
+    const gradeGain = 5 + Math.floor(Math.random() * 6);
+    applyEffects({ gradeScore: gradeGain });
+    return {
+      log: `You plagiarised an essay and got away with it. (+${gradeGain} grade points)`,
+      toast: 'Nobody caught it.',
+    };
+  }
+
+  if (action.id === 'cheat_exam') {
+    const caught = Math.random() < 0.5;
+    if (caught) {
+      STATE.school.gradeScore = scoreFromGrade('F');
+      const repLoss = -(5 + Math.floor(Math.random() * 6));
+      const teacherLoss = -(10 + Math.floor(Math.random() * 6));
+      applyEffects({ rep: repLoss });
+      adjustTeacherRelationships(teacherLoss);
+      return {
+        log: 'You were caught cheating in an exam and your result collapsed.',
+        toast: 'You got caught cheating.',
+      };
+    }
+    const newGrade = shiftSchoolGradeLevel(1);
+    return {
+      log: `You cheated in an exam and pulled your grade up to ${newGrade}.`,
+      toast: 'You got away with it.',
+    };
+  }
+
+  if (action.id === 'skip_class') {
+    const caught = Math.random() < 0.5;
+    const smartsLoss = -(Math.floor(Math.random() * 11));
+    applyEffects({ smarts: smartsLoss });
+    if (caught) {
+      adjustTeacherRelationships(-(Math.floor(Math.random() * 16)));
+      applyEffects({ rep: -(Math.floor(Math.random() * 6)) });
+      return {
+        log: 'You skipped class and got caught.',
+        toast: 'You got caught skipping.',
+      };
+    }
+    applyEffects({ happy: 10 });
+    return {
+      log: 'You skipped class and enjoyed the freedom for a bit.',
+      toast: 'You got away with skipping.',
+    };
+  }
+
+  return { log: action.title, toast: `${action.title} ✓` };
 }
 
 function runLearnSchoolAction(actionId) {
@@ -5061,33 +6149,38 @@ function runLearnSchoolAction(actionId) {
     showToast('That action is unavailable.');
     return;
   }
-  if (hasUsedLearnSchoolActionThisYear(actionId)) {
-    showToast('You have already done that this year.');
+  if (STATE.age < (action.minAge || 0)) {
+    showToast(`Available at age ${action.minAge}.`);
     return;
   }
-  applyEffects(action.effects);
+  if (getLearnSchoolActionUseCount(actionId) >= 2) {
+    runCappedSchoolDiaryOnly(action);
+    return;
+  }
+  const result = runLearnSchoolActionEffect(action);
   markLearnSchoolActionUsed(actionId);
   if (STATE.school?.classmates?.length) {
     STATE.school.rosterSnapshot = buildRosterSnapshot();
   }
-  logActivity(action.log, action.effects?.gradeScore || null);
+  logActivity(result.log, null);
   saveGame();
   renderLearnTab();
-  showToast(action.toast);
+  showToast(result.toast);
 }
 
 function buildLearnSchoolActionItems(items) {
   return items.map(item => {
-    const used = hasUsedLearnSchoolActionThisYear(item.id);
+    const available = STATE.age >= (item.minAge || 0);
+    const count = getLearnSchoolActionUseCount(item.id);
     return `
       <button class="learn-school-placeholder-card"
-        ${used ? 'disabled' : `onclick="runLearnSchoolAction('${item.id}')"`} 
-        style="cursor:${used ? 'default' : 'pointer'};opacity:${used ? '.58' : '1'}">
+        ${available ? `onclick="runLearnSchoolAction('${item.id}')"` : 'disabled'} 
+        style="cursor:${available ? 'pointer' : 'default'};opacity:${available ? '1' : '.58'}">
         <div class="learn-school-placeholder-copy">
           <div class="learn-school-placeholder-title">${item.title}</div>
           <div class="learn-school-placeholder-sub">${item.subtitle}</div>
         </div>
-        <div class="learn-school-pill">${used ? 'Done' : item.tag || 'Action'}</div>
+        <div class="learn-school-pill">${available ? `${Math.min(count, 2)}/2` : `${item.minAge}+`}</div>
       </button>`;
   }).join('');
 }
@@ -5098,7 +6191,7 @@ function buildLearnActionsPlaceholderPage() {
       ${buildLearnSchoolPageHeader('Actions', 'Choose what to do at school this year.')}
       <div class="learn-school-note-card">
         <div class="learn-school-note-label">School Actions</div>
-        <div class="learn-school-note-copy">These now feed the real grade system. Each action can be used once per year.</div>
+        <div class="learn-school-note-copy">Each action only has real effects the first two times you use it in a year. After that, you can still press it, but it only adds flavour.</div>
       </div>
       ${buildLearnSchoolActionItems(LEARN_SCHOOL_ACTIONS)}
     </div>`;
@@ -5121,14 +6214,16 @@ function buildLearnClubsPlaceholderPage() {
 }
 
 function buildLearnTeachersPlaceholderPage(edu) {
+  const staff = [...(edu.teachers || []), ...(edu.tutors || [])];
+  const hasTutor = !!(edu.tutors || []).length;
   return `
     <div class="learn-school-page">
-      ${buildLearnSchoolPageHeader('Teachers', 'View your teachers.')}
+      ${buildLearnSchoolPageHeader(hasTutor ? 'Teachers and Tutors' : 'Teachers', hasTutor ? 'View your teachers and tutor.' : 'View your teachers.')}
       <div class="learn-school-note-card">
-        <div class="learn-school-note-label">Placeholder</div>
-        <div class="learn-school-note-copy">Teacher profiles are staying lightweight for now. The two existing teachers are shown below.</div>
+        <div class="learn-school-note-label">${hasTutor ? 'Support Team' : 'Placeholder'}</div>
+        <div class="learn-school-note-copy">${hasTutor ? 'Your school staff and private tutor are shown below.' : 'Teacher profiles are staying lightweight for now. The two existing teachers are shown below.'}</div>
       </div>
-      ${(edu.teachers || []).map(t => buildLearnTeacherRow(t)).join('')}
+      ${staff.map(t => buildLearnTeacherRow(t)).join('')}
     </div>`;
 }
 
@@ -5168,11 +6263,17 @@ function renderLearnTab() {
   if (_learnScreen === 'classmates' && !(age >= 5 && age <= 18 && edu.classmates.length)) {
     _learnScreen = 'main';
   }
-  if (_learnScreen === 'classmate' && !edu.classmates.some(c => c.id === _learnClassmateId)) {
-    _learnScreen = age >= 5 && age <= 18 && edu.classmates.length ? 'classmates' : 'main';
+  if (_learnScreen === 'classmate' && !(
+    edu.classmates.some(c => c.id === _learnClassmateId)
+    || (edu.level === 'uni' && !!getUniversityCoursemateById(_learnClassmateId))
+  )) {
+    _learnScreen = age >= 5 && age <= 18 && edu.classmates.length ? 'classmates' : (edu.level === 'uni' ? 'uniPeople' : 'main');
     _learnClassmateId = null;
   }
   if (!isSchoolStage && ['actions', 'clubs', 'teachers'].includes(_learnScreen)) {
+    _learnScreen = 'main';
+  }
+  if (edu.level !== 'uni' && ['uniActions', 'uniSocial', 'uniSocietyList', 'uniClubList', 'uniPeople', 'uniCareers', 'uniCommitment'].includes(_learnScreen)) {
     _learnScreen = 'main';
   }
   const grade       = (age >= 5 && age <= 18) ? gradeFromScore(edu.gradeScore) : null;
@@ -5203,8 +6304,11 @@ function renderLearnTab() {
     hero.innerHTML = buildWorkHomeHero();
   } else if (edu.level === 'uni') {
     ensureUniversityState();
-    hero.style.background = 'linear-gradient(180deg, rgba(255,255,255,0.99), rgba(247,243,252,0.99))';
-    hero.style.border = '1px solid rgba(221,212,232,0.95)';
+    hero.style.background = 'transparent';
+    hero.style.border = 'none';
+    hero.style.padding = '0';
+    hero.style.borderRadius = '0';
+    hero.style.boxShadow = 'none';
     hero.innerHTML = buildUniversityHeroCard();
   } else if (grade && isSchoolStage) {
     hero.style.background = 'transparent';
@@ -5222,10 +6326,8 @@ function renderLearnTab() {
     hero.innerHTML = buildLearnHeroPreschool(edu);
   }
 
-  gradeBlockWrap.innerHTML = edu.level === 'uni'
-    ? `${buildUniversityPerformanceSection()}${buildUniversityImportantPeopleSection()}`
-    : '';
-  gradeBlockWrap.style.display = edu.level === 'uni' ? '' : 'none';
+  gradeBlockWrap.innerHTML = '';
+  gradeBlockWrap.style.display = 'none';
   rosterToggleWrap.style.display = 'none';
   container.querySelectorAll('.actions-section, .cm-section, .tch-section').forEach(el => el.remove());
   sectionTitle.style.display = 'none';
@@ -5269,8 +6371,8 @@ function renderLearnTab() {
     return;
   }
 
-  if (_learnScreen === 'classmate' && isSchoolStage) {
-    const classmate = edu.classmates.find(c => c.id === _learnClassmateId);
+  if (_learnScreen === 'classmate' && (isSchoolStage || edu.level === 'uni')) {
+    const classmate = edu.classmates.find(c => c.id === _learnClassmateId) || (edu.level === 'uni' ? getUniversityCoursemateById(_learnClassmateId) : null);
     if (!classmate) return;
     hero.style.display = 'none';
     gradeBlockWrap.style.display = 'none';
@@ -5284,7 +6386,7 @@ function renderLearnTab() {
     return;
   }
 
-  if (_learnScreen === 'uniApplyBasics' || _learnScreen === 'uniApplyType' || _learnScreen === 'uniApplyPreview') {
+  if (_learnScreen === 'uniApplyCourse' || _learnScreen === 'uniApplyUniversity' || _learnScreen === 'uniApplyFinances' || _learnScreen === 'uniFundingConfirm' || _learnScreen === 'uniApplyType') {
     hero.style.display = 'none';
     gradeBlockWrap.style.display = 'none';
     rosterToggleWrap.style.display = 'none';
@@ -5310,6 +6412,55 @@ function renderLearnTab() {
     return;
   }
 
+  if (_learnScreen === 'uniActions' && edu.level === 'uni') {
+    hero.style.display = 'none';
+    learnActions.style.display = '';
+    learnActions.innerHTML = buildUniversityActionPage();
+    return;
+  }
+
+  if (_learnScreen === 'uniSocial' && edu.level === 'uni') {
+    hero.style.display = 'none';
+    learnActions.style.display = '';
+    learnActions.innerHTML = buildUniversitySocialPage();
+    return;
+  }
+
+  if (_learnScreen === 'uniSocietyList' && edu.level === 'uni') {
+    hero.style.display = 'none';
+    learnActions.style.display = '';
+    learnActions.innerHTML = buildUniversitySocietyListPage();
+    return;
+  }
+
+  if (_learnScreen === 'uniClubList' && edu.level === 'uni') {
+    hero.style.display = 'none';
+    learnActions.style.display = '';
+    learnActions.innerHTML = buildUniversityClubListPage();
+    return;
+  }
+
+  if (_learnScreen === 'uniPeople' && edu.level === 'uni') {
+    hero.style.display = 'none';
+    learnActions.style.display = '';
+    learnActions.innerHTML = buildUniversityPeoplePage();
+    return;
+  }
+
+  if (_learnScreen === 'uniCareers' && edu.level === 'uni') {
+    hero.style.display = 'none';
+    learnActions.style.display = '';
+    learnActions.innerHTML = buildUniversityCareersPage();
+    return;
+  }
+
+  if (_learnScreen === 'uniCommitment' && edu.level === 'uni') {
+    hero.style.display = 'none';
+    learnActions.style.display = '';
+    learnActions.innerHTML = buildUniversityCommitmentPage();
+    return;
+  }
+
   if (_learnScreen === 'actions' && isSchoolStage) {
     hero.style.display = 'none';
     learnActions.style.display = '';
@@ -5332,7 +6483,7 @@ function renderLearnTab() {
   }
 
   hero.style.display = '';
-  gradeBlockWrap.style.display = edu.level === 'uni' ? '' : 'none';
+  gradeBlockWrap.style.display = 'none';
   learnActions.style.display = '';
 
   if (isPostSchoolPlanning || isGraduatePlanning) {
@@ -5761,6 +6912,1550 @@ function showToast(msg) {
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+// ── UNIVERSITY REBUILD ───────────────────────────────────
+const UNIVERSITY_REBUILD_COURSES = [
+  { id:'Law', label:'Law', icon:'mdi:scale-balance', blurb:'Solicitors, barristers, networking and pressure.' },
+  { id:'Medicine', label:'Medicine', icon:'mdi:stethoscope', blurb:'Long training, clinical placements and elite hospitals.' },
+  { id:'Business', label:'Business', icon:'mdi:briefcase-outline', blurb:'Management, marketing, finance, and executive tracks.' },
+  { id:'Economics', label:'Economics', icon:'mdi:chart-line', blurb:'Analysis, markets, internships and investment roles.' },
+  { id:'Computer Science', label:'Computer Science', icon:'mdi:laptop', blurb:'Hackathons, internships and technical interviews.' },
+  { id:'Education', label:'Education', icon:'mdi:school-outline', blurb:'Placements, volunteering and school-based pathways.' },
+  { id:'Art', label:'Art', icon:'mdi:palette', blurb:'Illustration, fashion, animation, tattooing and photography.' },
+];
+
+const UNIVERSITY_REBUILD_DIRECTORY = [
+  { name:'University of Oxford', tier:'Elite Universities', prestige:100, city:'Oxford', vibe:'ancient colleges, pressure, and old-money networks' },
+  { name:'University of Cambridge', tier:'Elite Universities', prestige:99, city:'Cambridge', vibe:'formal traditions, elite recruiters, and intense academics' },
+  { name:'King’s College London', tier:'Top Universities', prestige:88, city:'London', vibe:'city life, prestige, and strong employer access' },
+  { name:'University of Bristol', tier:'Top Universities', prestige:84, city:'Bristol', vibe:'strong academics with a lively student scene' },
+  { name:'University of Manchester', tier:'Top Universities', prestige:82, city:'Manchester', vibe:'big-city nightlife and strong campus societies' },
+  { name:'Ashton University', tier:'Standard Universities', prestige:60, city:'Ashton', vibe:'solid outcomes and approachable campus life' },
+  { name:'Redbridge University', tier:'Standard Universities', prestige:56, city:'Redbridge', vibe:'good student life and practical career routes' },
+  { name:'South Coast College', tier:'Local Universities', prestige:35, city:'South Coast', vibe:'cheap living, familiar faces, and fewer elite doors' },
+  { name:'Midland City College', tier:'Local Universities', prestige:30, city:'Midland City', vibe:'close to home, lower pressure, and smaller networks' },
+];
+
+const UNIVERSITY_REBUILD_TIER_META = {
+  'Elite Universities': { min:90, base:30, standing:1, tag:'Elite' },
+  'Top Universities': { min:80, base:54, standing:0.76, tag:'Top' },
+  'Standard Universities': { min:60, base:76, standing:0.46, tag:'Standard' },
+  'Local Universities': { min:45, base:90, standing:0.22, tag:'Local' },
+};
+
+const UNIVERSITY_REBUILD_CAREERS = {
+  Law: {
+    graduate: [
+      { company:'Sterling LLP', title:'Trainee Solicitor', difficulty:58, sponsorEligible:true, elite:true },
+      { company:'Chance Crown & Co', title:'Trainee Solicitor', difficulty:55, sponsorEligible:true, elite:true },
+      { company:'Fairmount LLP', title:'Trainee Solicitor', difficulty:52, sponsorEligible:true, elite:true },
+      { company:'Blackstone Chambers', title:'Pupillage', difficulty:62, sponsorEligible:true, elite:true },
+      { company:'St John’s Chambers', title:'Pupillage', difficulty:57, sponsorEligible:true, elite:true },
+    ],
+    internship: [
+      { company:'Carter & Mills Solicitors', title:'Legal Internship', difficulty:28, internshipOnly:true },
+      { company:'Greenfield Legal Services', title:'Legal Internship', difficulty:25, internshipOnly:true },
+      { company:'Crown Court', title:'Court Internship', difficulty:36, internshipOnly:true },
+      { company:'Sterling LLP', title:'Vacation Scheme', difficulty:52, elite:true },
+      { company:'Chance Crown & Co', title:'Vacation Scheme', difficulty:48, elite:true },
+      { company:'Fairmount LLP', title:'Vacation Scheme', difficulty:45, elite:true },
+    ],
+  },
+  Medicine: {
+    graduate: [
+      { company:'Royal Westminster Hospital', title:'Foundation Programme', difficulty:56, sponsorEligible:true, elite:true },
+      { company:'Sterling Health Group', title:'Graduate Medical Programme', difficulty:51, sponsorEligible:true, elite:true },
+    ],
+    internship: [
+      { company:'Downs Medical Centre', title:'Clinical Internship', difficulty:26, internshipOnly:true },
+      { company:'Northside Clinic', title:'Clinical Internship', difficulty:24, internshipOnly:true },
+      { company:'Royal Westminster Hospital', title:'Hospital Placement', difficulty:48, elite:true },
+    ],
+  },
+  'Computer Science': {
+    graduate: [
+      { company:'Terranova', title:'Graduate Software Engineer', difficulty:54, sponsorEligible:true, elite:true },
+      { company:'Ascot Tech', title:'Graduate Developer', difficulty:49, sponsorEligible:true, elite:true },
+      { company:'Hyperion', title:'Graduate Product Engineer', difficulty:52, sponsorEligible:true, elite:true },
+    ],
+    internship: [
+      { company:'Clearview Digital', title:'Software Internship', difficulty:22, internshipOnly:true },
+      { company:'Red Brook Tech', title:'Tech Internship', difficulty:24, internshipOnly:true },
+      { company:'Terranova', title:'Engineering Internship', difficulty:45, elite:true },
+    ],
+  },
+  Business: {
+    graduate: [
+      { company:'Ascot Capital', title:'Graduate Analyst', difficulty:56, sponsorEligible:true, elite:true },
+      { company:'Silverstone Financial', title:'Graduate Consultant', difficulty:52, sponsorEligible:true, elite:true },
+      { company:'Kingsguard Investments', title:'Investment Graduate Scheme', difficulty:58, sponsorEligible:true, elite:true },
+    ],
+    internship: [
+      { company:'Brown Advisory', title:'Finance Internship', difficulty:24, internshipOnly:true },
+      { company:'Bridge Analytics', title:'Analytics Internship', difficulty:22, internshipOnly:true },
+      { company:'Ascot Capital', title:'Summer Analyst', difficulty:47, elite:true },
+    ],
+  },
+  Economics: {
+    graduate: [
+      { company:'Ascot Capital', title:'Junior Analyst', difficulty:56, sponsorEligible:true, elite:true },
+      { company:'Silverstone Financial', title:'Junior Analyst', difficulty:52, sponsorEligible:true, elite:true },
+      { company:'Kingsguard Investments', title:'Junior Analyst', difficulty:58, sponsorEligible:true, elite:true },
+    ],
+    internship: [
+      { company:'Brown Advisory', title:'Economics Internship', difficulty:24, internshipOnly:true },
+      { company:'Bridge Analytics', title:'Analytics Internship', difficulty:22, internshipOnly:true },
+      { company:'Ascot Capital', title:'Summer Analyst', difficulty:47, elite:true },
+    ],
+  },
+  Education: {
+    graduate: [
+      { company:'Northfield Trust', title:'Teacher Training Route', difficulty:34, sponsorEligible:false },
+      { company:'Westbrook Academy', title:'Graduate Classroom Route', difficulty:30, sponsorEligible:false },
+    ],
+    internship: [
+      { company:'Local Primary School', title:'School Placement', difficulty:16, internshipOnly:true },
+      { company:'Community Secondary School', title:'Teaching Support Placement', difficulty:18, internshipOnly:true },
+      { company:'Further Education College', title:'Learning Support Internship', difficulty:20, internshipOnly:true },
+    ],
+  },
+  Art: {
+    graduate: [
+      { company:'Kindred Studio', title:'Illustrator', difficulty:32 },
+      { company:'Paper Moon Press', title:'Photographer', difficulty:30 },
+      { company:'Creator Studio', title:'Animator', difficulty:34 },
+    ],
+    internship: [
+      { company:'Kindred Studio', title:'Art Internship', difficulty:18, internshipOnly:true },
+      { company:'Paper Moon Press', title:'Creative Internship', difficulty:16, internshipOnly:true },
+    ],
+  },
+};
+
+const UNIVERSITY_REBUILD_SOCIETY_EVENTS = {
+  Law: ['Law Fair', 'Networking Night', 'Mooting Competition'],
+  Medicine: ['Clinical Skills Evening', 'Research Mixer', 'Hospital Insight Panel'],
+  Business: ['Finance Case Competition', 'Trading Floor Night', 'Women in Finance Mixer'],
+  'Computer Science': ['Hackathon', 'Founder Demo Night', 'Product Build Sprint'],
+  Education: ['Teaching Workshop', 'Classroom Practice Session', 'Schools Outreach Day'],
+};
+
+function getUniversityCourseLabel(courseId) {
+  return UNIVERSITY_REBUILD_COURSES.find(course => course.id === courseId)?.label || courseId || 'Course';
+}
+
+function getUniversityOptionByName(name) {
+  return UNIVERSITY_REBUILD_DIRECTORY.find(option => option.name === name) || null;
+}
+
+function getUniversityTierMetaByNameOrTier(value) {
+  const option = getUniversityOptionByName(value);
+  const tier = option?.tier || value;
+  return UNIVERSITY_REBUILD_TIER_META[tier] || UNIVERSITY_REBUILD_TIER_META['Standard Universities'];
+}
+
+function getUniversityCurrentSelection() {
+  const application = _uniApplyDraft || STATE.school?.postSchool?.uniApplication || {};
+  return getUniversityOptionByName(application.universityName || application.acceptedUniversityName || STATE.school.current);
+}
+
+function getUniversityBackupSelection() {
+  const application = _uniApplyDraft || STATE.school?.postSchool?.uniApplication || {};
+  return getUniversityOptionByName(application.backupUniversityName);
+}
+
+function getUniversityPrestigeStanding() {
+  const application = STATE.school.postSchool?.uniApplication || {};
+  const option = getUniversityOptionByName(application.acceptedUniversityName || application.universityName || STATE.school.current);
+  if (!option) return 0;
+  return getUniversityTierMetaByNameOrTier(option.tier).standing;
+}
+
+function getUniversityFundingOffers(draft = getUniversityApplicationDraft()) {
+  if (draft.fundingOffers) return draft.fundingOffers;
+  const gradeScore = STATE.school.gradeScore || 0;
+  const tuitionPerYear = UNIVERSITY_TUITION_FEE_PER_YEAR;
+  const studentLoanAmount = tuitionPerYear;
+
+  const parentBase = buildParentFundingOffer();
+  const parentRoll = Math.random();
+  let parents = {
+    status: 'partial',
+    tuitionPerYear: Math.min(tuitionPerYear, parentBase.amount || 0),
+    housingPerYear: 0,
+    text: `Your parents are offering ${fmtMoney(Math.min(tuitionPerYear, parentBase.amount || 0))} per year.`,
+    terms: parentBase.terms || [],
+  };
+  if (parentRoll < 0.18) {
+    parents = { status:'refuse', tuitionPerYear:0, housingPerYear:0, text:'Your parents refused to contribute.', terms:parentBase.terms || [] };
+  } else if (parentRoll < 0.34) {
+    const housingSupport = Math.round((1800 + Math.random() * 2600) / 100) * 100;
+    parents = {
+      status:'housing_only',
+      tuitionPerYear:0,
+      housingPerYear:housingSupport,
+      text:`Your parents will not pay tuition, but they will cover ${fmtMoney(housingSupport)} per year of housing costs.`,
+      terms:parentBase.terms || [],
+    };
+  } else if (parentRoll > 0.82 && parents.tuitionPerYear >= 4000) {
+    parents.status = 'full';
+    parents.tuitionPerYear = tuitionPerYear;
+    parents.text = 'Your parents offered to cover your full tuition fees.';
+  } else if (parents.tuitionPerYear > 0) {
+    parents.text = `Your parents offered ${fmtMoney(parents.tuitionPerYear)} per year towards tuition.`;
+  }
+
+  let scholarship = {
+    available: false,
+    amount: 0,
+    paymentType: null,
+    text: 'No scholarship offer.',
+  };
+  if (gradeScore >= 80) {
+    const scholarshipChance = gradeScore >= 90 ? 0.24 : 0.11;
+    if (Math.random() < scholarshipChance) {
+      const awards = [1000, 3000, 5000, 9000];
+      const amount = awards[Math.floor(Math.random() * awards.length)];
+      const paymentType = (amount >= 5000 && Math.random() < 0.6) || amount === 9000 ? 'yearly' : 'one_time';
+      scholarship = {
+        available: true,
+        amount,
+        paymentType,
+        text: `Scholarship awarded: ${fmtMoney(amount)}${paymentType === 'yearly' ? ' per year' : ' one-time'}.`,
+      };
+    } else {
+      scholarship.text = 'You met the grade requirement, but no scholarship offer came through.';
+    }
+  } else {
+    scholarship.text = 'Scholarships require A or A+ grades.';
+  }
+
+  draft.fundingOffers = {
+    studentLoan: { amountPerYear: studentLoanAmount, text:`Student finance approved ${fmtMoney(studentLoanAmount)} per year for tuition, plus ${fmtMoney(UNIVERSITY_MAINTENANCE_LOAN_PER_YEAR)} maintenance.` },
+    parents,
+    selfFund: { amountPerYear: tuitionPerYear, text:`You will need to cover up to ${fmtMoney(tuitionPerYear)} per year yourself.` },
+    scholarship,
+  };
+  return draft.fundingOffers;
+}
+
+function toggleUniversityFundingSource(sourceId) {
+  _uniApplyDraft = getUniversityApplicationDraft();
+  const offers = getUniversityFundingOffers(_uniApplyDraft);
+  const selected = new Set(_uniApplyDraft.selectedFundingSources || []);
+  if (sourceId === 'parents') {
+    if (selected.has('parents')) {
+      selected.delete('parents');
+      _uniApplyDraft = getUniversityApplicationDraft({
+        selectedFundingSources: [...selected],
+        parentFundingType: null,
+        parentalFundingAmount: 0,
+        parentalFundingAmountPerYear: 0,
+        parentHousingSupportPerYear: 0,
+        parentalFundingTerms: [],
+        parentalFundingAccepted: false,
+      });
+      saveUniversityDraft();
+      renderLearnTab();
+      return;
+    }
+    if (offers.parents.status === 'refuse') {
+      showToast('Your parents refused to contribute.');
+      return;
+    }
+    _uniParentFundingOffer = {
+      status: offers.parents.status,
+      amount: offers.parents.tuitionPerYear,
+      housingPerYear: offers.parents.housingPerYear || 0,
+      terms: offers.parents.terms || [],
+    };
+    renderParentFundingOfferPopup();
+    return;
+  }
+  if (sourceId === 'scholarship' && !offers.scholarship.available) {
+    showToast(offers.scholarship.text);
+    return;
+  }
+  if (selected.has(sourceId)) selected.delete(sourceId);
+  else selected.add(sourceId);
+  _uniApplyDraft.selectedFundingSources = [...selected];
+  saveUniversityDraft();
+  renderLearnTab();
+}
+
+function buildUniversityFundingReview(draft = getUniversityApplicationDraft()) {
+  const offers = getUniversityFundingOffers(draft);
+  const selected = new Set(draft.selectedFundingSources || []);
+  const lines = [];
+  let tuitionCovered = 0;
+  let housingCovered = 0;
+  let selfFundAmount = 0;
+
+  if (selected.has('scholarship') && offers.scholarship.available) {
+    lines.push(`Scholarship Awarded: ${fmtMoney(offers.scholarship.amount)}${offers.scholarship.paymentType === 'yearly' ? '/year' : ' one-time'}`);
+    tuitionCovered += offers.scholarship.amount;
+  }
+  if (selected.has('parents')) {
+    const parentTuition = draft.parentalFundingAccepted ? (draft.parentalFundingAmountPerYear || 0) : (offers.parents.tuitionPerYear || 0);
+    const parentHousing = draft.parentalFundingAccepted ? (draft.parentHousingSupportPerYear || 0) : (offers.parents.housingPerYear || 0);
+    if (parentTuition > 0) {
+      lines.push(`Parents Offering: ${fmtMoney(parentTuition)}/year`);
+      tuitionCovered += parentTuition;
+    }
+    if (parentHousing > 0) {
+      lines.push(`Parents Covering Housing: ${fmtMoney(parentHousing)}/year`);
+      housingCovered += parentHousing;
+    }
+    if (draft.parentalFundingAccepted && (draft.parentalFundingTerms || []).length) {
+      lines.push(`Parent Conditions: ${(draft.parentalFundingTerms || []).map(term => term.label).join(', ')}`);
+    }
+  }
+  if (selected.has('student_loan')) {
+    lines.push(`Student Loan Approved: ${fmtMoney(offers.studentLoan.amountPerYear)}/year`);
+    tuitionCovered += offers.studentLoan.amountPerYear;
+    housingCovered += UNIVERSITY_MAINTENANCE_LOAN_PER_YEAR;
+  }
+  if (selected.has('self_fund')) {
+    selfFundAmount = Math.max(0, UNIVERSITY_TUITION_FEE_PER_YEAR - tuitionCovered);
+    lines.push(`Self Funding Planned: ${fmtMoney(selfFundAmount)}/year`);
+    tuitionCovered += selfFundAmount;
+  }
+
+  return {
+    lines,
+    tuitionCovered,
+    housingCovered,
+    selfFundAmount,
+    remainingTuition: Math.max(0, UNIVERSITY_TUITION_FEE_PER_YEAR - tuitionCovered),
+  };
+}
+
+function prepareUniversityFundingSelection() {
+  _uniApplyDraft = getUniversityApplicationDraft();
+  const review = buildUniversityFundingReview(_uniApplyDraft);
+  if (!review.lines.length) {
+    showToast('Choose at least one funding method.');
+    return { ok:false };
+  }
+  const offers = getUniversityFundingOffers(_uniApplyDraft);
+  const selected = _uniApplyDraft.selectedFundingSources || [];
+  const primaryFunding = selected.length === 1 ? selected[0] : 'mixed';
+  _uniApplyDraft = getUniversityApplicationDraft({
+    fundingOffers: offers,
+    fundingChoice: primaryFunding,
+    funding: primaryFunding,
+    studentLoanAmountPerYear: selected.includes('student_loan') ? offers.studentLoan.amountPerYear : 0,
+    selfFundingAmountPerYear: selected.includes('self_fund') ? review.selfFundAmount : 0,
+    parentFundingType: selected.includes('parents') ? offers.parents.status : null,
+    parentalFundingAmountPerYear: selected.includes('parents') ? offers.parents.tuitionPerYear : 0,
+    parentalFundingAmount: selected.includes('parents') ? offers.parents.tuitionPerYear : 0,
+    parentalFundingTerms: offers.parents.terms || [],
+    parentHousingSupportPerYear: selected.includes('parents') ? offers.parents.housingPerYear : 0,
+    scholarshipAmount: selected.includes('scholarship') ? offers.scholarship.amount : 0,
+    scholarshipPaymentType: selected.includes('scholarship') ? offers.scholarship.paymentType : null,
+    remainingTuitionGapPerYear: review.remainingTuition,
+  });
+  saveUniversityDraft();
+  return { ok:true };
+}
+
+function previousUniApplicationStep() {
+  if (_learnScreen === 'uniApplyUniversity') _learnScreen = 'uniApplyCourse';
+  else if (_learnScreen === 'uniApplyFinances') _learnScreen = 'uniApplyUniversity';
+  else if (_learnScreen === 'uniFundingConfirm' || _learnScreen === 'uniApplyType') _learnScreen = 'uniApplyFinances';
+  else closeUniApplication();
+  renderLearnTab();
+  const tab = document.getElementById('tab-learn');
+  if (tab) tab.scrollTop = 0;
+}
+
+function nextUniApplicationStep() {
+  _uniApplyDraft = getUniversityApplicationDraft();
+  if (_learnScreen === 'uniApplyCourse') {
+    if (!_uniApplyDraft.course) return showToast('Choose a course first.');
+    saveUniversityDraft();
+    _learnScreen = 'uniApplyUniversity';
+  } else if (_learnScreen === 'uniApplyUniversity') {
+    if (!_uniApplyDraft.universityName) return showToast('Choose a university first.');
+    saveUniversityDraft();
+    _learnScreen = 'uniApplyFinances';
+  } else if (_learnScreen === 'uniApplyFinances') {
+    const result = prepareUniversityFundingSelection();
+    if (!result.ok) return;
+    _learnScreen = 'uniFundingConfirm';
+  } else if (_learnScreen === 'uniFundingConfirm' || _learnScreen === 'uniApplyType') {
+    submitUniApplication();
+    return;
+  }
+  renderLearnTab();
+  const tab = document.getElementById('tab-learn');
+  if (tab) tab.scrollTop = 0;
+}
+
+function selectUniApplicationField(field, value) {
+  _uniApplyDraft = getUniversityApplicationDraft();
+  if (field === 'course') {
+    _uniApplyDraft.course = value;
+  } else if (field === 'universityName') {
+    const option = getUniversityOptionByName(value);
+    if (_uniUniversityChoiceSlot === 'backup') {
+      _uniApplyDraft.backupUniversityName = option?.name || value;
+      _uniApplyDraft.backupUniversityTier = option?.tier || null;
+    } else {
+      _uniApplyDraft.universityName = option?.name || value;
+      _uniApplyDraft.universityTier = option?.tier || null;
+      _uniApplyDraft.uniType = option?.tier || null;
+      _uniApplyDraft.universityType = option?.tier || null;
+      if (_uniApplyDraft.backupUniversityName === _uniApplyDraft.universityName) {
+        _uniApplyDraft.backupUniversityName = null;
+        _uniApplyDraft.backupUniversityTier = null;
+      }
+    }
+  } else {
+    _uniApplyDraft[field] = value;
+  }
+  saveUniversityDraft();
+  renderLearnTab();
+}
+
+function universityAcceptanceChance(application) {
+  const grade = STATE.school.gradeScore || 50;
+  const option = getUniversityOptionByName(application.universityName);
+  const meta = getUniversityTierMetaByNameOrTier(option?.tier || application.universityTier || application.uniType);
+  if (grade < meta.min) return 0;
+  let chance = meta.base + Math.floor((grade - meta.min) * 1.2);
+  if (STATE.traits.includes('intelligent')) chance += 8;
+  if (STATE.traits.includes('hardworking')) chance += 6;
+  if (STATE.traits.includes('lazy')) chance -= 7;
+  if (['Law', 'Medicine'].includes(application.course)) chance -= 4;
+  if (option?.tier === 'Elite Universities') chance -= option.name.includes('Cambridge') ? 4 : 2;
+  return clamp(chance, 0, 96);
+}
+
+function submitUniApplication() {
+  _uniApplyDraft = getUniversityApplicationDraft();
+  if (!_uniApplyDraft.course || !_uniApplyDraft.universityName || !(_uniApplyDraft.selectedFundingSources || []).length) {
+    showToast('Finish your university choices first.');
+    return;
+  }
+  const postSchool = ensurePostSchoolState();
+  postSchool.uniApplication = createUniversityApplicationState({
+    ..._uniApplyDraft,
+    submittedAge: STATE.age,
+    status: 'pending',
+    result: null,
+  });
+  if (typeof syncUniversityApplicationState === 'function') syncUniversityApplicationState(postSchool.uniApplication);
+  saveGame();
+  _learnScreen = 'main';
+  _uniApplyDraft = null;
+  renderLearnTab();
+  showToast('Application sent. Results arrive next year.');
+}
+
+function resolveUniversityApplication() {
+  const application = STATE.school.postSchool?.uniApplication;
+  if (!application || application.status !== 'pending') return null;
+  if (application.submittedAge >= STATE.age) return null;
+  const accepted = Math.random() * 100 < universityAcceptanceChance(application);
+  let result;
+  if (accepted) {
+    application.status = 'accepted';
+    result = { outcome:'accepted', universityName:application.universityName, universityTier:application.universityTier, viaBackup:false };
+  } else if (application.backupUniversityName) {
+    const backupChance = universityAcceptanceChance({
+      ...application,
+      universityName: application.backupUniversityName,
+      universityTier: application.backupUniversityTier,
+      uniType: application.backupUniversityTier,
+      universityType: application.backupUniversityTier,
+    });
+    const backupAccepted = Math.random() * 100 < backupChance;
+    if (backupAccepted) {
+      application.status = 'accepted_backup';
+      result = { outcome:'accepted_backup', universityName:application.backupUniversityName, universityTier:application.backupUniversityTier, viaBackup:true };
+    } else {
+      application.status = 'rejected';
+      result = { outcome:'rejected', universityName:application.universityName, universityTier:application.universityTier, viaBackup:false };
+    }
+  } else {
+    application.status = 'rejected';
+    result = { outcome:'rejected', universityName:application.universityName, universityTier:application.universityTier, viaBackup:false };
+  }
+  application.result = result;
+  return application.result;
+}
+
+function acceptUniversityOffer(universityName = null, universityTier = null) {
+  const postSchool = ensurePostSchoolState();
+  if (!postSchool.uniApplication) return;
+  postSchool.uniApplication = createUniversityApplicationState(postSchool.uniApplication);
+  postSchool.uniApplication.status = 'accepted_offer';
+  postSchool.uniApplication.acceptedUniversityName = universityName || postSchool.uniApplication.universityName;
+  postSchool.uniApplication.acceptedUniversityTier = universityTier || postSchool.uniApplication.universityTier;
+  postSchool.uniApplication.acceptedViaBackup = !!(postSchool.uniApplication.backupUniversityName && postSchool.uniApplication.acceptedUniversityName === postSchool.uniApplication.backupUniversityName);
+  postSchool.uniApplication.acceptedType = universityTier || postSchool.uniApplication.universityTier;
+  postSchool.uniApplication.uniType = universityTier || postSchool.uniApplication.universityTier;
+  postSchool.uniApplication.universityType = universityTier || postSchool.uniApplication.universityTier;
+  postSchool.uniApplication.startedAge = STATE.age;
+  STATE.school.level = 'uni';
+  STATE.school.current = postSchool.uniApplication.acceptedUniversityName;
+  logActivity(`Accepted a place to study ${getUniversityCourseLabel(postSchool.uniApplication.course)} at ${postSchool.uniApplication.acceptedUniversityName}.`, null);
+  if (typeof syncUniversityApplicationState === 'function') syncUniversityApplicationState(postSchool.uniApplication);
+  if (typeof applyUniversityFundingForCurrentYear === 'function') applyUniversityFundingForCurrentYear();
+  if (typeof getCurrentHome === 'function' && getCurrentHome()?.source === 'family' && typeof makeRentalHome === 'function' && typeof addHomeToHistory === 'function' && typeof setCurrentHome === 'function') {
+    const studentHome = addHomeToHistory(makeRentalHome('rental_student_house'));
+    setCurrentHome(studentHome, 'Moved out for university and into a shared student house.');
+    showToast('You moved into shared student housing.');
+  }
+  saveGame();
+  closeMilestone();
+  updateAllUI();
+}
+
+function rejectUniversityOffer() {
+  const postSchool = ensurePostSchoolState();
+  if (postSchool.uniApplication) {
+    postSchool.uniApplication.status = 'declined';
+    if (typeof syncUniversityApplicationState === 'function') syncUniversityApplicationState(postSchool.uniApplication);
+  }
+  logActivity('Turned down the university offer.', null);
+  saveGame();
+  closeMilestone();
+  updateAllUI();
+}
+
+function showUniversityAdmissionResult(result, onClose) {
+  const application = STATE.school.postSchool?.uniApplication;
+  if (!application || !result) return;
+  _pendingAfterMilestone = onClose;
+  const body = (result.outcome === 'accepted' || result.outcome === 'accepted_backup')
+    ? `You've been offered a place to study ${getUniversityCourseLabel(application.course)} at ${result.universityName}.${result.viaBackup ? ' Your first choice said no, but your backup accepted you.' : ''}`
+    : `Unfortunately, your application to ${application.universityName} was unsuccessful.`;
+  const actions = (result.outcome === 'accepted' || result.outcome === 'accepted_backup')
+    ? `<button class="continue-btn" onclick="acceptUniversityOffer('${result.universityName}','${result.universityTier}')">Accept place →</button>
+       <button class="birth-btn secondary" onclick="rejectUniversityOffer()">Reject offer</button>`
+    : `<button class="continue-btn" onclick="closeMilestone()">Continue →</button>`;
+  document.getElementById('milestone-inner').innerHTML = `
+    <div class="milestone-emoji">${(result.outcome === 'accepted' || result.outcome === 'accepted_backup') ? '🎉' : '🎓'}</div>
+    <div class="milestone-title">${(result.outcome === 'accepted' || result.outcome === 'accepted_backup') ? 'Accepted' : 'Rejected'}</div>
+    <div class="milestone-body">${body}</div>
+    ${actions}`;
+  document.getElementById('milestone-overlay').classList.add('open');
+}
+
+function buildUniversityCourseSelectionCards() {
+  const selected = _uniApplyDraft?.course;
+  return `<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+    ${UNIVERSITY_REBUILD_COURSES.map(course => {
+      const active = selected === course.id;
+      return `<button onclick="selectUniApplicationField('course','${course.id}')" style="padding:16px;border-radius:20px;border:1.5px solid ${active ? '#6d56c9' : '#e3d8cb'};background:${active ? '#f6f1ff' : '#fff'};text-align:left;cursor:pointer">
+        <div style="font-size:28px;color:#6d56c9"><iconify-icon icon="${course.icon}"></iconify-icon></div>
+        <div style="font-size:16px;font-weight:800;color:#171510;margin-top:8px">${course.label}</div>
+        <div style="font-size:12px;line-height:1.45;color:#655d56;margin-top:6px">${course.blurb}</div>
+      </button>`;
+    }).join('')}
+  </div>`;
+}
+
+function buildUniversitySelectionCards() {
+  const selected = _uniUniversityChoiceSlot === 'backup' ? _uniApplyDraft?.backupUniversityName : _uniApplyDraft?.universityName;
+  const groups = ['Elite Universities', 'Top Universities', 'Standard Universities', 'Local Universities'];
+  return groups.map(tier => {
+    const entries = UNIVERSITY_REBUILD_DIRECTORY.filter(option => option.tier === tier);
+    return `<div style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8d8175">${tier}</div>
+      ${entries.map(option => {
+        const active = selected === option.name;
+        return `<button onclick="selectUniApplicationField('universityName','${option.name.replace(/'/g, "\\'")}')" style="padding:15px 16px;border-radius:18px;border:1.5px solid ${active ? '#6d56c9' : '#e7ddd1'};background:${active ? '#f6f1ff' : '#fff'};text-align:left;cursor:pointer">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div>
+              <div style="font-size:16px;font-weight:800;color:#171510">${option.name}</div>
+              <div style="font-size:12px;color:#6a6159;margin-top:4px">${option.city} • ${option.vibe}</div>
+            </div>
+            <div style="font-size:11px;font-weight:800;color:${active ? '#6d56c9' : '#8c7b6b'}">${option.prestige} Prestige</div>
+          </div>
+        </button>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+function setUniversityChoiceSlot(slot) {
+  _uniUniversityChoiceSlot = slot === 'backup' ? 'backup' : 'primary';
+  renderLearnTab();
+}
+
+function buildUniversityFundingCardsRebuild() {
+  const draft = getUniversityApplicationDraft();
+  const offers = getUniversityFundingOffers(draft);
+  const selected = new Set(draft.selectedFundingSources || []);
+  const cards = [
+    { id:'student_loan', title:'Student Loan', preview:'Click to see your exact approved amount.', result:offers.studentLoan.text, enabled:true },
+    { id:'parents', title:'Parents', preview:'Click to see what your parents are offering.', result:offers.parents.text, enabled:true },
+    { id:'self_fund', title:'Self Fund', preview:'Click to see what you would need to cover yourself.', result:offers.selfFund.text, enabled:true },
+    { id:'scholarship', title:'Scholarship', preview:'Click to see whether a scholarship came through.', result:offers.scholarship.text, enabled:true },
+  ];
+  return `<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+    ${cards.map(card => {
+      const active = selected.has(card.id);
+      const bodyText = active ? card.result : card.preview;
+      return `<button onclick="${card.enabled ? `toggleUniversityFundingSource('${card.id}')` : `showToast('${card.result.replace(/'/g, "\\'")}')`}" style="padding:16px;border-radius:20px;border:1.5px solid ${active ? '#6d56c9' : '#e3d8cb'};background:${active ? '#f6f1ff' : '#fff'};text-align:left;cursor:pointer;opacity:${card.enabled ? 1 : 0.72}">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div style="font-size:15px;font-weight:800;color:#171510">${card.title}</div>
+          <div style="width:22px;height:22px;border-radius:50%;border:1px solid ${active ? '#6d56c9' : '#b9aea2'};background:${active ? '#6d56c9' : '#fff'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px">${active ? '✓' : ''}</div>
+        </div>
+        <div style="font-size:12px;line-height:1.45;color:#655d56;margin-top:8px">${bodyText}</div>
+      </button>`;
+    }).join('')}
+  </div>`;
+}
+
+function buildFundingReviewScreen() {
+  const review = buildUniversityFundingReview(getUniversityApplicationDraft());
+  const selectedUni = getUniversityCurrentSelection();
+  return `
+    <div style="display:flex;flex-direction:column;gap:16px;padding-bottom:10px">
+      ${buildUniPageHeader('Funding Breakdown', 'Review everything before you submit.')}
+      <div style="padding:16px;border-radius:20px;background:#fff;border:1px solid #eadfd3">
+        <div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8a7c70">Application</div>
+        <div style="font-size:22px;font-weight:900;color:#171510;margin-top:6px">${selectedUni?.name || _uniApplyDraft?.universityName}</div>
+        <div style="font-size:13px;color:#6a6159;margin-top:4px">${getUniversityCourseLabel(_uniApplyDraft?.course)} • Tuition ${fmtMoney(UNIVERSITY_TUITION_FEE_PER_YEAR)}/year</div>
+      </div>
+      <div style="padding:16px;border-radius:20px;background:#fff;border:1px solid #eadfd3">
+        <div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8a7c70;margin-bottom:10px">Funding Breakdown</div>
+        ${review.lines.length ? review.lines.map(line => `<div style="font-size:14px;color:#241d17;line-height:1.55">• ${line}</div>`).join('') : '<div style="font-size:14px;color:#6a6159">No funding selected yet.</div>'}
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid #eee2d5;font-size:13px;color:${review.remainingTuition > 0 ? '#b45c4d' : '#4b8754'};font-weight:800">
+          ${review.remainingTuition > 0 ? `Remaining Tuition Gap: ${fmtMoney(review.remainingTuition)}/year` : 'Tuition fully planned.'}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button onclick="previousUniApplicationStep()" style="padding:15px;border:1px solid #ddd1c4;border-radius:18px;background:#fff;font-size:14px;font-weight:800;color:#6a6159;cursor:pointer">Edit Choices</button>
+        <button onclick="nextUniApplicationStep()" style="padding:15px;border:1px solid #6d56c9;border-radius:18px;background:linear-gradient(90deg,#6d56c9,#846be6);font-size:14px;font-weight:800;color:#fff;cursor:pointer">Submit Application</button>
+      </div>
+    </div>`;
+}
+
+function buildUniApplicationScreen() {
+  _uniApplyDraft = getUniversityApplicationDraft();
+  if (_learnScreen === 'uniApplyCourse') {
+    return `<div style="display:flex;flex-direction:column;gap:16px;padding-bottom:10px">
+      ${buildUniPageHeader('Choose Course', 'Pick the degree you want to study first.')}
+      ${buildUniversityCourseSelectionCards()}
+      <button onclick="nextUniApplicationStep()" style="width:100%;padding:18px;border-radius:22px;border:1px solid ${_uniApplyDraft.course ? '#6d56c9' : '#ddd1c4'};background:${_uniApplyDraft.course ? 'linear-gradient(90deg,#6d56c9,#846be6)' : '#ece4dc'};color:${_uniApplyDraft.course ? '#fff' : '#94877b'};font-size:15px;font-weight:800;cursor:pointer">Next: Choose University</button>
+    </div>`;
+  }
+  if (_learnScreen === 'uniApplyUniversity') {
+    const primary = getUniversityCurrentSelection();
+    const backup = getUniversityBackupSelection();
+    return `<div style="display:flex;flex-direction:column;gap:16px;padding-bottom:10px">
+      ${buildUniPageHeader('Choose University', 'Prestige matters for networking, internships and graduate schemes.')}
+      <div style="display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;background:#fff;border:1px solid #ece4da;font-size:11px;font-weight:700;color:#4f4741">${getUniversityCourseLabel(_uniApplyDraft.course)}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button onclick="setUniversityChoiceSlot('primary')" style="padding:14px;border-radius:18px;border:1px solid ${_uniUniversityChoiceSlot === 'primary' ? '#6d56c9' : '#e7ddd1'};background:${_uniUniversityChoiceSlot === 'primary' ? '#f6f1ff' : '#fff'};text-align:left;cursor:pointer">
+          <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8a7c70">First Choice</div>
+          <div style="font-size:15px;font-weight:800;color:#171510;margin-top:6px">${primary?.name || 'Choose university'}</div>
+        </button>
+        <button onclick="setUniversityChoiceSlot('backup')" style="padding:14px;border-radius:18px;border:1px solid ${_uniUniversityChoiceSlot === 'backup' ? '#6d56c9' : '#e7ddd1'};background:${_uniUniversityChoiceSlot === 'backup' ? '#f6f1ff' : '#fff'};text-align:left;cursor:pointer">
+          <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8a7c70">Backup Choice</div>
+          <div style="font-size:15px;font-weight:800;color:#171510;margin-top:6px">${backup?.name || 'Optional backup'}</div>
+        </button>
+      </div>
+      ${buildUniversitySelectionCards()}
+      <button onclick="nextUniApplicationStep()" style="width:100%;padding:18px;border-radius:22px;border:1px solid ${_uniApplyDraft.universityName ? '#6d56c9' : '#ddd1c4'};background:${_uniApplyDraft.universityName ? 'linear-gradient(90deg,#6d56c9,#846be6)' : '#ece4dc'};color:${_uniApplyDraft.universityName ? '#fff' : '#94877b'};font-size:15px;font-weight:800;cursor:pointer">Next: Plan Finances</button>
+    </div>`;
+  }
+  if (_learnScreen === 'uniApplyFinances') {
+    const selectedUni = getUniversityCurrentSelection();
+    const review = buildUniversityFundingReview(_uniApplyDraft);
+    return `<div style="display:flex;flex-direction:column;gap:16px;padding-bottom:10px">
+      ${buildUniPageHeader('Plan Finances', 'Choose one or more funding methods.')}
+      <div style="padding:16px;border-radius:20px;background:#fff;border:1px solid #eadfd3">
+        <div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8a7c70">Selected University</div>
+        <div style="font-size:22px;font-weight:900;color:#171510;margin-top:6px">${selectedUni?.name || _uniApplyDraft.universityName || 'University'}</div>
+        <div style="font-size:13px;color:#6a6159;margin-top:4px">${selectedUni?.tier || ''} • ${getUniversityCourseLabel(_uniApplyDraft.course)}</div>
+      </div>
+      ${buildUniversityFundingCardsRebuild()}
+      <div style="padding:16px;border-radius:20px;background:#fff;border:1px solid #eadfd3">
+        <div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8a7c70;margin-bottom:10px">Funding Result</div>
+        ${review.lines.length
+          ? `${review.lines.map(line => `<div style="font-size:14px;color:#241d17;line-height:1.55">• ${line}</div>`).join('')}
+             <div style="margin-top:12px;padding-top:10px;border-top:1px solid #eee2d5;font-size:13px;font-weight:800;color:${review.remainingTuition > 0 ? '#b45c4d' : '#4b8754'}">
+               ${review.remainingTuition > 0 ? `Still Uncovered: ${fmtMoney(review.remainingTuition)}/year` : 'Your tuition plan is fully covered.'}
+             </div>`
+          : `<div style="font-size:13px;line-height:1.5;color:#6a6159">Click Student Loan, Parents, Self Fund, or Scholarship to reveal each result and build your funding plan.</div>`}
+      </div>
+      <button onclick="nextUniApplicationStep()" style="width:100%;padding:18px;border-radius:22px;border:1px solid ${(_uniApplyDraft.selectedFundingSources || []).length ? '#6d56c9' : '#ddd1c4'};background:${(_uniApplyDraft.selectedFundingSources || []).length ? 'linear-gradient(90deg,#6d56c9,#846be6)' : '#ece4dc'};color:${(_uniApplyDraft.selectedFundingSources || []).length ? '#fff' : '#94877b'};font-size:15px;font-weight:800;cursor:pointer">Review Funding Breakdown</button>
+    </div>`;
+  }
+  return buildFundingReviewScreen();
+}
+
+function buildUniversityHeroCard() {
+  const uniName = STATE.school.current || STATE.school.postSchool?.uniApplication?.acceptedUniversityName || 'University';
+  const { course, totalYears, currentYear } = getUniversityYearMeta();
+  const grade = gradeFromScore(STATE.school.gradeScore || 0);
+  return `
+    <div class="learn-school-hero" style="background:linear-gradient(180deg, #fffefe 0%, #faf7ff 100%);border:1px solid rgba(224,212,242,0.95)">
+      <div class="learn-school-hero-inner">
+        <div class="learn-school-hero-copy">
+          <div style="display:inline-flex;align-items:center;width:fit-content;background:#ede4ff;border-radius:999px;padding:7px 14px;font-size:11px;font-weight:800;color:#6957c3;text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px">University</div>
+          <div class="learn-school-name" style="color:#172039">${uniName}</div>
+          <div class="learn-school-yearline" style="color:#6d6587">${getUniversityCourseLabel(course)} • Year ${currentYear} of ${totalYears}</div>
+        </div>
+        <div class="learn-school-hero-side">
+          <div class="learn-school-grade" style="background:linear-gradient(180deg, #f2ebff 0%, #ece3ff 100%)">
+            <div class="learn-school-grade-label">Grade</div>
+            <div class="learn-school-grade-value" style="color:#7458d5">${grade}</div>
+          </div>
+          <img src="${UNI_PREVIEW_IMAGE}" alt="University illustration" class="learn-school-illustration" />
+        </div>
+      </div>
+    </div>`;
+}
+
+function getUniversityStanding() {
+  return getUniversityPrestigeStanding();
+}
+
+function ensureUniversityCommitmentState() {
+  if (!STATE.education) STATE.education = {};
+  if (!STATE.volunteering) STATE.volunteering = { currentRole:null };
+  if (!('currentInternship' in STATE.education)) STATE.education.currentInternship = null;
+  if (!('currentPlacement' in STATE.education)) STATE.education.currentPlacement = null;
+  if (!('isCourseRep' in STATE.education)) STATE.education.isCourseRep = false;
+  if (!('courseRepTitle' in STATE.education)) STATE.education.courseRepTitle = null;
+  if (!Array.isArray(STATE.education.internshipHistory)) STATE.education.internshipHistory = [];
+  if (!STATE.education.graduateSchemePreparation) STATE.education.graduateSchemePreparation = { active:false, companyName:null, title:null };
+  if (!STATE.education.graduateSchemeOffer) STATE.education.graduateSchemeOffer = null;
+  if (!Array.isArray(STATE.education.societyMemberships)) STATE.education.societyMemberships = [];
+  if (!('societyInvolvement' in STATE.education)) STATE.education.societyInvolvement = 0;
+  if (!('networking' in STATE.education)) STATE.education.networking = 0;
+  return STATE.education;
+}
+
+function getUniversityActiveCommitments() {
+  ensureUniversityCommitmentState();
+  const commitments = [];
+  if (STATE.education.currentInternship) commitments.push({ type:'internship', title:STATE.education.currentInternship.title, subtitle:STATE.education.currentInternship.subtitle || 'Current internship' });
+  if (STATE.education.graduateSchemePreparation?.active) commitments.push({ type:'graduate_scheme', title:STATE.education.graduateSchemePreparation.companyName || 'Graduate Scheme Prep', subtitle:'Applications and interviews are ongoing' });
+  if (STATE.volunteering?.currentRole) commitments.push({ type:'volunteering', title:STATE.volunteering.currentRole.title, subtitle:STATE.volunteering.currentRole.subtitle || 'Current volunteering role' });
+  if (STATE.education.isCourseRep) commitments.push({ type:'course_rep', title:STATE.education.courseRepTitle || 'Course Representative', subtitle:'Representing your cohort' });
+  if (STATE.career?.job && STATE.career.job !== 'None') commitments.push({ type:'job', title:`Part-Time Job at ${STATE.career.companyName || 'Campus Workplace'}`, subtitle:'Earning money alongside your degree' });
+  return commitments;
+}
+
+function getUniversityCurrentCommitment() {
+  return getUniversityActiveCommitments()[0] || null;
+}
+
+function applyUniversityCommitmentAnnualEffects() {
+  if (STATE.school.level !== 'uni') return;
+  const commitments = getUniversityActiveCommitments();
+  if (commitments.length <= 1) return;
+  const overload = commitments.length - 1;
+  applyEffects({
+    gradeScore: -(4 * overload),
+    happy: -(3 * overload),
+    rel_friends: -(2 * overload),
+  });
+  if (commitments.length >= 3) applyEffects({ health:-2 });
+  logActivity(`Balancing ${commitments.length} university commitments took a toll on your grades and social life.`, null);
+}
+
+function buildUniversityCommitmentCard() {
+  const commitments = getUniversityActiveCommitments();
+  const chips = commitments.length
+    ? commitments.map(item => `<span style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#fff7e9;border:1px solid #ead8bb;font-size:11px;font-weight:800;color:#8a6832">${item.title}</span>`).join('')
+    : `<span style="font-size:13px;color:#6f665f">No major commitment yet.</span>`;
+  return `
+    <div style="margin-top:18px;padding:18px 16px;border-radius:24px;background:#fff;border:1px solid rgba(231,221,209,0.95);box-shadow:0 12px 28px rgba(64,42,22,0.05)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:14px">
+        <div>
+          <div style="font-size:11px;font-weight:800;color:#d78e36;letter-spacing:.08em;text-transform:uppercase">Commitments</div>
+          <div style="font-size:15px;font-weight:800;color:#171510;line-height:1.15;margin-top:4px">Balance matters here</div>
+        </div>
+        <button onclick="openLearnScreen('uniCommitment')" style="padding:10px 12px;border:1px solid #eadfd3;border-radius:14px;background:#fffaf2;font-size:12px;font-weight:800;color:#7a6343;cursor:pointer">Manage</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">${chips}</div>
+      ${STATE.career?.job && STATE.career.job !== 'None' ? '' : `<button onclick="openJobBoard('part-time')" style="margin-top:14px;width:100%;padding:13px 14px;border:1px solid #eadfd3;border-radius:16px;background:#fff;font-size:13px;font-weight:800;color:#171510;cursor:pointer">Apply for a Part-Time Job</button>`}
+    </div>`;
+}
+
+function buildUniversityHomeScreen() {
+  ensureUniversityCommitmentState();
+  return `
+    <div style="display:flex;flex-direction:column;gap:0">
+      ${buildUniversityMainSectionList()}
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:18px">
+        <div style="padding:14px;border-radius:18px;background:#fff;border:1px solid #ece1d4">
+          <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8d8175">Networking</div>
+          <div style="font-size:24px;font-weight:900;color:#171510;margin-top:6px">${STATE.education.networking || 0}</div>
+        </div>
+        <div style="padding:14px;border-radius:18px;background:#fff;border:1px solid #ece1d4">
+          <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8d8175">Society Involvement</div>
+          <div style="font-size:24px;font-weight:900;color:#171510;margin-top:6px">${STATE.education.societyInvolvement || 0}</div>
+        </div>
+      </div>
+      ${buildUniversityCommitmentCard()}
+    </div>`;
+}
+
+function buildUniversitySocialPage() {
+  const flatmates = (typeof getCurrentHomeResidents === 'function' ? getCurrentHomeResidents(getCurrentHome()) : []).filter(resident => resident.refType === 'roommate');
+  const hasMessy = flatmates.some(resident => (resident.traits || []).includes('messy'));
+  const hasLoud = flatmates.some(resident => (resident.traits || []).includes('loud'));
+  const rows = [
+    ['society_event', 'Go to a Society Event', 'Attend, network, flirt, or embarrass yourself'],
+    ['uni_cm_study', 'Study with a Course Mate', 'Keep grades moving and strengthen a bond'],
+    ['uni_cm_coffee', 'Grab Coffee with a Course Mate', 'A quieter social move'],
+    ['uni_cm_clubbing', 'Go Clubbing with a Course Mate', 'Fun, chaos, and chemistry'],
+    ['uni_cm_friend', 'Ask a Course Mate to Be Friends', 'Turn casual familiarity into a real bond'],
+    ['uni_cm_flirt', 'Flirt with a Course Mate', 'See whether the chemistry is mutual'],
+    ['uni_cm_hook_up', 'Hook Up with a Course Mate', 'Messy, risky, memorable'],
+    ['uni_cm_gossip', 'Gossip with a Course Mate', 'Information spreads fast on campus'],
+    ['flatmate_movie', 'Watch Movie Together', 'A low-stakes flat night'],
+    ['flatmate_kitchen', 'Chat in Kitchen', 'Build household rapport'],
+    ['flatmate_friend', 'Ask Flatmate to Be Friends', 'Turn a flatshare into a bond'],
+    ['flatmate_flirt', 'Flirt with a Flatmate', 'Dangerous, tempting, very close to home'],
+    ['flatmate_hook_up', 'Hook Up with a Flatmate', 'Fast chemistry, bigger fallout'],
+    ['flatmate_ask_out', 'Ask Out a Flatmate', 'Make it official or make it awkward'],
+    ['flatmate_night_out', 'Night Out Together', 'Drinks, drama, and blurry decisions'],
+    ['flatmate_argue', 'Argue', 'Sometimes flatshares explode'],
+  ];
+  if (hasMessy) rows.push(['flatmate_mess', 'Complain About Mess', 'Only worth it if the place is getting grim']);
+  if (hasLoud) rows.push(['flatmate_noise', 'Argue About Noise', 'A classic student-house fight']);
+  return `
+    <div class="learn-school-page">
+      ${buildUniversitySubPageHeader('Social', 'Course mates, societies, flatmates and chaos.')}
+      <div style="margin-top:18px">
+        ${rows.map(([id, title, subtitle]) => buildUniversityListRow(title, subtitle, `runUniversityAction('${id}')`, 'Social')).join('')}
+      </div>
+    </div>`;
+}
+
+function buildUniversityCareersPage() {
+  return `
+    <div class="learn-school-page">
+      ${buildUniversitySubPageHeader('Careers', 'Event-driven career building while you study.')}
+      ${[
+        ['apply_summer_internship', 'Apply for Internship', 'Top firms are hard, lower-tier internships are more accessible'],
+        ['apply_graduate_scheme', 'Apply for Graduate Scheme', isUniversityFinalTwoYears() ? 'Final-year pressure starts paying off now' : 'You can build prep early, but top offers come later'],
+        ['go_careers_fair', 'Go to Careers Fair', 'Meet employers and spot openings'],
+        ['attend_networking_event', 'Attend Networking Event', 'Build contacts that move applications'],
+        ['get_career_advice', 'Get Career Advice', 'Contextual advice based on your actual profile'],
+        ['become_course_rep', 'Become Course Representative', 'Good for reputation and future references'],
+        ['start_volunteering', 'Volunteer', 'Especially useful for Education and community-facing paths'],
+      ].map(([id, title, subtitle]) => buildUniversityListRow(title, subtitle, `runUniversityAction('${id}')`, 'Career')).join('')}
+    </div>`;
+}
+
+function buildUniversityCommitmentPage() {
+  const commitments = getUniversityActiveCommitments();
+  return `
+    <div class="learn-school-page">
+      ${buildUniversitySubPageHeader('Commitments', 'You can stack commitments, but there is a cost.')}
+      <div class="learn-school-note-card">
+        <div class="learn-school-note-label">Current Load</div>
+        <div class="learn-school-note-copy">${commitments.length ? commitments.map(item => item.title).join(' • ') : 'No major commitment yet.'}</div>
+      </div>
+      ${STATE.career?.job && STATE.career.job !== 'None' ? '' : buildUniversityListRow('Apply for a Part-Time Job', 'You can still do this even if you already have an internship', `openJobBoard('part-time')`, 'Work')}
+      ${buildUniversityListRow('Work Harder', 'Push harder across your commitments', `runUniversityAction('uni_commitment_work_harder')`, 'Action')}
+      ${buildUniversityListRow('Slack Off', 'Protect your energy but risk progress', `runUniversityAction('uni_commitment_slack_off')`, 'Action')}
+      ${STATE.career?.job && STATE.career.job !== 'None' ? buildUniversityListRow('Ask for More Shifts', 'Earn more, but increase pressure', `runUniversityAction('uni_commitment_more_shifts')`, 'Work') : ''}
+      ${buildUniversityListRow('Network Through Commitments', 'Turn your workload into contacts', `runUniversityAction('uni_commitment_network')`, 'Career')}
+      ${buildUniversityListRow('Quit a Commitment', 'Walk away from one of your current commitments', `runUniversityAction('uni_commitment_quit')`, 'Exit')}
+    </div>`;
+}
+
+function getUniversityCareerTrack(courseId = STATE.school.postSchool?.uniApplication?.course) {
+  return UNIVERSITY_REBUILD_CAREERS[courseId] || UNIVERSITY_REBUILD_CAREERS.Business;
+}
+
+function getUniversityCareerStrength() {
+  ensureUniversityCommitmentState();
+  const prestige = getUniversityPrestigeStanding() * 28;
+  const grades = Math.max(0, (STATE.school.gradeScore || 0) - 50) * 0.42;
+  const networking = (STATE.education.networking || 0) * 0.8;
+  const internships = (STATE.education.internshipHistory || []).length * 7;
+  const societies = (STATE.education.societyInvolvement || 0) * 0.6;
+  return prestige + grades + networking + internships + societies;
+}
+
+function maybeOfferEmployerSponsorship(company) {
+  const application = STATE.school.postSchool?.uniApplication;
+  const course = application?.course;
+  if (!application || course === 'Education') return false;
+  if (!company?.sponsorEligible) return false;
+  if (Math.random() >= 0.7) return false;
+  const recurringSupport = (application.studentLoanAmountPerYear || 0) + (application.parentalFundingAmountPerYear || 0) + ((application.scholarshipPaymentType === 'yearly') ? (application.scholarshipAmount || 0) : 0);
+  const remaining = Math.max(0, UNIVERSITY_TUITION_FEE_PER_YEAR - Math.min(UNIVERSITY_TUITION_FEE_PER_YEAR, recurringSupport));
+  if (!remaining) return false;
+  application.employerSponsorshipPerYear = remaining;
+  application.employerSponsorName = company.company;
+  application.selectedFundingSources = Array.from(new Set([...(application.selectedFundingSources || []), 'employer_sponsorship']));
+  syncUniversityApplicationState(application);
+  logActivity(`${company.company} offered to cover your remaining tuition fees.`, 10);
+  return true;
+}
+
+function handleUniversityInternshipApplication() {
+  ensureUniversityCommitmentState();
+  if (STATE.education.currentInternship) return { log:'You already have an internship lined up.', toast:'You already have one.' };
+  const track = getUniversityCareerTrack();
+  const pool = track.internship || [];
+  const company = pickRandom(pool);
+  const chance = clamp(42 + getUniversityCareerStrength() - (company.difficulty || 30), 12, 92);
+  if (Math.random() * 100 < chance) {
+    STATE.education.currentInternship = { title:`${company.title} at ${company.company}`, subtitle:'Current internship', companyName:company.company, internshipOnly:!!company.internshipOnly };
+    STATE.education.internshipHistory.push({ companyName:company.company, title:company.title, age:STATE.age, internshipOnly:!!company.internshipOnly });
+    return { log:`You landed ${company.title} at ${company.company}.`, toast:'Internship secured.' };
+  }
+  return { log:`${company.company} turned you down for ${company.title}.`, toast:'Application unsuccessful.' };
+}
+
+function handleGraduateSchemeApplication() {
+  ensureUniversityCommitmentState();
+  const track = getUniversityCareerTrack();
+  const pool = track.graduate || [];
+  const company = pickRandom(pool);
+  const finalYearsBoost = isUniversityFinalTwoYears() ? 8 : -8;
+  const chance = clamp(18 + getUniversityCareerStrength() + finalYearsBoost - (company.difficulty || 40), 4, 84);
+  if (Math.random() * 100 < chance) {
+    STATE.education.graduateSchemePreparation = { active:true, companyName:company.company, title:company.title };
+    STATE.education.graduateSchemeOffer = { companyName:company.company, title:company.title, securedAge:STATE.age };
+    const sponsorship = maybeOfferEmployerSponsorship(company);
+    return {
+      log: sponsorship
+        ? `${company.company} offered you ${company.title} and agreed to fund the rest of your tuition.`
+        : `${company.company} offered you ${company.title} after graduation.`,
+      toast:'Graduate scheme secured.',
+    };
+  }
+  STATE.education.graduateSchemePreparation = { active:true, companyName:company.company, title:company.title };
+  return { log:`You started preparing and applying for graduate schemes, but ${company.company} passed for now.`, toast:'Applications sent.' };
+}
+
+function getContextualCareerAdvice() {
+  ensureUniversityCommitmentState();
+  const grade = STATE.school.gradeScore || 0;
+  const internships = (STATE.education.internshipHistory || []).length;
+  const networking = STATE.education.networking || 0;
+  const prestige = getUniversityPrestigeStanding();
+  const { currentYear, totalYears } = getUniversityYearMeta();
+  if (grade < 70) return 'The counsellor said I should improve my grades.';
+  if (!internships && currentYear <= 2) return 'The counsellor encouraged me to apply for internships.';
+  if ((STATE.volunteering?.currentRole ? 0 : 1) && getUniversityCourseLabel(STATE.school.postSchool?.uniApplication?.course) === 'Education') return 'The counsellor recommended volunteering.';
+  if (currentYear >= Math.max(2, totalYears - 1) && prestige >= 0.45 && networking < 8) return 'The counsellor encouraged me to build my network before graduate scheme season.';
+  if (currentYear >= Math.max(2, totalYears - 1) && grade >= 80) return 'The counsellor encouraged me to apply for graduate schemes.';
+  if (internships > 0 && networking >= 8 && grade >= 78) return 'The counsellor said to keep doing what I’m doing.';
+  return 'The counsellor recommended volunteering.';
+}
+
+function launchUniversitySocietyEvent() {
+  ensureUniversityCommitmentState();
+  const course = STATE.school.postSchool?.uniApplication?.course;
+  const pool = UNIVERSITY_REBUILD_SOCIETY_EVENTS[course] || UNIVERSITY_REBUILD_SOCIETY_EVENTS.Business;
+  const eventName = pickRandom(pool);
+  openEvent({
+    id: `uni_society_${STATE.age}_${eventName}`,
+    category: 'Society',
+    title: eventName,
+    text: `A course society event is happening tonight. It could help your social life, reputation, and future applications.`,
+    choices: [
+      { text:'Attend', effects:{ happy:+2, rel_friends:+2, gradeScore:+1 }, log:`You turned up to ${eventName}.`, onChoose:() => { STATE.education.societyInvolvement += 2; } },
+      { text:'Skip', effects:{ happy:+1 }, log:`You skipped ${eventName}.` },
+      { text:'Network', effects:{ rep:+2, rel_friends:+2 }, log:`You networked hard at ${eventName}.`, onChoose:() => { STATE.education.networking += 3; STATE.education.societyInvolvement += 2; } },
+      { text:'Apply for Internship', effects:{ rep:+1 }, log:`You chased opportunities at ${eventName}.`, onChoose:() => {
+        STATE.education.networking += 2;
+        if (!STATE.education.currentInternship && Math.random() < 0.35) {
+          const result = handleUniversityInternshipApplication();
+          logActivity(result.log, 6);
+        }
+      } },
+      { text:'Embarrass Yourself', effects:{ happy:-1, rep:-3 }, log:`You embarrassed yourself at ${eventName}.` },
+      { text:'Flirt', effects:{ happy:+2, rel_friends:+1 }, log:`You flirted your way through ${eventName}.` },
+    ],
+  });
+}
+
+function getUniversityFlatmates() {
+  const home = typeof getCurrentHome === 'function' ? getCurrentHome() : null;
+  const residents = typeof getCurrentHomeResidents === 'function' ? getCurrentHomeResidents(home) : [];
+  return residents.filter(resident => resident.refType === 'roommate');
+}
+
+function handleUniversityCoursemateAction(classmateId, actionId) {
+  const classmate = getUniversityCoursemateById(classmateId) || STATE.school.classmates.find(item => item.id === classmateId);
+  if (!classmate) return;
+  const update = (effects, logText) => {
+    applyEffects(effects || {});
+    classmate.relationship = clamp((classmate.relationship || 50) + (effects?.rel_friends || 0) + 4);
+    if (typeof markNpcInteraction === 'function') markNpcInteraction(classmate, logText);
+    logActivity(logText, null);
+    saveGame();
+    renderLearnTab();
+  };
+  if (actionId === 'uni_cm_study') return update({ smarts:+2, gradeScore:+3, rel_friends:+3 }, `Studied with ${classmate.firstName}.`);
+  if (actionId === 'uni_cm_coffee') return update({ happy:+2, rel_friends:+3 }, `Grabbed coffee with ${classmate.firstName}.`);
+  if (actionId === 'uni_cm_clubbing') return update({ happy:+4, rel_friends:+2, gradeScore:-1 }, `Went clubbing with ${classmate.firstName}.`);
+  if (actionId === 'uni_cm_friend') {
+    if (typeof ensureNpcCoreFields === 'function') {
+      ensureNpcCoreFields(classmate, { role:'friend', socialGroup:'university friend' });
+    }
+    classmate.status = 'friend';
+    classmate.socialGroup = 'university friend';
+    if (typeof upsertPersistentFriend === 'function') upsertPersistentFriend(classmate);
+    if (STATE.relationships?.friends !== undefined) {
+      STATE.relationships.friends = clamp((STATE.relationships.friends || 0) + 8);
+    }
+    return update({ rel_friends:+4, happy:+2 }, `${classmate.firstName} became one of your university friends.`);
+  }
+  if (actionId === 'uni_cm_flirt') {
+    const success = (classmate.relationship || 50) >= 56 || Math.random() < 0.45;
+    return update(success ? { happy:+3, rel_friends:+2 } : { happy:-1, rel_friends:-1 }, success ? `You flirted with ${classmate.firstName} and they seemed into it.` : `You flirted with ${classmate.firstName}, but it landed awkwardly.`);
+  }
+  if (actionId === 'uni_cm_hook_up') {
+    const success = (classmate.relationship || 50) >= 66 || Math.random() < 0.32;
+    return update(success ? { happy:+5, rel_friends:+1 } : { happy:-2, rel_friends:-3 }, success ? `Things escalated with ${classmate.firstName}.` : `Trying to hook up with ${classmate.firstName} made things awkward.`);
+  }
+  if (actionId === 'uni_cm_gossip') return update({ rel_friends:+1, rep:-1 }, `You traded gossip with ${classmate.firstName}.`);
+}
+
+function handleFlatmateInteraction(actionId) {
+  const flatmates = getUniversityFlatmates();
+  const resident = pickRandom(flatmates);
+  if (!resident) return { log:'You do not currently have any flatmates.', toast:'No flatmates right now.' };
+  const person = resident.friendProfile || resident;
+  const log = text => `${text} ${person.firstName}.`;
+  if (actionId === 'flatmate_movie') return { log:log('Watched a movie with'), toast:'Flat night.' , effects:{ happy:+2, rel_friends:+2 } };
+  if (actionId === 'flatmate_kitchen') return { log:log('Chatted in the kitchen with'), toast:'Kitchen chat.', effects:{ happy:+1, rel_friends:+2 } };
+  if (actionId === 'flatmate_friend') return { log:log('Asked to be friends with'), toast:'You made the first move.', effects:{ rel_friends:+3, happy:+1 } };
+  if (actionId === 'flatmate_flirt') return { log:log('Flirted with'), toast:'Very close-to-home energy.', effects:{ happy:+2, rel_friends:+1 } };
+  if (actionId === 'flatmate_hook_up') return { log:log('Hooked up with'), toast:'That will change the flat dynamic.', effects:{ happy:+4, rel_friends:-1 } };
+  if (actionId === 'flatmate_ask_out') return { log:log('Asked out'), toast:'Big move.', effects:{ happy:+2, rel_friends:+1 } };
+  if (actionId === 'flatmate_night_out') return { log:log('Went on a night out with'), toast:'Big night.', effects:{ happy:+4, rel_friends:+2, gradeScore:-1 } };
+  if (actionId === 'flatmate_argue') return { log:log('Argued with'), toast:'The flat feels tense.', effects:{ happy:-2, rel_friends:-3 } };
+  if (actionId === 'flatmate_mess') return { log:log('Complained about the mess to'), toast:'The kitchen was grim.', effects:{ happy:-1, rel_friends:-2 } };
+  if (actionId === 'flatmate_noise') return { log:log('Argued about noise with'), toast:'The walls are thin.', effects:{ happy:-2, rel_friends:-2 } };
+  return null;
+}
+
+function runUniversityAction(actionId) {
+  ensureUniversityCommitmentState();
+  const coursemates = getUniversityCoursemates();
+  const randomCoursemate = coursemates[Math.floor(Math.random() * coursemates.length)] || null;
+  const logAndRefresh = (log, toast) => {
+    if (log) logActivity(log, null);
+    saveGame();
+    renderLearnTab();
+    if (toast) showToast(toast);
+  };
+  if (actionId === 'society_event') {
+    launchUniversitySocietyEvent();
+    return;
+  }
+  if (actionId.startsWith('uni_cm_')) {
+    const coursemate = pickRandom(getUniversityCoursemates());
+    if (!coursemate) {
+      showToast('No course mates available.');
+      return;
+    }
+    handleUniversityCoursemateAction(coursemate.id, actionId);
+    return;
+  }
+  if (actionId.startsWith('flatmate_')) {
+    const result = handleFlatmateInteraction(actionId);
+    if (!result) return;
+    applyEffects(result.effects || {});
+    logActivity(result.log, null);
+    saveGame();
+    renderLearnTab();
+    if (result.toast) showToast(result.toast);
+    return;
+  }
+  if (actionId === 'apply_summer_internship') {
+    const result = handleUniversityInternshipApplication();
+    logActivity(result.log, null);
+    saveGame();
+    renderLearnTab();
+    showToast(result.toast);
+    return;
+  }
+  if (actionId === 'apply_graduate_scheme') {
+    const result = handleGraduateSchemeApplication();
+    logActivity(result.log, null);
+    saveGame();
+    renderLearnTab();
+    showToast(result.toast);
+    return;
+  }
+  if (actionId === 'go_careers_fair') {
+    STATE.education.networking += 2;
+    applyEffects({ rep:+2, happy:+1 });
+    logActivity('You worked the careers fair and came away with useful leads.', null);
+    saveGame();
+    renderLearnTab();
+    showToast('Useful contacts made.');
+    return;
+  }
+  if (actionId === 'attend_networking_event') {
+    STATE.education.networking += 3;
+    applyEffects({ rep:+3, rel_friends:+1 });
+    logActivity('You attended a networking event and met useful people.', null);
+    saveGame();
+    renderLearnTab();
+    showToast('You met useful people.');
+    return;
+  }
+  if (actionId === 'get_career_advice') {
+    const advice = getContextualCareerAdvice();
+    applyEffects({ happy:+1 });
+    logActivity(advice, null);
+    saveGame();
+    renderLearnTab();
+    showToast('Career advice updated.');
+    return;
+  }
+  if (actionId === 'become_course_rep') {
+    STATE.education.isCourseRep = true;
+    STATE.education.courseRepTitle = 'Course Representative';
+    logActivity('You became the course representative.', null);
+    saveGame();
+    renderLearnTab();
+    showToast('You are now course rep.');
+    return;
+  }
+  if (actionId === 'start_volunteering') {
+    if (!STATE.volunteering.currentRole) STATE.volunteering.currentRole = { title:'Volunteer Role at Community Hub', subtitle:'Current volunteering role' };
+    logActivity('You started volunteering alongside university.', null);
+    saveGame();
+    renderLearnTab();
+    showToast('You started volunteering.');
+    return;
+  }
+  if (actionId === 'attend_lecture') {
+    applyEffects({ smarts:+3, gradeScore:+4 });
+    return logAndRefresh('Attended your lectures and stayed on top of the material.', 'You kept up with the course.');
+  }
+  if (actionId === 'skip_lecture') {
+    applyEffects({ happy:+2, gradeScore:-3 });
+    return logAndRefresh('Skipped a lecture and bought yourself some free time.', 'You skipped class.');
+  }
+  if (actionId === 'study_library') {
+    applyEffects({ smarts:+4, gradeScore:+5, happy:-1 });
+    return logAndRefresh('Put in a quiet study session in the library.', 'Library session done.');
+  }
+  if (actionId === 'revise_exams') {
+    applyEffects({ gradeScore:+6, smarts:+2, happy:-2 });
+    return logAndRefresh('Revised hard for your exams.', 'Revision helped.');
+  }
+  if (actionId === 'pull_all_nighter') {
+    applyEffects({ gradeScore:+4, health:-3, happy:-3 });
+    return logAndRefresh('Pulled an all-nighter to get through your workload.', 'You are exhausted.');
+  }
+  if (actionId === 'use_ai_assignment_uni') {
+    applyEffects({ gradeScore:+4 });
+    if (Math.random() < 0.32) {
+      applyEffects({ rep:-4, gradeScore:-6 });
+      return logAndRefresh('You were questioned about using AI on an assignment.', 'You got away with less than you hoped.');
+    }
+    return logAndRefresh('Used AI to speed up an assignment and it seemed to work.', 'Nobody called it out.');
+  }
+  if (actionId === 'plagiarise_assignment_uni') {
+    if (Math.random() < 0.58) {
+      applyEffects({ rep:-8, gradeScore:-10 });
+      return logAndRefresh('You were caught plagiarising an assignment.', 'Plagiarism backfired.');
+    }
+    applyEffects({ gradeScore:+5 });
+    return logAndRefresh('You plagiarised an assignment and got away with it.', 'You were not caught.');
+  }
+  if (actionId === 'go_clubbing' || actionId === 'attend_house_party' || actionId === 'throw_house_party' || actionId === 'host_pre_drinks') {
+    applyEffects({ happy:+4, rel_friends:+3 });
+    if (randomCoursemate) randomCoursemate.relationship = clamp((randomCoursemate.relationship || 50) + 8);
+    return logAndRefresh('You leaned into the social side of university.', 'Your social life picked up.');
+  }
+  if (actionId === 'join_society') {
+    openLearnScreen('uniSocietyList');
+    return;
+  }
+  if (actionId === 'join_club') {
+    openLearnScreen('uniClubList');
+    return;
+  }
+  if (actionId === 'make_new_friends_uni') {
+    if (randomCoursemate) randomCoursemate.relationship = clamp((randomCoursemate.relationship || 50) + 14);
+    applyEffects({ rel_friends:+5, happy:+2 });
+    return logAndRefresh(`You made more of an effort with people on your course${randomCoursemate ? `, especially ${randomCoursemate.firstName}` : ''}.`, 'You met more people.');
+  }
+  if (actionId === 'ask_someone_out_uni') {
+    applyEffects({ happy:+2 });
+    return logAndRefresh('You asked someone out from your university circle.', 'You put yourself out there.');
+  }
+  if (actionId === 'uni_commitment_work_harder') {
+    if (getUniversityCurrentCommitment()?.type === 'job') return runCareerAction('work_hard');
+    applyEffects({ rep:+2, happy:-1 });
+    return logAndRefresh('You put more effort into your current commitment.', 'You pushed harder.');
+  }
+  if (actionId === 'uni_commitment_slack_off') {
+    if (getUniversityCurrentCommitment()?.type === 'job') return runCareerAction('slack_off');
+    applyEffects({ happy:+1, rep:-2 });
+    return logAndRefresh('You coasted a little in your current commitment.', 'You took it easier.');
+  }
+  if (actionId === 'uni_commitment_more_shifts') {
+    STATE.finances.balance += 250;
+    return logAndRefresh('You asked for more shifts and earned a bit more money.', 'More shifts picked up.');
+  }
+  if (actionId === 'uni_commitment_quit') {
+    if (getUniversityCurrentCommitment()?.type === 'job') {
+      fireFromJob('You quit your part-time role.');
+    } else if (STATE.education.currentInternship) {
+      STATE.education.currentInternship = null;
+    } else if (STATE.education.graduateSchemePreparation?.active) {
+      STATE.education.graduateSchemePreparation = { active:false, companyName:null, title:null };
+    } else if (STATE.education.currentPlacement) {
+      STATE.education.currentPlacement = null;
+    } else if (STATE.education.isCourseRep) {
+      STATE.education.isCourseRep = false;
+      STATE.education.courseRepTitle = null;
+    } else if (STATE.volunteering?.currentRole) {
+      STATE.volunteering.currentRole = null;
+    }
+    return logAndRefresh('You stepped away from one of your current commitments.', 'Commitment ended.');
+  }
+  if (actionId === 'uni_commitment_network') {
+    applyEffects({ rep:+3, rel_friends:+2 });
+    STATE.education.networking += 2;
+    return logAndRefresh('You used your commitments to meet more people.', 'You built connections.');
+  }
+  if (actionId === 'uni_commitment_coffee_chat') {
+    applyEffects({ happy:+2, rel_friends:+2 });
+    return logAndRefresh('You had a coffee chat that could help later.', 'Good conversation.');
+  }
+  if (actionId === 'uni_commitment_impress') {
+    applyEffects({ rep:+4 });
+    return logAndRefresh('You made a strong impression in your current commitment.', 'You stood out.');
+  }
+  showToast('Coming soon.');
+}
+
+function buildLearnClassmateActions(c) {
+  const actions = getAvailableActions('classmate', STATE.age, c) || [];
+  if (STATE.school?.level === 'uni') {
+    actions.push(
+      { id:'uni_cm_study', name:'Study Together' },
+      { id:'uni_cm_coffee', name:'Grab Coffee' },
+      { id:'uni_cm_clubbing', name:'Go Clubbing' },
+      { id:'uni_cm_friend', name:'Ask to Be Friends' },
+      { id:'uni_cm_flirt', name:'Flirt' },
+      { id:'uni_cm_hook_up', name:'Hook Up' },
+      { id:'uni_cm_gossip', name:'Gossip' },
+    );
+  }
+  if (!actions.length) return '';
+  return `
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${actions.map(action => `
+        <button onclick="runLearnClassmateAction('${action.id}', '${c.id}')"
+          style="width:100%;padding:11px 14px;background:${String(action.id).startsWith('uni_cm_') ? '#fff7ef' : 'var(--surface-mid)'};border:1px solid ${String(action.id).startsWith('uni_cm_') ? '#eadcca' : 'var(--border)'};border-radius:11px;font-size:13px;font-weight:${String(action.id).startsWith('uni_cm_') ? '700' : '600'};color:${String(action.id).startsWith('uni_cm_') ? '#6b5740' : 'var(--text)'};text-align:left;cursor:pointer">
+          ${action.name}
+        </button>`).join('')}
+    </div>`;
+}
+
+function runLearnClassmateAction(actionId, classmateId) {
+  if (String(actionId).startsWith('uni_cm_')) {
+    _learnScreen = 'classmate';
+    _learnClassmateId = classmateId;
+    handleUniversityCoursemateAction(classmateId, actionId);
+    return;
+  }
+  triggerAction(actionId, classmateId, 'classmate');
+  _learnScreen = 'classmate';
+  _learnClassmateId = classmateId;
+  renderLearnTab();
+}
+
+const SIMPLE_CAREER_ROUTES = {
+  Law: [
+    { title:'Trainee Lawyer', years:2 },
+    { title:'Lawyer', years:5 },
+    { title:'Senior Lawyer', years:5 },
+    { title:'Partner', years:0 },
+  ],
+  Medicine: [
+    { title:'Trainee Doctor', years:2 },
+    { title:'Doctor', years:5, branch:['Dentist', 'Physician', 'GP', 'Surgeon'] },
+    { title:'Dentist', years:0 },
+    { title:'Physician', years:0 },
+    { title:'GP', years:0 },
+    { title:'Surgeon', years:0 },
+  ],
+  Business: [
+    { title:'Office Worker', years:3 },
+    { title:'Manager', years:4 },
+    { title:'Senior Manager', years:4 },
+    { title:'Executive', years:5 },
+    { title:'CEO', years:0 },
+  ],
+  Economics: [
+    { title:'Junior Analyst', years:3 },
+    { title:'Analyst', years:4 },
+    { title:'Senior Analyst', years:5 },
+    { title:'Investment Manager', years:0 },
+  ],
+  'Computer Science': [
+    { title:'Junior Developer', years:3 },
+    { title:'Software Engineer', years:5 },
+    { title:'Tech Lead', years:0 },
+  ],
+  Education: [
+    { title:'Teaching Assistant', years:3 },
+    { title:'Teacher', years:5 },
+    { title:'Head of Department', years:5 },
+    { title:'Head Teacher', years:5 },
+    { title:'Lecturer', years:5 },
+    { title:'Professor', years:0 },
+  ],
+  Art: [
+    { title:'Illustrator', years:0 },
+    { title:'Fashion Designer', years:0 },
+    { title:'Animator', years:0 },
+    { title:'Tattoo Artist', years:0 },
+    { title:'Photographer', years:0 },
+  ],
+};
+
+const SIMPLE_LAW_BARRISTER_ROUTE = [
+  { title:'Trainee Barrister', years:2 },
+  { title:'Barrister', years:10 },
+  { title:'Judge', years:0 },
+];
+
+const SIMPLE_CAREER_COMPANIES = {
+  Law: ['Sterling LLP', 'Chance Crown & Co', 'Fairmount LLP', 'Blackstone Chambers', 'St John’s Chambers'],
+  Medicine: ['Royal Westminster Hospital', 'Sterling Health Group'],
+  Business: ['Ascot Capital', 'Silverstone Financial', 'Kingsguard Investments', 'Terranova', 'Ascot Tech'],
+  Economics: ['Ascot Capital', 'Silverstone Financial', 'Kingsguard Investments'],
+  'Computer Science': ['Terranova', 'Ascot Tech', 'Hyperion'],
+  Education: ['Local Primary School', 'Community Secondary School', 'Further Education College', 'University of Oxford', 'University of Cambridge'],
+  Art: ['Kindred Studio', 'Paper Moon Press', 'Creator Studio'],
+};
+
+const SIMPLE_LAW_SALARY_BANDS = {
+  'Sterling LLP': {
+    'Trainee Lawyer': [56000, 65000],
+    Lawyer: [150000, 250000],
+    'Senior Lawyer': [250000, 500000],
+    Partner: [500000, 2000000],
+  },
+  'Chance Crown & Co': {
+    'Trainee Lawyer': [40000, 52000],
+    Lawyer: [120000, 180000],
+    'Senior Lawyer': [180000, 300000],
+    Partner: [300000, 1500000],
+  },
+  'Fairmount LLP': {
+    'Trainee Lawyer': [30000, 42000],
+    Lawyer: [80000, 130000],
+    'Senior Lawyer': [150000, 260000],
+    Partner: [300000, 500000],
+  },
+  'Blackstone Chambers': {
+    'Trainee Barrister': [50000, 70000],
+    Barrister: [180000, 600000],
+    Judge: [320000, 900000],
+  },
+  'St John’s Chambers': {
+    'Trainee Barrister': [40000, 55000],
+    Barrister: [140000, 420000],
+    Judge: [280000, 700000],
+  },
+};
+
+function normalizeCareerRouteCourse(course) {
+  if (course === 'Business') return 'Business';
+  if (course === 'Economics') return 'Economics';
+  return course;
+}
+
+function isLawChambersCompany(companyName) {
+  return /chambers/i.test(String(companyName || ''));
+}
+
+function isLawBarristerTitle(title) {
+  return /barrister|judge/i.test(String(title || ''));
+}
+
+function getSimpleCareerRoute(courseOrTitle, companyName = null) {
+  if (courseOrTitle === 'Law') {
+    return isLawChambersCompany(companyName) ? SIMPLE_LAW_BARRISTER_ROUTE : SIMPLE_CAREER_ROUTES.Law;
+  }
+  if (SIMPLE_CAREER_ROUTES[courseOrTitle]) return SIMPLE_CAREER_ROUTES[courseOrTitle];
+  if (SIMPLE_LAW_BARRISTER_ROUTE.some(step => step.title === courseOrTitle) || isLawBarristerTitle(courseOrTitle)) {
+    return SIMPLE_LAW_BARRISTER_ROUTE;
+  }
+  return Object.values(SIMPLE_CAREER_ROUTES).find(route => route.some(step => step.title === courseOrTitle)) || null;
+}
+
+function getCareerCourseFromTitle(title) {
+  if (SIMPLE_LAW_BARRISTER_ROUTE.some(step => step.title === title)) return 'Law';
+  return Object.entries(SIMPLE_CAREER_ROUTES).find(([, route]) => route.some(step => step.title === title))?.[0] || null;
+}
+
+function getGraduateEntryRoleForCourse(course, companyName = null) {
+  const route = getSimpleCareerRoute(normalizeCareerRouteCourse(course), companyName);
+  return route?.[0]?.title || 'Office Worker';
+}
+
+function getCareerCompanyForCourse(course, preferredCompany = null) {
+  const companies = SIMPLE_CAREER_COMPANIES[normalizeCareerRouteCourse(course)] || ['Company'];
+  if (preferredCompany && companies.includes(preferredCompany)) return preferredCompany;
+  return companies[0];
+}
+
+function getSimpleCareerSalaryRange(course, title, companyName = null) {
+  if (normalizeCareerRouteCourse(course) === 'Law') {
+    return SIMPLE_LAW_SALARY_BANDS[companyName]?.[title] || null;
+  }
+  return null;
+}
+
+function getSimpleCareerSalaryForState(course, title, companyName = null, skew = 0.5) {
+  const range = getSimpleCareerSalaryRange(course, title, companyName);
+  if (!range) return null;
+  return getGeneratedSalaryForRange(range[0], range[1], skew);
+}
+
+function applyGraduateSchemeOutcomeOnGraduation(application) {
+  const offer = STATE.education?.graduateSchemeOffer;
+  if (!offer) return;
+  const course = normalizeCareerRouteCourse(application.course);
+  const title = offer.startTitle || getGraduateEntryRoleForCourse(course, offer.companyName);
+  const companyName = offer.companyName || getCareerCompanyForCourse(course);
+  const salary = getSimpleCareerSalaryForState(course, title, companyName, 0.55) || Math.max(26000, STATE.finances.income || 28000);
+  STATE.career.job = title;
+  STATE.career.companyName = companyName;
+  STATE.career.startedAge = STATE.age;
+  STATE.career.category = ['Law', 'Business', 'Economics'].includes(course) ? 'corporate' : course === 'Medicine' ? 'emergency' : course === 'Computer Science' ? 'creative' : 'office';
+  STATE.career.jobType = 'Full-Time';
+  STATE.career.work = null;
+  STATE.finances.job = title;
+  STATE.finances.jobType = 'Full-Time';
+  STATE.finances.income = salary;
+  STATE.career.salary = salary;
+  STATE.career.level = 1;
+  ensureCareerState({
+    title,
+    companyName,
+    jobCategory: STATE.career.category,
+    icon: course === 'Law'
+      ? 'mdi:scale-balance'
+      : course === 'Medicine'
+        ? 'mdi:stethoscope'
+        : course === 'Computer Science'
+          ? 'mdi:laptop'
+          : course === 'Art'
+            ? 'mdi:palette-outline'
+            : 'mdi:briefcase-outline',
+  });
+  STATE.education.graduateSchemePreparation = { active:false, companyName:null, title:null };
+  STATE.education.graduateSchemeOffer = null;
+  STATE.education.currentInternship = null;
+  logActivity(`Your graduate scheme at ${companyName} started as soon as you graduated.`, 10);
+}
+
+function applySimpleCareerRouteProgression() {
+  const title = STATE.career?.job;
+  if (!title || title === 'None') return;
+  const course = getCareerCourseFromTitle(title);
+  if (!course) return;
+  const route = getSimpleCareerRoute(course, STATE.career.companyName || STATE.career.work?.companyName);
+  const stepIndex = route.findIndex(step => step.title === title);
+  if (stepIndex < 0) return;
+  const step = route[stepIndex];
+  const years = getCurrentJobYears();
+  if (!step.years || years < step.years) return;
+  let nextTitle = route[stepIndex + 1]?.title || null;
+  if (!nextTitle || nextTitle === title) return;
+  STATE.career.job = nextTitle;
+  STATE.finances.job = nextTitle;
+  STATE.career.startedAge = STATE.age;
+  STATE.career.level = Math.max(STATE.career.level || 1, stepIndex + 2);
+  STATE.finances.income = getSimpleCareerSalaryForState(course, nextTitle, STATE.career.companyName, 0.62)
+    || Math.round(Math.max(STATE.finances.income || 26000, (STATE.finances.income || 26000) * 1.18));
+  STATE.career.salary = STATE.finances.income;
+  if (STATE.career.work?.progression) STATE.career.work.progression = getCareerPathForJob(nextTitle);
+  logActivity(`You progressed to ${nextTitle} at ${STATE.career.companyName || 'your company'}.`, 12);
+}
+
+function getCareerPathForJob(jobTitle) {
+  const course = getCareerCourseFromTitle(jobTitle);
+  if (course) {
+    const companyName = STATE.career?.job === jobTitle ? STATE.career.companyName : null;
+    return getSimpleCareerRoute(course, companyName || (isLawBarristerTitle(jobTitle) ? 'Blackstone Chambers' : null)).map(step => step.title);
+  }
+  return ['Entry Role', 'Skilled Role', 'Senior Role', 'Lead Role'];
+}
+
+function getLegalJobRequirements() {
+  return [];
+}
+
+function canAccessFurtherEducation() {
+  return false;
+}
+
+function getFullTimeJobs() {
+  const degree = normalizeCareerRouteCourse(getDegreeCourse());
+  const companies = SIMPLE_CAREER_COMPANIES[degree];
+  if (!companies) return generateFullTimeJobs().map(job => normalizeJob(job, 'full-time'));
+  const currentTitle = STATE.career?.job;
+  const jobs = companies.flatMap(company => {
+    const route = getSimpleCareerRoute(degree, company);
+    const routeIndex = route.findIndex(step => step.title === currentTitle);
+    const availableTitles = routeIndex >= 0
+      ? [route[Math.min(routeIndex, route.length - 1)].title, route[Math.min(routeIndex + 1, route.length - 1)]?.title].filter(Boolean)
+      : [route[0]?.title, route[1]?.title].filter(Boolean);
+    return availableTitles.map((title, index) => {
+      const salaryRange = getSimpleCareerSalaryRange(degree, title, company);
+      return {
+        title,
+        company,
+        salary: salaryRange ? formatSalaryRange(salaryRange[0], salaryRange[1]) : `£${(26000 + (index * 9000)).toLocaleString()}/year`,
+        salaryMin: salaryRange?.[0],
+        salaryMax: salaryRange?.[1],
+        icon: degree === 'Law' ? 'mdi:scale-balance' : degree === 'Medicine' ? 'mdi:stethoscope' : degree === 'Computer Science' ? 'mdi:laptop' : 'mdi:briefcase-outline',
+        accent: '#6d56c9',
+      };
+    });
+  });
+  return jobs.slice(0, 12).map(job => normalizeJob(job, 'full-time'));
+}
+
+function handleGraduateSchemeApplication() {
+  ensureUniversityCommitmentState();
+  const course = normalizeCareerRouteCourse(STATE.school.postSchool?.uniApplication?.course);
+  const track = getUniversityCareerTrack(course);
+  const pool = track.graduate || [];
+  const company = pickRandom(pool);
+  const finalYearsBoost = isUniversityFinalTwoYears() ? 8 : -8;
+  const chance = clamp(18 + getUniversityCareerStrength() + finalYearsBoost - (company.difficulty || 40), 4, 84);
+  const startTitle = getGraduateEntryRoleForCourse(course, company.company);
+  if (Math.random() * 100 < chance) {
+    STATE.education.graduateSchemePreparation = { active:true, companyName:company.company, title:company.title };
+    STATE.education.graduateSchemeOffer = { companyName:company.company, title:company.title, startTitle, securedAge:STATE.age };
+    const sponsorship = maybeOfferEmployerSponsorship(company);
+    return {
+      log: sponsorship
+        ? `${company.company} offered you ${startTitle} after graduation and agreed to fund the rest of your tuition.`
+        : `${company.company} offered you ${startTitle} after graduation.`,
+      toast:'Graduate scheme secured.',
+    };
+  }
+  STATE.education.graduateSchemePreparation = { active:true, companyName:company.company, title:company.title };
+  return { log:`You started preparing and applying for graduate schemes, but ${company.company} passed for now.`, toast:'Applications sent.' };
 }
 
 // ── INIT ──────────────────────────────────────────────────

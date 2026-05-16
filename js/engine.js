@@ -97,6 +97,8 @@ const APPEARANCE_EMOJIS = ['😊','🙂','😄','😎','🥰','😏','🤓','�
 
 // ── GRADE SYSTEM ──────────────────────────────────────────
 const GRADES = ['A+','A','B','C','D','E','F'];
+const UNIVERSITY_TUITION_FEE_PER_YEAR = 9000;
+const UNIVERSITY_MAINTENANCE_LOAN_PER_YEAR = 6500;
 
 function gradeFromScore(score) {
   if (score >= 90) return 'A+';
@@ -116,6 +118,283 @@ function scoreFromGrade(g) {
 function gradeColor(g) {
   const map = {'A+':'#16a34a','A':'#22c55e','B':'#84cc16','C':'#f59e0b','D':'#f97316','E':'#ef4444','F':'#dc2626'};
   return map[g] || '#6b7280';
+}
+
+function createUniversityApplicationState(overrides = {}) {
+  const base = {
+    course: null,
+    universityName: null,
+    backupUniversityName: null,
+    universityTier: null,
+    backupUniversityTier: null,
+    selectedFundingSources: [],
+    fundingChoice: null,
+    funding: null,
+    universityType: null,
+    uniType: null,
+    status: 'draft',
+    result: null,
+    submittedAge: null,
+    acceptedType: null,
+    startedAge: null,
+    graduatedAge: null,
+    degreeAwarded: null,
+    acceptedUniversityName: null,
+    acceptedUniversityTier: null,
+    acceptedViaBackup: false,
+    tuitionFeePerYear: UNIVERSITY_TUITION_FEE_PER_YEAR,
+    maintenanceLoanPerYear: UNIVERSITY_MAINTENANCE_LOAN_PER_YEAR,
+    studentLoanAmountPerYear: 0,
+    selfFundingAmountPerYear: 0,
+    parentHousingSupportPerYear: 0,
+    parentFundingType: null,
+    scholarshipAmount: 0,
+    scholarshipPaymentType: null,
+    scholarshipAppliedYears: 0,
+    employerSponsorshipPerYear: 0,
+    employerSponsorName: null,
+    remainingTuitionGapPerYear: 0,
+    yearlyTuitionFundingSource: null,
+    yearlyMaintenanceFundingSource: null,
+    tuitionDebtPerYear: 0,
+    maintenanceDebtPerYear: 0,
+    totalTuitionDebt: 0,
+    totalMaintenanceDebt: 0,
+    tuitionDebtAccrued: 0,
+    maintenanceDebtAccrued: 0,
+    maintenanceSupportPerYear: 0,
+    parentalFundingAmount: 0,
+    parentalFundingAmountPerYear: 0,
+    parentalFundingTerms: [],
+    parentalFundingAccepted: false,
+    parentalFundingRejected: false,
+    parentalFundingStopped: false,
+    parentWarningIssued: false,
+    selfFundingEnabled: false,
+    scholarshipStatus: null,
+    yearlyFundingAppliedAges: [],
+  };
+  const next = { ...base, ...overrides };
+  if (!next.funding && next.fundingChoice) next.funding = next.fundingChoice;
+  if (!next.fundingChoice && next.funding) next.fundingChoice = next.funding;
+  if (!next.uniType && next.universityType) next.uniType = next.universityType;
+  if (!next.universityType && next.uniType) next.universityType = next.uniType;
+  if (!next.universityTier && next.uniType) next.universityTier = next.uniType;
+  if (!next.uniType && next.universityTier) next.uniType = next.universityTier;
+  if (!next.universityType && next.universityTier) next.universityType = next.universityTier;
+  if (!Array.isArray(next.selectedFundingSources)) next.selectedFundingSources = [];
+  if (!Array.isArray(next.parentalFundingTerms)) next.parentalFundingTerms = [];
+  if (!Array.isArray(next.yearlyFundingAppliedAges)) next.yearlyFundingAppliedAges = [];
+  next.parentalFundingAmountPerYear = next.parentalFundingAmountPerYear || next.parentalFundingAmount || 0;
+  next.parentalFundingAmount = next.parentalFundingAmount || next.parentalFundingAmountPerYear || 0;
+  next.tuitionDebtAccrued = next.tuitionDebtAccrued || next.totalTuitionDebt || 0;
+  next.maintenanceDebtAccrued = next.maintenanceDebtAccrued || next.totalMaintenanceDebt || 0;
+  next.totalTuitionDebt = next.totalTuitionDebt || next.tuitionDebtAccrued || 0;
+  next.totalMaintenanceDebt = next.totalMaintenanceDebt || next.maintenanceDebtAccrued || 0;
+  return next;
+}
+
+function ensureEducationState() {
+  if (!STATE.education) STATE.education = {};
+  if (STATE.school?.postSchool?.uniApplication) {
+    STATE.school.postSchool.uniApplication = createUniversityApplicationState(STATE.school.postSchool.uniApplication);
+    STATE.education.universityApplication = STATE.school.postSchool.uniApplication;
+  } else if (!('universityApplication' in STATE.education)) {
+    STATE.education.universityApplication = null;
+  }
+  return STATE.education;
+}
+
+function syncUniversityApplicationState(application) {
+  ensureEducationState();
+  STATE.school.postSchool = STATE.school.postSchool || { schoolFinishedShown:false, uniApplication:null };
+  STATE.school.postSchool.uniApplication = application ? createUniversityApplicationState(application) : null;
+  STATE.education.universityApplication = STATE.school.postSchool.uniApplication;
+  return STATE.school.postSchool.uniApplication;
+}
+
+function getUniversityCurrentYearNumber(application = STATE.school?.postSchool?.uniApplication) {
+  if (!application?.startedAge || !application?.course) return 0;
+  return STATE.age - application.startedAge + 1;
+}
+
+function isCreativeUniversityCourse(course) {
+  return ['Art', 'Music'].includes(course);
+}
+
+function gradeAtLeast(currentGrade, requiredGrade) {
+  const rank = { 'A+':7, 'A':6, 'B':5, 'C':4, 'D':3, 'E':2, 'F':1 };
+  return (rank[currentGrade] || 0) >= (rank[requiredGrade] || 0);
+}
+
+function queuePendingMilestone(title, body, emoji = '⚠️') {
+  if (!title || !body) return;
+  STATE.pendingMilestone = { title, body, emoji };
+}
+
+function evaluateParentFundingTerms(application) {
+  if (!application?.parentalFundingAccepted || application.parentalFundingStopped) {
+    return { breached:false, messages:[] };
+  }
+  const messages = [];
+  const playerGrade = gradeFromScore(STATE.school.gradeScore || 0);
+  const currentYear = getUniversityCurrentYearNumber(application);
+  (application.parentalFundingTerms || []).forEach(term => {
+    if (term.type === 'min_grade' && !gradeAtLeast(playerGrade, term.value)) {
+      messages.push(`Your grade slipped below ${term.value}.`);
+    }
+    if (term.type === 'specific_course' && application.course !== term.value) {
+      messages.push(`You are no longer studying ${term.value}.`);
+    }
+    if (term.type === 'no_creative_degree' && isCreativeUniversityCourse(application.course)) {
+      messages.push('You chose a creative degree against their wishes.');
+    }
+    if (term.type === 'part_time_job') {
+      if (currentYear <= 1) return;
+      const hasPartTimeJob = STATE.career?.jobType === 'Part-Time'
+        || STATE.finances?.jobType === 'Part-Time'
+        || ((STATE.finances?.job && STATE.finances.job !== 'None') && !STATE.career?.jobType);
+      if (!hasPartTimeJob) messages.push('You still have not taken a part-time job.');
+    }
+  });
+  return { breached:messages.length > 0, messages };
+}
+
+function applyUniversityFundingForCurrentYear() {
+  const application = createUniversityApplicationState(STATE.school?.postSchool?.uniApplication || STATE.education?.universityApplication || null);
+  if (!application?.startedAge || STATE.school.level !== 'uni') return;
+  const totalYears = getUniversityCourseYears(application.course);
+  const currentYear = getUniversityCurrentYearNumber(application);
+  if (currentYear < 1 || currentYear > totalYears) return;
+  if ((application.yearlyFundingAppliedAges || []).includes(STATE.age)) return;
+
+  application.yearlyFundingAppliedAges.push(STATE.age);
+
+  if (Array.isArray(application.selectedFundingSources) && application.selectedFundingSources.length) {
+    const selected = new Set(application.selectedFundingSources);
+    let tuitionRemaining = application.tuitionFeePerYear || UNIVERSITY_TUITION_FEE_PER_YEAR;
+    let tuitionCovered = 0;
+    let maintenanceSupport = 0;
+    let tuitionDebt = 0;
+    let maintenanceDebt = 0;
+    const sourceParts = [];
+
+    const applyTuitionSupport = (label, amount) => {
+      const support = Math.max(0, Math.min(tuitionRemaining, Math.round(amount || 0)));
+      if (!support) return 0;
+      tuitionRemaining -= support;
+      tuitionCovered += support;
+      sourceParts.push(`${label} ${fmtMoney(support)}`);
+      return support;
+    };
+
+    const scholarshipIsActive = application.scholarshipAmount > 0
+      && (
+        application.scholarshipPaymentType === 'yearly'
+          || (application.scholarshipPaymentType === 'one_time' && currentYear === 1)
+      );
+    if (selected.has('scholarship') && scholarshipIsActive) {
+      applyTuitionSupport('scholarship covered', application.scholarshipAmount);
+    }
+    if (selected.has('parents') && application.parentalFundingAmountPerYear > 0) {
+      applyTuitionSupport('your parents covered', application.parentalFundingAmountPerYear);
+    }
+    if (selected.has('student_loan') && application.studentLoanAmountPerYear > 0) {
+      const supported = applyTuitionSupport('student finance covered', application.studentLoanAmountPerYear);
+      tuitionDebt += supported;
+      if (supported > 0) application.tuitionDebtPerYear = supported;
+    }
+    if (selected.has('employer_sponsorship') && application.employerSponsorshipPerYear > 0) {
+      applyTuitionSupport(`${application.employerSponsorName || 'your employer'} covered`, application.employerSponsorshipPerYear);
+    }
+    if (selected.has('self_fund') && tuitionRemaining > 0) {
+      const selfFunded = Math.round(Math.min(Math.max(application.selfFundingAmountPerYear || application.tuitionFeePerYear || 0, 0), tuitionRemaining));
+      applyTuitionSupport('you paid', selfFunded);
+      if (selfFunded > 0) STATE.finances.balance -= selfFunded;
+    }
+
+    if (selected.has('student_loan')) {
+      maintenanceSupport += UNIVERSITY_MAINTENANCE_LOAN_PER_YEAR;
+      maintenanceDebt += UNIVERSITY_MAINTENANCE_LOAN_PER_YEAR;
+      STATE.finances.balance += UNIVERSITY_MAINTENANCE_LOAN_PER_YEAR;
+      sourceParts.push(`maintenance loan ${fmtMoney(UNIVERSITY_MAINTENANCE_LOAN_PER_YEAR)}`);
+    }
+    if (selected.has('parents') && application.parentHousingSupportPerYear > 0) {
+      maintenanceSupport += application.parentHousingSupportPerYear;
+      STATE.finances.balance += application.parentHousingSupportPerYear;
+      sourceParts.push(`parents covered housing ${fmtMoney(application.parentHousingSupportPerYear)}`);
+    }
+
+    if (tuitionRemaining > 0) {
+      tuitionDebt += tuitionRemaining;
+      application.remainingTuitionGapPerYear = tuitionRemaining;
+      sourceParts.push(`uncovered tuition ${fmtMoney(tuitionRemaining)}`);
+      logActivity(`You still had ${fmtMoney(tuitionRemaining)} of tuition left to cover this year.`, null);
+    } else {
+      application.remainingTuitionGapPerYear = 0;
+    }
+
+    application.yearlyTuitionFundingSource = selected.size > 1 ? 'mixed' : (application.selectedFundingSources[0] || null);
+    application.yearlyMaintenanceFundingSource = selected.has('student_loan') && selected.has('parents')
+      ? 'mixed'
+      : (selected.has('student_loan') ? 'student_loan' : selected.has('parents') ? 'parents' : application.yearlyMaintenanceFundingSource);
+    application.tuitionDebtPerYear = tuitionDebt;
+    application.maintenanceDebtPerYear = maintenanceDebt;
+    application.tuitionDebtAccrued += tuitionDebt;
+    application.maintenanceDebtAccrued += maintenanceDebt;
+    application.totalTuitionDebt = application.tuitionDebtAccrued;
+    application.totalMaintenanceDebt = application.maintenanceDebtAccrued;
+    application.maintenanceSupportPerYear = maintenanceSupport;
+    if (sourceParts.length) {
+      logActivity(`University funding this year: ${sourceParts.join(', ')}.`, null);
+    }
+    syncUniversityApplicationState(application);
+    return;
+  }
+
+  if (application.fundingChoice === 'student_loan') {
+    application.yearlyTuitionFundingSource = 'student_loan';
+    application.yearlyMaintenanceFundingSource = 'student_loan';
+    application.tuitionDebtPerYear = UNIVERSITY_TUITION_FEE_PER_YEAR;
+    application.maintenanceDebtPerYear = UNIVERSITY_MAINTENANCE_LOAN_PER_YEAR;
+    application.tuitionDebtAccrued += UNIVERSITY_TUITION_FEE_PER_YEAR;
+    application.maintenanceDebtAccrued += UNIVERSITY_MAINTENANCE_LOAN_PER_YEAR;
+    application.totalTuitionDebt = application.tuitionDebtAccrued;
+    application.totalMaintenanceDebt = application.maintenanceDebtAccrued;
+    application.maintenanceSupportPerYear = UNIVERSITY_MAINTENANCE_LOAN_PER_YEAR;
+    STATE.finances.balance += UNIVERSITY_MAINTENANCE_LOAN_PER_YEAR;
+    logActivity(`Student finance covered your tuition and added ${fmtMoney(UNIVERSITY_MAINTENANCE_LOAN_PER_YEAR)} for living costs.`, null);
+  } else if (application.fundingChoice === 'ask_parents') {
+    const termsCheck = evaluateParentFundingTerms(application);
+    if (termsCheck.breached) {
+      if (application.parentWarningIssued) {
+        application.parentalFundingStopped = true;
+        logActivity('Your parents stopped contributing to university costs.', null);
+        queuePendingMilestone('Parent Funding Stopped', 'Your parents have stopped contributing because you did not meet their terms.', '💸');
+      } else {
+        application.parentWarningIssued = true;
+        queuePendingMilestone('Your Parents Are Warning You', termsCheck.messages.join(' '), '⚠️');
+        if (!application.parentalFundingStopped && application.parentalFundingAmountPerYear > 0) {
+          STATE.finances.balance += application.parentalFundingAmountPerYear;
+          logActivity(`Your parents still contributed ${fmtMoney(application.parentalFundingAmountPerYear)} this year, but warned you to meet their terms.`, null);
+        }
+      }
+    } else {
+      application.parentWarningIssued = false;
+      if (!application.parentalFundingStopped && application.parentalFundingAmountPerYear > 0) {
+        STATE.finances.balance += application.parentalFundingAmountPerYear;
+        logActivity(`Your parents contributed ${fmtMoney(application.parentalFundingAmountPerYear)} towards university this year.`, null);
+      }
+    }
+  } else if (application.fundingChoice === 'self_fund') {
+    application.selfFundingEnabled = true;
+    application.yearlyTuitionFundingSource = 'self_fund';
+    application.yearlyMaintenanceFundingSource = 'self_fund';
+    STATE.finances.balance -= UNIVERSITY_TUITION_FEE_PER_YEAR;
+    logActivity(`You paid ${fmtMoney(UNIVERSITY_TUITION_FEE_PER_YEAR)} in tuition fees yourself.`, null);
+  }
+
+  syncUniversityApplicationState(application);
 }
 
 function getSchoolTypeLabels() {
@@ -284,9 +563,13 @@ function createNewLife(opts) {
       vipIds:             [],
       rosterSnapshot:     [],
       teachers:           [],
+      tutors:             [],
       scholarshipOffered: false,
       scholarshipSchool:  null,
       postSchool:         { schoolFinishedShown:false, uniApplication:null },
+    },
+    education: {
+      universityApplication: null,
     },
 
     career: { job:'None', salary:0, level:0 },
@@ -320,6 +603,7 @@ function createNewLife(opts) {
   STATE.relationships.family = Math.round((STATE.family.mum.relationship + STATE.family.dad.relationship) / 2);
   if (typeof initializeHomeState === 'function') initializeHomeState();
   ensureNpcSystemState();
+  ensureEducationState();
   return STATE;
 }
 
@@ -570,19 +854,49 @@ function inferCareerPathFromJobOrCourse(jobTitle, degreeCourse) {
   return 'General';
 }
 
+function getNpcCareerCatalog(path) {
+  return {
+    Legal: ['Court Clerk', 'Legal Assistant', 'Paralegal', 'Senior Paralegal', 'Solicitor'],
+    Healthcare: ['Healthcare Assistant', 'Lab Assistant', 'Staff Nurse', 'Junior Doctor', 'Doctor'],
+    Education: ['Classroom Support Officer', 'Teaching Assistant', 'Teacher Trainee', 'Teacher', 'Head of Department'],
+    Engineering: ['Electrical Trainee', 'Operations Analyst', 'Junior Engineer', 'Engineer', 'Senior Engineer'],
+    Technology: ['Support Analyst', 'Operations Analyst', 'Project Coordinator', 'Developer', 'Senior Developer'],
+    Business: ['Admin Assistant', 'Receptionist', 'Finance Assistant', 'Sales Executive', 'Project Coordinator', 'Accountant', 'Financial Advisor', 'Manager', 'Senior Manager'],
+    Creative: ['Content Creator', 'Graphic Designer', 'Illustrator', 'Senior Designer', 'Creative Lead'],
+    'Public Service': ['Civil Service Officer', 'Police Officer', 'Firefighter', 'Senior Officer', 'Regional Lead'],
+    General: ['Receptionist', 'Admin Assistant', 'Customer Service Advisor', 'Coordinator', 'Manager'],
+  }[path] || ['Receptionist', 'Admin Assistant', 'Sales Executive'];
+}
+
+function chooseNpcReemploymentTitle(path, previousJobTitle, npc = null) {
+  const catalog = getNpcCareerCatalog(path);
+  const previousIndex = catalog.findIndex(title => title === previousJobTitle);
+  if (previousIndex === -1) {
+    return catalog[npcSeedBetween(npc || { id: uid() }, `reemployment-${path}`, 0, catalog.length - 1)];
+  }
+  const minIndex = Math.max(0, previousIndex - 1);
+  const maxIndex = Math.min(catalog.length - 1, previousIndex + 1);
+  return catalog[npcSeedBetween(npc || { id: uid() }, `reemployment-${path}-${previousJobTitle}`, minIndex, maxIndex)];
+}
+
 function estimateNpcSalary(jobTitle, context = {}, npc = null) {
   if (!jobTitle || jobTitle === 'None') return 0;
   const parentIncome = SOCIAL_CLASSES.find(item => item.id === STATE.socialClass)?.parentIncome || 22000;
   if (context.role === 'parent') {
-    const multiplier = {
-      lower: 0.85,
+    const title = String(jobTitle).toLowerCase();
+    const classMultiplier = {
+      lower: 0.92,
       working: 1,
-      middle: 1.15,
-      upper_middle: 1.5,
-      elite: 2.6,
+      middle: 1.08,
+      upper_middle: 1.16,
+      elite: 1.28,
     }[STATE.socialClass] || 1;
-    const seedBump = npc ? npcSeedBetween(npc, 'parent-salary', -3500, 8500) : 0;
-    return Math.max(12000, Math.round((parentIncome * multiplier) + seedBump));
+    const seedRange = (min, max, key = 'parent-salary') => npc ? npcSeedBetween(npc, key, min, max) : Math.round((min + max) / 2);
+    if (/ceo|investment banker|entrepreneur|surgeon|barrister|politician/.test(title)) return Math.round(seedRange(95000, 320000, 'parent-salary-exec') * classMultiplier);
+    if (/financial advisor|doctor|solicitor|architect|university lecturer/.test(title)) return Math.round(seedRange(52000, 145000, 'parent-salary-professional') * classMultiplier);
+    if (/accountant|engineer|senior manager|office manager|teacher|nurse|police officer|social worker/.test(title)) return Math.round(seedRange(30000, 82000, 'parent-salary-skilled') * classMultiplier);
+    if (/factory worker|bus driver|shop assistant|cleaner|warehouse operative|carer|postman|waiter|babysitter|assistant|receptionist|customer service/.test(title)) return Math.round(seedRange(16000, 36000, 'parent-salary-basic') * classMultiplier);
+    return Math.max(16000, Math.round(parentIncome + seedRange(-8000, 12000, 'parent-salary-generic')));
   }
   const title = String(jobTitle).toLowerCase();
   if (/partner|judge/.test(title)) return npc ? npcSeedBetween(npc, 'salary', 180000, 550000) : 220000;
@@ -948,25 +1262,24 @@ function maybeUpdateNpcCareer(entry, updates) {
     if (!wantsWork) return;
     const readyChance = 0.42 + ((smart - 50) * 0.003) + ((ambitious - 50) * 0.004) + ((rep - 50) * 0.002);
     if (Math.random() < readyChance) {
-      const path = npc.careerPath || inferCareerPathFromJobOrCourse(npc.jobTitle, npc.degreeCourse);
-      const catalog = {
-        Legal: ['Legal Assistant', 'Paralegal', 'Court Clerk'],
-        Healthcare: ['Healthcare Assistant', 'Lab Assistant', 'Junior Doctor'],
-        Education: ['Teaching Assistant', 'Classroom Support Officer', 'Teacher Trainee'],
-        Engineering: ['Electrical Trainee', 'Operations Analyst', 'Junior Engineer'],
-        Technology: ['Operations Analyst', 'Project Coordinator', 'Support Analyst'],
-        Business: ['Finance Assistant', 'Sales Executive', 'Project Coordinator'],
-        Creative: ['Content Creator', 'Graphic Designer', 'Illustrator'],
-        'Public Service': ['Police Officer', 'Firefighter', 'Civil Service Officer'],
-        General: ['Receptionist', 'Admin Assistant', 'Customer Service Advisor'],
-      }[path] || ['Receptionist', 'Admin Assistant', 'Sales Executive'];
-      npc.jobTitle = catalog[npcSeedBetween(npc, `new-job-${STATE.age}`, 0, catalog.length - 1)];
+      const previousPath = npc.previousCareerPath || npc.careerPath || inferCareerPathFromJobOrCourse(npc.previousJobTitle || npc.jobTitle, npc.degreeCourse);
+      const sameFieldChance = entry.role === 'parent' && npc.previousCareerPath ? 0.8 : 0;
+      const path = Math.random() < sameFieldChance
+        ? previousPath
+        : (npc.careerPath || inferCareerPathFromJobOrCourse(npc.jobTitle, npc.degreeCourse));
+      npc.careerPath = path;
+      npc.jobTitle = (entry.role === 'parent' && npc.previousJobTitle && path === previousPath)
+        ? chooseNpcReemploymentTitle(path, npc.previousJobTitle, npc)
+        : chooseNpcReemploymentTitle(path, null, npc);
       npc.job = npc.jobTitle;
       npc.employmentStatus = 'Employed';
       npc.salary = estimateNpcSalary(npc.jobTitle, { role: entry.role }, npc);
       npc.careerStage = 'Early career';
       npc.yearsInRole = 0;
       npc.employer = `${npc.surname || 'Northbridge'} ${path}`;
+      npc.previousJobTitle = null;
+      npc.previousCareerPath = null;
+      npc.previousSalary = null;
       recordNpcLifeUpdate(npc, `${prefix} started working as ${npc.jobTitle}.`, updates, 4);
     }
     return;
@@ -994,6 +1307,9 @@ function maybeUpdateNpcCareer(entry, updates) {
   }
 
   if (Math.random() < effectiveJobLossChance) {
+    npc.previousJobTitle = npc.jobTitle;
+    npc.previousCareerPath = npc.careerPath || inferCareerPathFromJobOrCourse(npc.jobTitle, npc.degreeCourse);
+    npc.previousSalary = npc.salary || 0;
     npc.employmentStatus = 'Unemployed';
     npc.jobTitle = 'None';
     npc.job = 'None';
@@ -1178,12 +1494,14 @@ function ensureRomanceState() {
       marriageYears: 0,
       relationshipYears: 0,
       datingPool: [],
+      datingPoolAge: null,
     };
   }
   STATE.romance.status = STATE.romance.status || 'single';
   if (!Array.isArray(STATE.romance.exes)) STATE.romance.exes = [];
   if (!Array.isArray(STATE.romance.children)) STATE.romance.children = [];
   if (!Array.isArray(STATE.romance.datingPool)) STATE.romance.datingPool = [];
+  if (!('datingPoolAge' in STATE.romance)) STATE.romance.datingPoolAge = null;
   STATE.romance.pendingChildNamingId = STATE.romance.pendingChildNamingId || null;
   if (!STATE.romance.partner && STATE._partnerName && (STATE.relationships?.partner || 0) > 0) {
     const parts = String(STATE._partnerName).trim().split(/\s+/);
@@ -1315,7 +1633,9 @@ function getPreferredDatingGenders() {
 
 function generateDatingCandidate(knownPerson = null) {
   const known = knownPerson ? ensureNpcCoreFields({ ...knownPerson }, { role: 'friend', socialGroup: knownPerson.socialGroup || 'friend' }) : null;
-  const baseAge = Math.max(16, STATE.age + npcSeedBetween({ id: uid() }, 'dating-age', -2, 3));
+  const baseAge = known
+    ? Math.max(16, known.age ?? STATE.age)
+    : Math.max(16, STATE.age + npcSeedBetween({ id: uid() }, 'dating-age', -2, 2));
   const preferredGenders = getPreferredDatingGenders();
   const gender = known?.gender || pickRandom(preferredGenders);
   const partner = buildRomanceNpc(known || {
@@ -1337,12 +1657,13 @@ function generateDatingPool(count = 10) {
   known.forEach(person => pool.push(generateDatingCandidate(person)));
   while (pool.length < count) pool.push(generateDatingCandidate());
   STATE.romance.datingPool = pool.slice(0, count);
+  STATE.romance.datingPoolAge = STATE.age;
   return STATE.romance.datingPool;
 }
 
 function getDatingPool() {
   ensureRomanceState();
-  if (!STATE.romance.datingPool.length) generateDatingPool(10);
+  if (!STATE.romance.datingPool.length || STATE.romance.datingPoolAge !== STATE.age) generateDatingPool(10);
   return STATE.romance.datingPool;
 }
 
@@ -1361,6 +1682,15 @@ function beginRelationshipWithPartner(partner, sourceLabel = 'Started dating') {
   romance.relationshipYears = 0;
   romance.marriageYears = 0;
   romance.pregnancy = null;
+  if (romance.partner) {
+    romance.partner.status = 'partner';
+    const liveClassmate = (STATE.school?.classmates || []).find(person => person.id === romance.partner.id);
+    if (liveClassmate) {
+      liveClassmate.status = 'partner';
+      liveClassmate.relationshipStatus = 'Dating';
+    }
+    STATE.social.friends = (STATE.social?.friends || []).filter(friend => friend.id !== romance.partner.id);
+  }
   STATE.relationships.partner = clamp(romance.partner.relationship ?? 60);
   syncRomanceLegacyFields();
   logActivity(`${sourceLabel} ${romance.partner.firstName} ${romance.partner.surname}.`, 10);
@@ -1399,8 +1729,12 @@ function attemptDatePerson(personId) {
 
 function passDatingMatch(personId) {
   ensureRomanceState();
+  if (STATE.romance.datingPoolAge !== STATE.age) {
+    generateDatingPool(10);
+  }
   STATE.romance.datingPool = getDatingPool().filter(person => person.id !== personId);
   while (STATE.romance.datingPool.length < 10) STATE.romance.datingPool.push(generateDatingCandidate());
+  STATE.romance.datingPoolAge = STATE.age;
 }
 
 function movePartnerToExes(reason = 'Relationship ended') {
@@ -2063,16 +2397,26 @@ function getAvailableActions(role, age = STATE.age, person = null) {
 }
 
 function triggerAction(actionId, personId, role) {
+  const universityPeople = STATE.school?.uniProfile?.people || [];
+  const householdResident = typeof getHouseholdResidentById === 'function' ? getHouseholdResidentById(personId) : null;
   const person = (role === 'Mother' || role === 'Father')
     ? getParentById(personId)
     : (role === 'Brother' || role === 'Sister')
       ? getSiblingById(personId)
-      : (role === 'Son' || role === 'Daughter')
+    : (role === 'Son' || role === 'Daughter')
         ? getChildById(personId)
       : (role === 'Friend')
-        ? STATE.school.classmates.find(c => c.id === personId) || getPersistentFriendById(personId)
+        ? STATE.school.classmates.find(c => c.id === personId)
+          || universityPeople.find(c => c.id === personId)
+          || householdResident?.friendProfile
+          || (householdResident?.refType === 'friend' && householdResident.refId ? getPersistentFriendById(householdResident.refId) : null)
+          || (householdResident?.refType === 'sibling' && householdResident.refId ? getSiblingById(householdResident.refId) : null)
+          || getPersistentFriendById(personId)
       : (role === 'classmate')
-        ? STATE.school.classmates.find(c => c.id === personId) || null
+        ? STATE.school.classmates.find(c => c.id === personId)
+          || universityPeople.find(c => c.id === personId && c.label !== 'Lecturer')
+          || householdResident?.friendProfile
+          || null
         : null;
   const action = getAvailableActions(role, STATE.age, person).find(a => a.id === actionId);
   if (!action) return;
@@ -2095,6 +2439,12 @@ function triggerAction(actionId, personId, role) {
         ? runChildRelationshipAction(action, person, role)
       : runClassmateRelationshipAction(action, person, role);
   if (!result.ok) return;
+  if (householdResident && role === 'Friend' && person) {
+    householdResident.relationship = person.relationship ?? householdResident.relationship ?? 50;
+    if (householdResident.friendProfile) {
+      householdResident.friendProfile.relationship = householdResident.relationship;
+    }
+  }
   if (person) markNpcInteraction(person);
   if (person?.status === 'friend') syncFriendSnapshot(person);
   if (!result.skipRefresh) {
@@ -2221,6 +2571,7 @@ function transitionSchool(newLevel) {
   STATE.school.current        = pickUKSchoolNameByType(STATE.school.type?.[newLevel], newLevel);
   STATE.school.rosterSnapshot = buildRosterSnapshot();
   STATE.school.teachers       = generateTeachers();
+  STATE.school.tutors         = [];
 }
 
 function finishSchool() {
@@ -2234,6 +2585,7 @@ function finishSchool() {
   STATE.school.vipIds = [];
   STATE.school.rosterSnapshot = [];
   STATE.school.teachers = [];
+  STATE.school.tutors = [];
   STATE.school.postSchool = STATE.school.postSchool || { schoolFinishedShown:false, uniApplication:null };
   STATE.finances.income = 0;
   STATE.career = { job:'None', salary:0, level:0 };
@@ -2268,6 +2620,8 @@ function maybeGraduateUniversity() {
   STATE.school.vipIds = [];
   STATE.school.rosterSnapshot = [];
   STATE.school.teachers = [];
+  STATE.school.tutors = [];
+  if (typeof applyGraduateSchemeOutcomeOnGraduation === 'function') applyGraduateSchemeOutcomeOnGraduation(application);
   logActivity(`Graduated with a degree in ${application.course}.`, null);
   return true;
 }
@@ -2398,6 +2752,7 @@ function maybeReceiveClassmateFriendRequest() {
 // ── ANNUAL TICK ───────────────────────────────────────────
 function annualTick() {
   ensureNpcSystemState();
+  ensureEducationState();
   STATE.finances.balance += (STATE.finances.income - STATE.finances.expenses);
 
   if (typeof runAnnualHomeTick === 'function') runAnnualHomeTick();
@@ -2411,6 +2766,7 @@ function annualTick() {
   if (STATE.age === 18 && STATE.school.level==='college')   finishSchool();
   if (STATE.age >= 18 && !STATE.school.postSchool) STATE.school.postSchool = { schoolFinishedShown:false, uniApplication:null };
   maybeGraduateUniversity();
+  applyUniversityFundingForCurrentYear();
   if (typeof maybeCompleteFurtherEducationYear === 'function') maybeCompleteFurtherEducationYear();
 
   if (STATE.career?.job && STATE.career.job !== 'None' && STATE.career.work) {
@@ -2437,6 +2793,8 @@ function annualTick() {
     }
   }
   if (typeof applyAnnualLegalCareerProgression === 'function') applyAnnualLegalCareerProgression();
+  if (typeof applySimpleCareerRouteProgression === 'function') applySimpleCareerRouteProgression();
+  if (typeof applyUniversityCommitmentAnnualEffects === 'function') applyUniversityCommitmentAnnualEffects();
 
   STATE.annualGradeGain  = 0;
   STATE.annualStudyCount = 0;
